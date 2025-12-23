@@ -1,0 +1,85 @@
+name: marckdots-testings
+
+services:
+  # =============================================================================
+  # DEBIAN DISTRIBUTIONS
+  # =============================================================================
+  
+  debian-11:
+    image: debian:11
+    container_name: marckv-debian-11
+    hostname: debian-11
+    tty: true
+    stdin_open: true
+    volumes:
+      - .:/root/.marck.dots:ro
+    working_dir: /root
+    command: bash -c "apt update && apt install -y curl git wget && bash"
+    networks:
+      - marckv-net
+
+  debian-12:
+    image: debian:12
+    container_name: marckv-debian-12
+    hostname: debian-12
+    tty: true
+    stdin_open: true
+    volumes:
+      - .:/root/.marck.dots:ro
+    working_dir: /root
+    command: bash -c "apt update && apt install -y curl git wget && bash"
+    networks:
+      - marckv-net
+
+  # =============================================================================
+  # UBUNTU DISTRIBUTIONS
+  # =============================================================================
+
+  ubuntu-20:
+    image: ubuntu:20.04
+    container_name: marckv-ubuntu-20
+    hostname: ubuntu-20
+    tty: true
+    stdin_open: true
+    environment:
+      - DEBIAN_FRONTEND=noninteractive
+    volumes:
+      - .:/root/.marck.dots:ro
+    working_dir: /root
+    command: bash -c "apt update && apt install -y curl git wget && bash"
+    networks:
+      - marckv-net
+
+  ubuntu-22:
+    image: ubuntu:22.04
+    container_name: marckv-ubuntu-22
+    hostname: ubuntu-22
+    tty: true
+    stdin_open: true
+    environment:
+      - DEBIAN_FRONTEND=noninteractive
+    volumes:
+      - .:/root/.marck.dots:ro
+    working_dir: /root
+    command: bash -c "apt update && apt install -y curl git wget && bash"
+    networks:
+      - marckv-net
+
+  ubuntu-24:
+    image: ubuntu:24.04
+    container_name: marckv-ubuntu-24
+    hostname: ubuntu-24
+    tty: true
+    stdin_open: true
+    environment:
+      - DEBIAN_FRONTEND=noninteractive
+    volumes:
+      - .:/root/.marck.dots:ro
+    working_dir: /root
+    command: bash -c "apt update && apt install -y curl git wget && bash"
+    networks:
+      - marckv-net
+
+networks:
+  marckv-net:
+    driver: bridge
