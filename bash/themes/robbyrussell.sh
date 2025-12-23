@@ -91,24 +91,24 @@ set_robbyrussell_prompt() {
     local user_host=""
     if [[ $EUID -eq 0 ]]; then
         # Root user - red
-        user_host="${RED}${BOLD}$(whoami)@$(hostname -s)${RESET}"
+        user_host="\[${RED}${BOLD}\]$(whoami)@$(hostname -s)\[${RESET}\]"
     else
         # Normal user - green
-        user_host="${GREEN}${BOLD}$(whoami)@$(hostname -s)${RESET}"
+        user_host="\[${GREEN}${BOLD}\]$(whoami)@$(hostname -s)\[${RESET}\]"
     fi
     
     # Current directory (compact format)
-    local current_dir="${CYAN}${BOLD}$(get_compact_pwd)${RESET}"
+    local current_dir="\[${CYAN}${BOLD}\]$(get_compact_pwd)\[${RESET}\]"
     
     # Git information
-    local git_info="${YELLOW}$(git_prompt_info)${RESET}"
+    local git_info="\[${YELLOW}\]$(git_prompt_info)\[${RESET}\]"
     
     # Arrow with color based on last command success
     local arrow=""
     if [[ $last_exit_code -eq 0 ]]; then
-        arrow="${GREEN}${BOLD}➜${RESET}"
+        arrow="\[${GREEN}${BOLD}\]➜\[${RESET}\]"
     else
-        arrow="${RED}${BOLD}➜${RESET}"
+        arrow="\[${RED}${BOLD}\]➜\[${RESET}\]"
     fi
     
     # Build the complete prompt
