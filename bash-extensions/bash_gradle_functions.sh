@@ -1,18 +1,68 @@
 # ------------------------------------------------------------------
 # alias grdev="gradle -PdevArgs"
 
+# Initialize shared color palette.
+# Uses tput when terminal capabilities are available; otherwise falls back to ANSI escape codes.
+_grdev_init_colors() {
+    # Default ANSI fallback (current behavior).
+    GRDEV_RED='\033[0;31m'
+    GRDEV_GREEN='\033[0;32m'
+    GRDEV_YELLOW='\033[1;33m'
+    GRDEV_BLUE='\033[0;34m'
+    GRDEV_PURPLE='\033[0;35m'
+    GRDEV_CYAN='\033[0;36m'
+    GRDEV_WHITE='\033[1;37m'
+    GRDEV_BOLD='\033[1m'
+    GRDEV_NC='\033[0m'
+    GRDEV_BRIGHT_GREEN='\033[1;32m'
+    GRDEV_BRIGHT_RED='\033[1;31m'
+    GRDEV_BRIGHT_YELLOW='\033[1;33m'
+    GRDEV_BRIGHT_BLUE='\033[1;34m'
+    GRDEV_BRIGHT_CYAN='\033[1;36m'
+    GRDEV_BRIGHT_PURPLE='\033[1;35m'
+
+    # Prefer terminal capabilities when available.
+    if command -v tput >/dev/null 2>&1 && [[ -n "${TERM:-}" ]]; then
+        local color_count
+        color_count="$(tput colors 2>/dev/null || echo 0)"
+        if [[ "$color_count" =~ ^[0-9]+$ ]] && (( color_count >= 8 )); then
+            local tput_bold tput_reset
+            tput_bold="$(tput bold 2>/dev/null)"
+            tput_reset="$(tput sgr0 2>/dev/null)"
+
+            GRDEV_RED="$(tput setaf 1 2>/dev/null)"
+            GRDEV_GREEN="$(tput setaf 2 2>/dev/null)"
+            GRDEV_YELLOW="$(tput setaf 3 2>/dev/null)"
+            GRDEV_BLUE="$(tput setaf 4 2>/dev/null)"
+            GRDEV_PURPLE="$(tput setaf 5 2>/dev/null)"
+            GRDEV_CYAN="$(tput setaf 6 2>/dev/null)"
+            GRDEV_WHITE="$(tput setaf 7 2>/dev/null)"
+            GRDEV_BOLD="$tput_bold"
+            GRDEV_NC="$tput_reset"
+            GRDEV_BRIGHT_GREEN="${tput_bold}$(tput setaf 2 2>/dev/null)"
+            GRDEV_BRIGHT_RED="${tput_bold}$(tput setaf 1 2>/dev/null)"
+            GRDEV_BRIGHT_YELLOW="${tput_bold}$(tput setaf 3 2>/dev/null)"
+            GRDEV_BRIGHT_BLUE="${tput_bold}$(tput setaf 4 2>/dev/null)"
+            GRDEV_BRIGHT_CYAN="${tput_bold}$(tput setaf 6 2>/dev/null)"
+            GRDEV_BRIGHT_PURPLE="${tput_bold}$(tput setaf 5 2>/dev/null)"
+        fi
+    fi
+}
+
+_grdev_init_colors
+
 # Function to display help information
 show_help() {
-    local GREEN='\033[0;32m'
-    local YELLOW='\033[1;33m'
-    local BLUE='\033[0;34m'
-    local CYAN='\033[0;36m'
-    local WHITE='\033[1;37m'
-    local BOLD='\033[1m'
-    local NC='\033[0m'
-    local BRIGHT_GREEN='\033[1;32m'
-    local BRIGHT_BLUE='\033[1;34m'
-    local BRIGHT_CYAN='\033[1;36m'
+    local GREEN="$GRDEV_GREEN"
+    local YELLOW="$GRDEV_YELLOW"
+    local BLUE="$GRDEV_BLUE"
+    local CYAN="$GRDEV_CYAN"
+    local WHITE="$GRDEV_WHITE"
+    local BOLD="$GRDEV_BOLD"
+    local NC="$GRDEV_NC"
+    local BRIGHT_GREEN="$GRDEV_BRIGHT_GREEN"
+    local BRIGHT_BLUE="$GRDEV_BRIGHT_BLUE"
+    local BRIGHT_CYAN="$GRDEV_BRIGHT_CYAN"
     
     echo -e "${BRIGHT_BLUE}${BOLD}═══════════════════════════════════════════════════════════════${NC}"
     echo -e "${BRIGHT_CYAN}${BOLD}                         GRDEV - Gradle Development Tool${NC}"
@@ -37,6 +87,7 @@ show_help() {
     echo -e "  ${BLUE}-y${NC}, ${BLUE}--yes${NC}               Auto-confirm all dialogs"
     echo -e "  ${BLUE}-n${NC}, ${BLUE}--no-clean${NC}          Skip clean step (dev mode only)"
     echo -e "  ${BLUE}-p${NC}, ${BLUE}--profile${NC} ${YELLOW}<name>${NC}    Specify Spring profile (default: dev)"
+    echo -e "  ${BLUE}--no-liquibase${NC}         Add no-liquibase to active Spring profile(s)"
     echo -e "  ${BLUE}-h${NC}, ${BLUE}--help${NC}              Show this help message"
     echo ""
     echo -e "${BRIGHT_GREEN}${BOLD}COMBINED OPTIONS:${NC}"
@@ -78,6 +129,7 @@ show_help() {
 #   grdev [-y|--yes]         - Auto-confirm all dialogs
 #   grdev [-n|--no-clean]    - Skip clean step (only affects -d/--dev mode)
 #   grdev [-p|--profile] <profile> - Specify Spring profile (default: dev)
+#   grdev [--no-liquibase]   - Add no-liquibase profile
 #   grdev [-h|--help]        - Show detailed help information
 #
 # Combined options examples:
@@ -90,21 +142,21 @@ show_help() {
 #   grdev --help             - Display comprehensive help
 function grdev {
     # Color and style definitions
-    local RED='\033[0;31m'
-    local GREEN='\033[0;32m'
-    local YELLOW='\033[1;33m'
-    local BLUE='\033[0;34m'
-    local PURPLE='\033[0;35m'
-    local CYAN='\033[0;36m'
-    local WHITE='\033[1;37m'
-    local BOLD='\033[1m'
-    local NC='\033[0m' # No Color
-    local BRIGHT_GREEN='\033[1;32m'
-    local BRIGHT_RED='\033[1;31m'
-    local BRIGHT_YELLOW='\033[1;33m'
-    local BRIGHT_BLUE='\033[1;34m'
-    local BRIGHT_CYAN='\033[1;36m'
-    local BRIGHT_PURPLE='\033[1;35m'
+    local RED="$GRDEV_RED"
+    local GREEN="$GRDEV_GREEN"
+    local YELLOW="$GRDEV_YELLOW"
+    local BLUE="$GRDEV_BLUE"
+    local PURPLE="$GRDEV_PURPLE"
+    local CYAN="$GRDEV_CYAN"
+    local WHITE="$GRDEV_WHITE"
+    local BOLD="$GRDEV_BOLD"
+    local NC="$GRDEV_NC" # No Color
+    local BRIGHT_GREEN="$GRDEV_BRIGHT_GREEN"
+    local BRIGHT_RED="$GRDEV_BRIGHT_RED"
+    local BRIGHT_YELLOW="$GRDEV_BRIGHT_YELLOW"
+    local BRIGHT_BLUE="$GRDEV_BRIGHT_BLUE"
+    local BRIGHT_CYAN="$GRDEV_BRIGHT_CYAN"
+    local BRIGHT_PURPLE="$GRDEV_BRIGHT_PURPLE"
     
     # Parse arguments to determine directory and options
     local TARGET_DIR=""
@@ -112,7 +164,9 @@ function grdev {
     local DEV_MODE=false
     local AUTO_YES=false
     local NO_CLEAN=false
+    local NO_LIQUIBASE=false
     local SPRING_PROFILE="dev"  # Default profile
+    local EFFECTIVE_SPRING_PROFILE=""
     local ORIGINAL_DIR=$(pwd)
     
     # Check for help first (simple approach)
@@ -141,6 +195,10 @@ function grdev {
                 ;;
             --no-clean)
                 NO_CLEAN=true
+                shift
+                ;;
+            --no-liquibase)
+                NO_LIQUIBASE=true
                 shift
                 ;;
             -h|--help)
@@ -197,7 +255,7 @@ function grdev {
                             ;;
                         *)
                             echo -e "${BRIGHT_RED}${BOLD}Error: ${NC}${RED}Unknown option: -$opt${NC} ${BRIGHT_RED}${BOLD}❌${NC}"
-                            echo -e "${CYAN}Usage: grdev [directory] [-r|--run] [-d|--dev] [-y|--yes] [-n|--no-clean] [-p|--profile <profile>] [-h|--help]${NC}"
+                            echo -e "${CYAN}Usage: grdev [directory] [-r|--run] [-d|--dev] [-y|--yes] [-n|--no-clean] [--no-liquibase] [-p|--profile <profile>] [-h|--help]${NC}"
                             echo -e "${CYAN}Examples: grdev -dy, grdev -ry, grdev -dny, grdev -p prod, grdev --help${NC}"
                             return 1
                             ;;
@@ -229,6 +287,16 @@ function grdev {
         echo -e "${BRIGHT_YELLOW}${BOLD}Note: ${NC}${YELLOW}--no-clean option ignored (only applies to -d/--dev mode)${NC} ⚠️"
         NO_CLEAN=false  # Reset to false since it's not applicable
     fi
+
+    # Build effective profile value to be used in Spring commands
+    EFFECTIVE_SPRING_PROFILE="$SPRING_PROFILE"
+    if [[ "$NO_LIQUIBASE" == true ]]; then
+        if [[ "$DEV_MODE" == true ]]; then
+            EFFECTIVE_SPRING_PROFILE="${SPRING_PROFILE},no-liquibase"
+        else
+            EFFECTIVE_SPRING_PROFILE="no-liquibase"
+        fi
+    fi
     
     # Set working directory
     if [[ -n "$TARGET_DIR" ]]; then
@@ -251,7 +319,7 @@ function grdev {
     
     # Show current working directory
     echo -e "${BRIGHT_CYAN}${BOLD}➤${NC} ${GREEN}Working in directory:${NC} ${BOLD}${WHITE}$CURRENT_DIR${NC}"
-    echo -e "${BRIGHT_CYAN}${BOLD}➤${NC} ${PURPLE}Spring profile:${NC} ${BOLD}${YELLOW}$SPRING_PROFILE${NC}"
+    echo -e "${BRIGHT_CYAN}${BOLD}➤${NC} ${PURPLE}Spring profile:${NC} ${BOLD}${YELLOW}$EFFECTIVE_SPRING_PROFILE${NC}"
     
     # List of common test tasks to check
     local COMMON_TEST_TASKS="test|integrationTest|functionalTest|acceptanceTest|unitTest|e2eTest|smokeTest|contractTest|performanceTest|testIntegration|check|webapp|webapp_test"
@@ -365,11 +433,11 @@ function grdev {
     if [[ "$RUN_ONLY" == true ]]; then
         local JAR_FILE=$(find "$BUILD_DIR" -name '*.jar' ! -name '*plain.jar' -print -quit)
         if [[ -n "$JAR_FILE" ]]; then
-            local run_command="java -Xmx128m -Xms64m -jar $JAR_FILE --spring.main.banner-mode=off --spring.profiles.active=$SPRING_PROFILE"
-            if ask_confirmation "Run existing JAR file (profile: $SPRING_PROFILE, no Spring banner)" "$run_command"; then
+            local run_command="java -Xmx128m -Xms64m -jar $JAR_FILE --spring.main.banner-mode=off --spring.profiles.active=$EFFECTIVE_SPRING_PROFILE"
+            if ask_confirmation "Run existing JAR file (profile: $EFFECTIVE_SPRING_PROFILE, no Spring banner)" "$run_command"; then
                 echo -e "${BRIGHT_CYAN}${BOLD}➤${NC} ${CYAN}Executing JAR file...${NC}"
                 echo -e "${BRIGHT_CYAN}${BOLD}➤${NC} ${WHITE}$run_command${NC}"
-                java -Xmx128m -Xms64m -jar "$JAR_FILE" --spring.main.banner-mode=off --spring.profiles.active="$SPRING_PROFILE"
+                java -Xmx128m -Xms64m -jar "$JAR_FILE" --spring.main.banner-mode=off --spring.profiles.active="$EFFECTIVE_SPRING_PROFILE"
             fi
         else
             echo -e "${BRIGHT_RED}${BOLD}No JAR file found in ${BOLD}$BUILD_DIR${NC} ${BRIGHT_RED}${BOLD}❌${NC}"
@@ -384,15 +452,15 @@ function grdev {
         
         if [[ "$NO_CLEAN" == true ]]; then
             clean_part=""
-            description="Run with bootRun (profile: $SPRING_PROFILE, no clean, no Spring banner)"
+            description="Run with bootRun (profile: $EFFECTIVE_SPRING_PROFILE, no clean, no Spring banner)"
             action_message="Running with bootRun (no clean)..."
         else
             clean_part="clean "
-            description="Clean and run with bootRun (profile: $SPRING_PROFILE, no Spring banner)"
+            description="Clean and run with bootRun (profile: $EFFECTIVE_SPRING_PROFILE, no Spring banner)"
             action_message="Cleaning and running with bootRun..."
         fi
         
-        local bootrun_command="$GRADLE_CMD ${clean_part}bootRun --args='--spring.main.banner-mode=off --spring.profiles.active=$SPRING_PROFILE'"
+        local bootrun_command="$GRADLE_CMD ${clean_part}bootRun --args='--spring.main.banner-mode=off --spring.profiles.active=$EFFECTIVE_SPRING_PROFILE'"
         if ask_confirmation "$description" "$bootrun_command"; then
             echo -e "${BRIGHT_CYAN}${BOLD}➤${NC} ${GREEN}$action_message${NC}"
             echo -e "${BRIGHT_CYAN}${BOLD}➤${NC} ${WHITE}$bootrun_command${NC}"
@@ -415,7 +483,7 @@ function grdev {
         
         # Ask for confirmation to compile and run
         local BUILD_COMMAND="$GRADLE_CMD clean build $TEST_TASKS"
-        if ask_confirmation "Compile and run JAR file (profile: $SPRING_PROFILE, skipping all test tasks)" "$BUILD_COMMAND"; then
+        if ask_confirmation "Compile and run JAR file (profile: $EFFECTIVE_SPRING_PROFILE, skipping all test tasks)" "$BUILD_COMMAND"; then
             echo -e "${BRIGHT_CYAN}${BOLD}➤${NC} ${GREEN}Compiling with Gradle ${BOLD}(skipping all test tasks)${NC}..."
             echo -e "${BRIGHT_CYAN}${BOLD}➤${NC} ${CYAN}Executing:${NC} ${BOLD}${WHITE}$BUILD_COMMAND${NC}"
             
@@ -425,8 +493,8 @@ function grdev {
                 echo -e "${BRIGHT_GREEN}${BOLD}Build successful.${NC} ${GREEN}Running JAR file... ${NC}✅"
                 local JAR_FILE=$(find "$BUILD_DIR" -name '*.jar' ! -name '*plain.jar' -print -quit)
                 if [[ -n "$JAR_FILE" ]]; then
-                    echo -e "${BRIGHT_CYAN}${BOLD}➤${NC} ${WHITE}java -Xmx128m -Xms64m -jar ${BOLD}${YELLOW}$JAR_FILE${NC}${WHITE} --spring.main.banner-mode=off --spring.profiles.active=$SPRING_PROFILE${NC}"
-                    java -Xmx128m -Xms64m -jar "$JAR_FILE" --spring.main.banner-mode=off --spring.profiles.active="$SPRING_PROFILE"
+                    echo -e "${BRIGHT_CYAN}${BOLD}➤${NC} ${WHITE}java -Xmx128m -Xms64m -jar ${BOLD}${YELLOW}$JAR_FILE${NC}${WHITE} --spring.main.banner-mode=off --spring.profiles.active=$EFFECTIVE_SPRING_PROFILE${NC}"
+                    java -Xmx128m -Xms64m -jar "$JAR_FILE" --spring.main.banner-mode=off --spring.profiles.active="$EFFECTIVE_SPRING_PROFILE"
                 else
                     echo -e "${BRIGHT_RED}${BOLD}No JAR file found in ${BOLD}$BUILD_DIR${NC} ${RED}after successful build ${NC}❌"
                     cd "$ORIGINAL_DIR"
