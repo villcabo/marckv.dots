@@ -85,7 +85,7 @@ show_help() {
     echo -e "  ${BLUE}-r${NC}, ${BLUE}--run${NC}               Run existing JAR file (skip compilation)"
     echo -e "  ${BLUE}-d${NC}, ${BLUE}--dev${NC}               Development mode using bootRun"
     echo -e "  ${BLUE}-y${NC}, ${BLUE}--yes${NC}               Auto-confirm all dialogs"
-    echo -e "  ${BLUE}-n${NC}, ${BLUE}--no-clean${NC}          Skip clean step (dev mode only)"
+    echo -e "  ${BLUE}-n${NC}, ${BLUE}--no-clean${NC}          Skip clean step (dev and build modes)"
     echo -e "  ${BLUE}-p${NC}, ${BLUE}--profile${NC} ${YELLOW}<name>${NC}    Specify Spring profile (default: dev)"
     echo -e "  ${BLUE}--no-liquibase${NC}         Add no-liquibase to active Spring profile(s)"
     echo -e "  ${BLUE}-h${NC}, ${BLUE}--help${NC}              Show this help message"
@@ -127,7 +127,7 @@ show_help() {
 #   grdev [-d|--dev]         - Run with clean bootRun in current directory
 #   grdev [directory] -d     - Run with clean bootRun in specified directory
 #   grdev [-y|--yes]         - Auto-confirm all dialogs
-#   grdev [-n|--no-clean]    - Skip clean step (only affects -d/--dev mode)
+#   grdev [-n|--no-clean]    - Skip clean step (affects build and -d/--dev modes)
 #   grdev [-p|--profile] <profile> - Specify Spring profile (default: dev)
 #   grdev [--no-liquibase]   - Add no-liquibase profile
 #   grdev [-h|--help]        - Show detailed help information
@@ -282,10 +282,10 @@ function grdev {
         return 1
     fi
     
-    # Handle --no-clean option: only effective with --dev mode
-    if [[ "$NO_CLEAN" == true && "$DEV_MODE" != true ]]; then
-        echo -e "${BRIGHT_YELLOW}${BOLD}Note: ${NC}${YELLOW}--no-clean option ignored (only applies to -d/--dev mode)${NC} ⚠️"
-        NO_CLEAN=false  # Reset to false since it's not applicable
+    # Handle --no-clean option: not applicable when only running an existing JAR
+    if [[ "$NO_CLEAN" == true && "$RUN_ONLY" == true ]]; then
+        echo -e "${BRIGHT_YELLOW}${BOLD}Note: ${NC}${YELLOW}--no-clean option ignored when using -r/--run${NC} ⚠️"
+        NO_CLEAN=false
     fi
 
     # Build effective profile value to be used in Spring commands
@@ -482,9 +482,23 @@ function grdev {
         rm -f "$TEMP_OUTPUT"
         
         # Ask for confirmation to compile and run
-        local BUILD_COMMAND="$GRADLE_CMD clean build $TEST_TASKS"
-        if ask_confirmation "Compile and run JAR file (profile: $EFFECTIVE_SPRING_PROFILE, skipping all test tasks)" "$BUILD_COMMAND"; then
-            echo -e "${BRIGHT_CYAN}${BOLD}➤${NC} ${GREEN}Compiling with Gradle ${BOLD}(skipping all test tasks)${NC}..."
+        local clean_part=""
+        local description=""
+        local action_message=""
+
+        if [[ "$NO_CLEAN" == true ]]; then
+            clean_part=""
+            description="Compile and run JAR file (profile: $EFFECTIVE_SPRING_PROFILE, skipping all test tasks, no clean)"
+            action_message="Compiling with Gradle (no clean, skipping all test tasks)..."
+        else
+            clean_part="clean "
+            description="Compile and run JAR file (profile: $EFFECTIVE_SPRING_PROFILE, skipping all test tasks)"
+            action_message="Compiling with Gradle (skipping all test tasks)..."
+        fi
+
+        local BUILD_COMMAND="$GRADLE_CMD ${clean_part}build $TEST_TASKS"
+        if ask_confirmation "$description" "$BUILD_COMMAND"; then
+            echo -e "${BRIGHT_CYAN}${BOLD}➤${NC} ${GREEN}${action_message}${NC}"
             echo -e "${BRIGHT_CYAN}${BOLD}➤${NC} ${CYAN}Executing:${NC} ${BOLD}${WHITE}$BUILD_COMMAND${NC}"
             
             eval $BUILD_COMMAND
