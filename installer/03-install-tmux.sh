@@ -21,8 +21,8 @@ bold() { echo -e "${BOLD}$1${NC}"; }
 
 # Resolve repository root based on this script location
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-MARCK_DOTS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-SOURCE_TMUX_CONF="$MARCK_DOTS_DIR/tmux/.tmux.conf"
+MARCKV_DOTS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+SOURCE_TMUX_CONF="$MARCKV_DOTS_DIR/tmux/.tmux.conf"
 TARGET_TMUX_CONF="$HOME/.tmux.conf"
 
 install_tmux_conf() {

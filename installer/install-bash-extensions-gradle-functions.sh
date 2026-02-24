@@ -52,9 +52,9 @@ error() { echo -e "${RED}[ERROR]${NC} $1"; }
 bold() { echo -e "${BOLD}$1${NC}"; }
 
 # Configuration
-MARCK_DOTS_DIR="$HOME/.marckv.dots"
+MARCKV_DOTS_DIR="$HOME/.marckv.dots"
 BASH_ALIASES_FILE="$HOME/.bash_aliases"
-GRADLE_FUNCTIONS_SOURCE="$MARCK_DOTS_DIR/bash-extensions/bash_gradle_functions.sh"
+GRADLE_FUNCTIONS_SOURCE="$MARCKV_DOTS_DIR/bash-extensions/bash_gradle_functions.sh"
 
 # Line to be added to ~/.bash_aliases
 LOAD_LINE='[[ -s "$HOME/.marckv.dots/bash-extensions/bash_gradle_functions.sh" ]] && source "$HOME/.marckv.dots/bash-extensions/bash_gradle_functions.sh" # Gradle functions'
@@ -62,8 +62,8 @@ LOAD_LINE='[[ -s "$HOME/.marckv.dots/bash-extensions/bash_gradle_functions.sh" ]
 install_gradle_functions() {
     bold "=== marckv.dots Gradle functions installer ==="
 
-    if [[ ! -d "$MARCK_DOTS_DIR" ]]; then
-        error "Directory $MARCK_DOTS_DIR does not exist."
+    if [[ ! -d "$MARCKV_DOTS_DIR" ]]; then
+        error "Directory $MARCKV_DOTS_DIR does not exist."
         error "Make sure marckv.dots is cloned in your home directory."
         exit 1
     fi
@@ -74,7 +74,7 @@ install_gradle_functions() {
         exit 1
     fi
 
-    info "marckv.dots directory found: $MARCK_DOTS_DIR"
+    info "marckv.dots directory found: $MARCKV_DOTS_DIR"
     info "Gradle functions source: $GRADLE_FUNCTIONS_SOURCE"
 
     if [[ ! -f "$BASH_ALIASES_FILE" ]]; then
@@ -138,11 +138,11 @@ uninstall_gradle_functions() {
 status_gradle_functions() {
     bold "=== marckv.dots Gradle functions status ==="
 
-    if [[ ! -d "$MARCK_DOTS_DIR" ]]; then
-        error "marckv.dots directory not found: $MARCK_DOTS_DIR"
+    if [[ ! -d "$MARCKV_DOTS_DIR" ]]; then
+        error "marckv.dots directory not found: $MARCKV_DOTS_DIR"
         return 1
     else
-        success "marckv.dots directory: $MARCK_DOTS_DIR"
+        success "marckv.dots directory: $MARCKV_DOTS_DIR"
     fi
 
     if [[ ! -f "$GRADLE_FUNCTIONS_SOURCE" ]]; then

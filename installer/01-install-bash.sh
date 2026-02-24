@@ -20,19 +20,20 @@ error() { echo -e "${RED}[ERROR]${NC} $1"; }
 bold() { echo -e "${BOLD}$1${NC}"; }
 
 # Configuration
-MARCK_DOTS_DIR="$HOME/.marck.dots"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MARCKV_DOTS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 BASHRC_FILE="$HOME/.bashrc"
-MARCK_BASHRC="$MARCK_DOTS_DIR/bash/.bashrc"
+MARCK_BASHRC="$MARCKV_DOTS_DIR/bash/.bashrc"
 
 # Line to be added to system ~/.bashrc
-LOAD_LINE='[[ -s "$HOME/.marck.dots/bash/.bashrc" ]] && source "$HOME/.marck.dots/bash/.bashrc"'
+LOAD_LINE='[[ -s "$HOME/.marckv.dots/bash/.bashrc" ]] && source "$HOME/.marckv.dots/bash/.bashrc"'
 
 install_bashrc() {
     bold "=== marckv.dots custom bashrc installer ==="
     
-    # Verificar que existe el directorio marck.dots
-    if [[ ! -d "$MARCK_DOTS_DIR" ]]; then
-        error "Directory $MARCK_DOTS_DIR does not exist."
+    # Verificar que existe el directorio marckv.dots
+    if [[ ! -d "$MARCKV_DOTS_DIR" ]]; then
+        error "Directory $MARCKV_DOTS_DIR does not exist."
         error "Make sure the volume is properly mounted in the container."
         exit 1
     fi
@@ -43,7 +44,7 @@ install_bashrc() {
         exit 1
     fi
     
-    info "marck.dots directory found: $MARCK_DOTS_DIR"
+    info "marckv.dots directory found: $MARCKV_DOTS_DIR"
     info "Custom bashrc file: $MARCK_BASHRC"
     
     # Crear ~/.bashrc si no existe
@@ -115,11 +116,11 @@ uninstall_bashrc() {
 status_bashrc() {
     bold "=== Custom bashrc status ==="
     
-    if [[ ! -d "$MARCK_DOTS_DIR" ]]; then
-        error "marckv.dots directory not found: $MARCK_DOTS_DIR"
+    if [[ ! -d "$MARCKV_DOTS_DIR" ]]; then
+        error "marckv.dots directory not found: $MARCKV_DOTS_DIR"
         return 1
     else
-        success "marckv.dots directory: $MARCK_DOTS_DIR"
+        success "marckv.dots directory: $MARCKV_DOTS_DIR"
     fi
     
     if [[ ! -f "$MARCK_BASHRC" ]]; then

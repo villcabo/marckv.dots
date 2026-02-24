@@ -28,12 +28,13 @@ _confirm_operation() {
 }
 
 # Configuration
-MARCK_DOTS_DIR="$HOME/.marck.dots"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MARCKV_DOTS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 BASH_ALIASES_FILE="$HOME/.bash_aliases"
-DOCKER_COLOR_ALIASES="$MARCK_DOTS_DIR/docker-aliases/docker-color_aliases.sh"
+DOCKER_COLOR_ALIASES="$MARCKV_DOTS_DIR/docker-aliases/docker-color_aliases.sh"
 
 # Line to be added to ~/.bash_aliases
-LOAD_LINE='[[ -s "$HOME/.marck.dots/docker-aliases/docker-color_aliases.sh" ]] && source "$HOME/.marck.dots/docker-aliases/docker-color_aliases.sh"'
+LOAD_LINE='[[ -s "$HOME/.marckv.dots/docker-aliases/docker-color_aliases.sh" ]] && source "$HOME/.marckv.dots/docker-aliases/docker-color_aliases.sh"'
 
 # Function to check/install docker-color-output binary
 check_docker_color_binary() {
@@ -132,9 +133,9 @@ check_docker_color_binary() {
 install_aliases_only() {
     info "Installing Docker Color Aliases..."
     
-    # Verificar que existe el directorio marck.dots
-    if [[ ! -d "$MARCK_DOTS_DIR" ]]; then
-        error "Directory $MARCK_DOTS_DIR does not exist."
+    # Verificar que existe el directorio marckv.dots
+    if [[ ! -d "$MARCKV_DOTS_DIR" ]]; then
+        error "Directory $MARCKV_DOTS_DIR does not exist."
         error "Make sure the volume is properly mounted in the container."
         exit 1
     fi
@@ -145,7 +146,7 @@ install_aliases_only() {
         exit 1
     fi
     
-    info "marck.dots directory found: $MARCK_DOTS_DIR"
+    info "marckv.dots directory found: $MARCKV_DOTS_DIR"
     info "Docker color aliases file: $DOCKER_COLOR_ALIASES"
     
     # Crear ~/.bash_aliases si no existe
@@ -312,11 +313,11 @@ install_docker_color_binary() {
 status_docker_color() {
     bold "=== Docker Color Aliases status ==="
     
-    if [[ ! -d "$MARCK_DOTS_DIR" ]]; then
-        error "marckv.dots directory not found: $MARCK_DOTS_DIR"
+    if [[ ! -d "$MARCKV_DOTS_DIR" ]]; then
+        error "marckv.dots directory not found: $MARCKV_DOTS_DIR"
         return 1
     else
-        success "marckv.dots directory: $MARCK_DOTS_DIR"
+        success "marckv.dots directory: $MARCKV_DOTS_DIR"
     fi
     
     if [[ ! -f "$DOCKER_COLOR_ALIASES" ]]; then
