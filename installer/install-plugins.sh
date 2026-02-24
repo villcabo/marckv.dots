@@ -68,6 +68,29 @@ install_nvim_plugins() {
     success "Plugins de Neovim instalados correctamente."
 }
 
+# Parsear argumentos
+FORCE=false
+for arg in "$@"; do
+    case "$arg" in
+        --force) FORCE=true ;;
+        *) warn "Argumento desconocido: $arg" ;;
+    esac
+done
+
 bold "=== Instalador de configuración/plugins de Neovim ==="
+
+# Verificar si ya está instalado
+DOTS_DIR="$HOME/.marckv.dots"
+NVIM_DEST="$HOME/.config/nvim"
+if [ -L "$NVIM_DEST" ] || [ -d "$NVIM_DEST" ]; then
+    if [ "$FORCE" = false ]; then
+        error "La configuración de Neovim ya está instalada en ${YELLOW}${BOLD}$NVIM_DEST${NC}"
+        info  "Para reinstalar forzosamente, ejecute:"
+        echo  "  ${BOLD}$0 --force${NC}"
+        exit 1
+    fi
+    warn "Modo --force: se eliminará la configuración existente en $NVIM_DEST"
+fi
+
 prepare_nvim_config
 install_nvim_plugins
