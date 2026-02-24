@@ -80,17 +80,19 @@ done
 bold "=== Instalador de configuración/plugins de Neovim ==="
 
 # Verificar si ya está instalado
-DOTS_DIR="$HOME/.marckv.dots"
 NVIM_DEST="$HOME/.config/nvim"
+NVIM_ALREADY_INSTALLED=false
 if [ -L "$NVIM_DEST" ] || [ -d "$NVIM_DEST" ]; then
     if [ "$FORCE" = false ]; then
-        error "La configuración de Neovim ya está instalada en ${YELLOW}${BOLD}$NVIM_DEST${NC}"
-        info  "Para reinstalar forzosamente, ejecute:"
-        echo  "  ${BOLD}$0 --force${NC}"
-        exit 1
+        warn "La configuración de Neovim ya está instalada en ${YELLOW}${BOLD}$NVIM_DEST${NC}"
+        info  "Para reinstalar forzosamente, ejecute: ${BOLD}$0 --force${NC}"
+        NVIM_ALREADY_INSTALLED=true
+    else
+        warn "Modo --force: se eliminará la configuración existente en $NVIM_DEST"
     fi
-    warn "Modo --force: se eliminará la configuración existente en $NVIM_DEST"
 fi
 
-prepare_nvim_config
+if [ "$NVIM_ALREADY_INSTALLED" = false ]; then
+    prepare_nvim_config
+fi
 install_nvim_plugins
