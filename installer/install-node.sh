@@ -33,12 +33,25 @@ die() {
 # Función para obtener la versión más reciente de Node.js LTS
 get_latest_node_version() {
     local latest_version
-    latest_version=$(curl -s https://nodejs.org/dist/index.json | grep -o '"version":"[^"]*"' | head -1 | cut -d'"' -f4 | sed 's/v//')
-    
+    # Filtrar por campo "lts" distinto de false para obtener solo versiones LTS
+    if command -v python3 >/dev/null 2>&1; then
+        latest_version=$(curl -s https://nodejs.org/dist/index.json | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+lts = [d for d in data if d.get('lts')]
+print(lts[0]['version'].lstrip('v')) if lts else sys.exit(1)
+" 2>/dev/null)
+    else
+        # Fallback: buscar la primera entrada donde lts no sea false
+        latest_version=$(curl -s https://nodejs.org/dist/index.json | \
+            grep -v '"lts":false' | grep -o '"version":"v[^"]*"' | head -1 | \
+            cut -d'"' -f4 | sed 's/v//')
+    fi
+
     if [ -z "$latest_version" ]; then
         return 1
     fi
-    
+
     echo "$latest_version"
     return 0
 }
