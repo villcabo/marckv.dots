@@ -1,4 +1,4 @@
-name: marckdots-testings
+name: marckvdots-testings
 
 services:
   # =============================================================================
@@ -12,7 +12,7 @@ services:
     tty: true
     stdin_open: true
     volumes:
-      - .:/root/.marck.dots:ro
+      - .:/root/.marckv.dots:ro
     working_dir: /root
     command: bash -c "apt update && apt install -y curl git wget && bash"
     networks:
@@ -25,7 +25,7 @@ services:
     tty: true
     stdin_open: true
     volumes:
-      - .:/root/.marck.dots:ro
+      - .:/root/.marckv.dots:ro
     working_dir: /root
     command: bash -c "apt update && apt install -y curl git wget && bash"
     networks:
@@ -44,7 +44,7 @@ services:
     environment:
       - DEBIAN_FRONTEND=noninteractive
     volumes:
-      - .:/root/.marck.dots:ro
+      - .:/root/.marckv.dots:ro
     working_dir: /root
     command: bash -c "apt update && apt install -y curl git wget && bash"
     networks:
@@ -59,7 +59,7 @@ services:
     environment:
       - DEBIAN_FRONTEND=noninteractive
     volumes:
-      - .:/root/.marck.dots:ro
+      - .:/root/.marckv.dots:ro
     working_dir: /root
     command: bash -c "apt update && apt install -y curl git wget && bash"
     networks:
@@ -74,7 +74,7 @@ services:
     environment:
       - DEBIAN_FRONTEND=noninteractive
     volumes:
-      - .:/root/.marck.dots:ro
+      - .:/root/.marckv.dots:ro
     working_dir: /root
     command: bash -c "apt update && apt install -y curl git wget && bash"
     networks:
