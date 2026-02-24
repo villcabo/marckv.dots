@@ -6,12 +6,10 @@ return {
     -- URL: https://github.com/akinsho/bufferline.nvim
     -- Description: A snazzy buffer line (with tabpage integration) for Neovim.
     "akinsho/bufferline.nvim",
-    enabled = false, -- Disable this plugin
+    enabled = false,
   },
   {
-    -- Plugin para mejorar la experiencia de edición en Neovim
     -- URL: https://github.com/yetone/avante.nvim
-    -- Description: Este plugin ofrece una serie de mejoras y herramientas para optimizar la edición de texto en Neovim.
     "yetone/avante.nvim",
     enabled = false,
   },
@@ -31,16 +29,33 @@ return {
     "tris203/precognition.nvim",
     enabled = false,
   },
-
   {
     "sphamba/smear-cursor.nvim",
     enabled = false,
   },
   {
-    -- Plugin: claude-code.nvim
-    -- URL: https://github.com/greggh/claude-code.nvim
-    -- Description: Neovim integration for Claude Code AI assistant
+    -- AI de pago (Claude) — reemplazado por Copilot free tier
     "coder/claudecode.nvim",
-    enabled = true,
+    enabled = false,
+  },
+  {
+    -- Solo wrappea el gemini CLI, no provee autocomplete inline
+    "jonroosevelt/gemini-cli.nvim",
+    enabled = false,
+  },
+  {
+    -- Plugin de notas Obsidian — usar la app standalone
+    "obsidian-nvim/obsidian.nvim",
+    enabled = false,
+  },
+  {
+    -- Útil solo para demos/grabaciones de pantalla
+    "NStefan002/screenkey.nvim",
+    enabled = false,
+  },
+  {
+    -- Juego de práctica de Vim, no para uso diario
+    "ThePrimeagen/vim-be-good",
+    enabled = false,
   },
 }
