@@ -1,23 +1,46 @@
 -- This file contains the configuration for disabling specific Neovim plugins.
 
 return {
-  -- UI
-  { "akinsho/bufferline.nvim", enabled = false },
-  { "sphamba/smear-cursor.nvim", enabled = false },
-  { "tris203/precognition.nvim", enabled = false },
-  { "NStefan002/screenkey.nvim", enabled = false },
+  {
+    -- Plugin: bufferline.nvim
+    -- URL: https://github.com/akinsho/bufferline.nvim
+    -- Description: A snazzy buffer line (with tabpage integration) for Neovim.
+    "akinsho/bufferline.nvim",
+    enabled = false, -- Disable this plugin
+  },
+  {
+    -- Plugin para mejorar la experiencia de edición en Neovim
+    -- URL: https://github.com/yetone/avante.nvim
+    -- Description: Este plugin ofrece una serie de mejoras y herramientas para optimizar la edición de texto en Neovim.
+    "yetone/avante.nvim",
+    enabled = false,
+  },
+  {
+    "CopilotC-Nvim/CopilotChat.nvim",
+    enabled = false,
+  },
+  {
+    "NickvanDyke/opencode.nvim",
+    enabled = false,
+  },
+  {
+    "olimorris/codecompanion.nvim",
+    enabled = false,
+  },
+  {
+    "tris203/precognition.nvim",
+    enabled = false,
+  },
 
-  -- AI (pago / reemplazado por gemini free)
-  { "yetone/avante.nvim", enabled = false },
-  { "CopilotC-Nvim/CopilotChat.nvim", enabled = false },
-  { "olimorris/codecompanion.nvim", enabled = false },
-  { "coder/claudecode.nvim", enabled = false },
-  { "zbirenbaum/copilot.lua", enabled = false },
-  { "NickvanDyke/opencode.nvim", enabled = false },
-
-  -- Notas / Obsidian
-  { "obsidian-nvim/obsidian.nvim", enabled = false },
-
-  -- Juegos / entretenimiento
-  { "ThePrimeagen/vim-be-good", enabled = false },
+  {
+    "sphamba/smear-cursor.nvim",
+    enabled = false,
+  },
+  {
+    -- Plugin: claude-code.nvim
+    -- URL: https://github.com/greggh/claude-code.nvim
+    -- Description: Neovim integration for Claude Code AI assistant
+    "coder/claudecode.nvim",
+    enabled = true,
+  },
 }
