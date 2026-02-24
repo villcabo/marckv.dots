@@ -58,6 +58,21 @@ prepare_nvim_config() {
     fi
 }
 
+# Instalar Gemini CLI (requerido por el plugin gemini-cli.nvim)
+install_gemini_cli() {
+    if command -v gemini >/dev/null 2>&1; then
+        success "Gemini CLI ya está instalado ($(gemini --version 2>/dev/null || echo 'versión desconocida'))."
+        return 0
+    fi
+    if ! command -v npm >/dev/null 2>&1; then
+        warn "npm no encontrado. Omitiendo instalación de Gemini CLI (el plugin gemini-cli.nvim puede no funcionar)."
+        return 0
+    fi
+    info "Instalando Gemini CLI via npm..."
+    npm install -g @google/gemini-cli && success "Gemini CLI instalado correctamente." \
+        || warn "No se pudo instalar Gemini CLI. El plugin gemini-cli.nvim puede no funcionar."
+}
+
 # Instalar plugins de Neovim
 install_nvim_plugins() {
     if ! command -v nvim >/dev/null 2>&1; then
@@ -95,4 +110,5 @@ fi
 if [ "$NVIM_ALREADY_INSTALLED" = false ]; then
     prepare_nvim_config
 fi
+install_gemini_cli
 install_nvim_plugins
