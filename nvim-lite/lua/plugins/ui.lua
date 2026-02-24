@@ -79,6 +79,16 @@ return {
     },
   },
 
+  -- snacks.picker: show hidden files (e.g. .env)
+  {
+    "folke/snacks.nvim",
+    opts = {
+      picker = {
+        hidden = true,
+      },
+    },
+  },
+
   -- zen-mode
   {
     "folke/zen-mode.nvim",
