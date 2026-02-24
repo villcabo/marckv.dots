@@ -34,6 +34,7 @@ end
 require("lazy").setup({
   spec = {
     { "LazyVim/LazyVim", import = "lazyvim.plugins" },
+    { import = "lazyvim.plugins.extras.editor.snacks_picker" },
     { import = "lazyvim.plugins.extras.coding.mini-surround" },
     { import = "plugins" },
   },
