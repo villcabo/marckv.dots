@@ -51,6 +51,9 @@ _grdev_init_colors() {
 
 _grdev_init_colors
 
+# Directory where environment files live (can be overridden by the user)
+GRDEV_ENVIRONMENTS_DIR="${GRDEV_ENVIRONMENTS_DIR:-$HOME/.grdev/environments}"
+
 # Function to display help information
 show_help() {
     local GREEN="$GRDEV_GREEN"
@@ -87,6 +90,7 @@ show_help() {
     echo -e "  ${BLUE}-y${NC}, ${BLUE}--yes${NC}               Auto-confirm all dialogs"
     echo -e "  ${BLUE}-n${NC}, ${BLUE}--no-clean${NC}          Skip clean step (dev and build modes)"
     echo -e "  ${BLUE}-p${NC}, ${BLUE}--profile${NC} ${YELLOW}<name>${NC}    Specify Spring profile (default: dev)"
+    echo -e "  ${BLUE}-e${NC}, ${BLUE}--env${NC} ${YELLOW}<name>${NC}        Load extra properties from ~/.grdev/environments/<name>"
     echo -e "  ${BLUE}--no-liquibase${NC}         Add no-liquibase to active Spring profile(s)"
     echo -e "  ${BLUE}-h${NC}, ${BLUE}--help${NC}              Show this help message"
     echo ""
@@ -100,6 +104,11 @@ show_help() {
     echo -e "  ${CYAN}grdev${NC} ${BLUE}-dy${NC} ${BLUE}-p${NC} ${YELLOW}test${NC}        ${WHITE}# Dev mode with test profile${NC}"
     echo -e "  ${CYAN}grdev${NC} ${YELLOW}auth-service${NC} ${BLUE}-dny${NC} ${BLUE}-p${NC} ${YELLOW}local${NC}  ${WHITE}# Full example${NC}"
     echo ""
+    echo -e "${BRIGHT_GREEN}${BOLD}ENVIRONMENTS:${NC}"
+    echo -e "  Files in ${YELLOW}~/.grdev/environments/${NC} hold extra properties injected at runtime."
+    echo -e "  Format: ${WHITE}key=value${NC} lines (comments with ${CYAN}#${NC} are ignored)."
+    echo -e "  Properties are passed as ${CYAN}-Dkey=value${NC} JVM flags (jar/bootRun)."
+    echo ""
     echo -e "${BRIGHT_GREEN}${BOLD}FEATURES:${NC}"
     echo -e "  ${WHITE}•${NC} Automatic test task detection and exclusion"
     echo -e "  ${WHITE}•${NC} Spring Boot banner suppression"
@@ -107,13 +116,16 @@ show_help() {
     echo -e "  ${WHITE}•${NC} Smart Gradle wrapper detection"
     echo -e "  ${WHITE}•${NC} Directory-specific execution"
     echo -e "  ${WHITE}•${NC} Spring profile support (default: dev)"
+    echo -e "  ${WHITE}•${NC} Environment files for extra runtime properties"
     echo ""
     echo -e "${BRIGHT_GREEN}${BOLD}EXAMPLES:${NC}"
-    echo -e "  ${CYAN}grdev${NC}                    ${WHITE}# Simple compile and run${NC}"
-    echo -e "  ${CYAN}grdev${NC} ${BLUE}-dy${NC}               ${WHITE}# Fast dev mode${NC}"
-    echo -e "  ${CYAN}grdev${NC} ${YELLOW}payment-service${NC} ${BLUE}-ry${NC}   ${WHITE}# Run JAR in specific project${NC}"
-    echo -e "  ${CYAN}grdev${NC} ${BLUE}-dny${NC} ${BLUE}-p${NC} ${YELLOW}test${NC}        ${WHITE}# Dev mode, no clean, test profile${NC}"
-    echo -e "  ${CYAN}grdev${NC} ${BLUE}-p${NC} ${YELLOW}prod${NC} ${BLUE}-y${NC}          ${WHITE}# Production profile, auto-confirm${NC}"
+    echo -e "  ${CYAN}grdev${NC}                           ${WHITE}# Simple compile and run${NC}"
+    echo -e "  ${CYAN}grdev${NC} ${BLUE}-dy${NC}                      ${WHITE}# Fast dev mode${NC}"
+    echo -e "  ${CYAN}grdev${NC} ${YELLOW}payment-service${NC} ${BLUE}-ry${NC}          ${WHITE}# Run JAR in specific project${NC}"
+    echo -e "  ${CYAN}grdev${NC} ${BLUE}-dny${NC} ${BLUE}-p${NC} ${YELLOW}test${NC}               ${WHITE}# Dev mode, no clean, test profile${NC}"
+    echo -e "  ${CYAN}grdev${NC} ${BLUE}-p${NC} ${YELLOW}prod${NC} ${BLUE}-y${NC}               ${WHITE}# Production profile, auto-confirm${NC}"
+    echo -e "  ${CYAN}grdev${NC} ${BLUE}-e${NC} ${YELLOW}qadb${NC}                    ${WHITE}# Load ~/.grdev/environments/qadb props${NC}"
+    echo -e "  ${CYAN}grdev${NC} ${BLUE}-dy${NC} ${BLUE}-e${NC} ${YELLOW}qadb${NC} ${BLUE}-p${NC} ${YELLOW}qa${NC}         ${WHITE}# Dev mode with qa env + profile${NC}"
     echo ""
     echo -e "${BRIGHT_BLUE}${BOLD}═══════════════════════════════════════════════════════════════${NC}"
 }
@@ -167,6 +179,10 @@ function grdev {
     local NO_LIQUIBASE=false
     local SPRING_PROFILE="dev"  # Default profile
     local EFFECTIVE_SPRING_PROFILE=""
+    local ENV_NAME=""
+    local ENV_JVM_PROPS=""      # -Dkey=value flags for direct java -jar calls
+    local ENV_SPRING_ARGS=""    # --key=value flags for bootRun --args
+    local ENV_VARS_LIST=()      # display list: "key=value"
     local ORIGINAL_DIR=$(pwd)
     
     # Check for help first (simple approach)
@@ -200,6 +216,16 @@ function grdev {
             --no-liquibase)
                 NO_LIQUIBASE=true
                 shift
+                ;;
+            --env)
+                shift
+                if [[ $# -gt 0 ]]; then
+                    ENV_NAME="$1"
+                    shift
+                else
+                    echo -e "${BRIGHT_RED}${BOLD}Error: ${NC}${RED}--env requires an environment name${NC} ${BRIGHT_RED}${BOLD}❌${NC}"
+                    return 1
+                fi
                 ;;
             -h|--help)
                 show_help
@@ -253,6 +279,21 @@ function grdev {
                                 return 1
                             fi
                             ;;
+                        e)
+                            # Handle -e in combined options (next argument should be env name)
+                            if [ $((j + 1)) -lt ${#options} ]; then
+                                echo -e "${BRIGHT_RED}${BOLD}Error: ${NC}${RED}-e must be the last option in combined options${NC} ${BRIGHT_RED}${BOLD}❌${NC}"
+                                echo -e "${CYAN}Use: grdev -dy -e qadb  (not grdev -dye qadb)${NC}"
+                                return 1
+                            fi
+                            shift
+                            if [[ $# -gt 0 ]]; then
+                                ENV_NAME="$1"
+                            else
+                                echo -e "${BRIGHT_RED}${BOLD}Error: ${NC}${RED}-e requires an environment name${NC} ${BRIGHT_RED}${BOLD}❌${NC}"
+                                return 1
+                            fi
+                            ;;
                         *)
                             echo -e "${BRIGHT_RED}${BOLD}Error: ${NC}${RED}Unknown option: -$opt${NC} ${BRIGHT_RED}${BOLD}❌${NC}"
                             echo -e "${CYAN}Usage: grdev [directory] [-r|--run] [-d|--dev] [-y|--yes] [-n|--no-clean] [--no-liquibase] [-p|--profile <profile>] [-h|--help]${NC}"
@@ -298,6 +339,57 @@ function grdev {
         fi
     fi
     
+    # Load environment file if -e/--env was specified
+    if [[ -n "$ENV_NAME" ]]; then
+        local env_file="$GRDEV_ENVIRONMENTS_DIR/$ENV_NAME"
+        if [[ ! -d "$GRDEV_ENVIRONMENTS_DIR" ]]; then
+            echo -e "${BRIGHT_RED}${BOLD}Error: ${NC}${RED}Environments directory not found: $GRDEV_ENVIRONMENTS_DIR${NC} ${BRIGHT_RED}${BOLD}❌${NC}"
+            echo -e "${CYAN}Create it with: ${BOLD}mkdir -p $GRDEV_ENVIRONMENTS_DIR${NC}"
+            return 1
+        fi
+        if [[ ! -f "$env_file" ]]; then
+            echo -e "${BRIGHT_RED}${BOLD}Error: ${NC}${RED}Environment file not found: $env_file${NC} ${BRIGHT_RED}${BOLD}❌${NC}"
+            local available
+            available=$(ls "$GRDEV_ENVIRONMENTS_DIR" 2>/dev/null)
+            if [[ -n "$available" ]]; then
+                echo -e "${CYAN}Available environments:${NC}"
+                while IFS= read -r f; do
+                    echo -e "  ${YELLOW}• $f${NC}"
+                done <<< "$available"
+            else
+                echo -e "${YELLOW}No environment files found in $GRDEV_ENVIRONMENTS_DIR${NC}"
+            fi
+            return 1
+        fi
+        # Parse KEY=VALUE lines; skip blanks and comments
+        # Uses parameter expansion (no BASH_REMATCH) for bash/zsh compatibility
+        while IFS= read -r line; do
+            [[ "$line" =~ ^[[:space:]]*# ]] && continue
+            [[ -z "${line// }" ]] && continue
+            [[ "$line" != *=* ]] && continue
+            local _key="${line%%=*}"
+            local _val="${line#*=}"
+            # Validate key: letter/underscore start, then alphanumeric/dot/dash/underscore
+            [[ ! "$_key" =~ ^[A-Za-z_][A-Za-z0-9_.-]*$ ]] && continue
+            # Strip surrounding double quotes
+            if [[ "${_val}" == '"'*'"' ]]; then
+                _val="${_val#\"}"
+                _val="${_val%\"}"
+            fi
+            # Strip surrounding single quotes
+            if [[ "${_val}" == "'"*"'" ]]; then
+                _val="${_val#\'}"
+                _val="${_val%\'}"
+            fi
+            # Escape value for eval (handles !, $, spaces, etc.) - command substitution avoids printf -v portability issues
+            local _val_q
+            _val_q="$(printf '%q' "$_val")"
+            ENV_JVM_PROPS="$ENV_JVM_PROPS -D${_key}=${_val_q}"
+            ENV_SPRING_ARGS="$ENV_SPRING_ARGS --${_key}=${_val_q}"
+            ENV_VARS_LIST+=("${_key}=${_val}")
+        done < "$env_file"
+    fi
+
     # Set working directory
     if [[ -n "$TARGET_DIR" ]]; then
         if [[ -d "$TARGET_DIR" ]]; then
@@ -320,7 +412,13 @@ function grdev {
     # Show current working directory
     echo -e "${BRIGHT_CYAN}${BOLD}➤${NC} ${GREEN}Working in directory:${NC} ${BOLD}${WHITE}$CURRENT_DIR${NC}"
     echo -e "${BRIGHT_CYAN}${BOLD}➤${NC} ${PURPLE}Spring profile:${NC} ${BOLD}${YELLOW}$EFFECTIVE_SPRING_PROFILE${NC}"
-    
+    if [[ -n "$ENV_NAME" ]]; then
+        echo -e "${BRIGHT_CYAN}${BOLD}➤${NC} ${PURPLE}Environment file:${NC} ${BOLD}${YELLOW}$ENV_NAME${NC} ${CYAN}($GRDEV_ENVIRONMENTS_DIR/$ENV_NAME)${NC}"
+        for _var in "${ENV_VARS_LIST[@]}"; do
+            echo -e "    ${CYAN}•${NC} ${WHITE}$_var${NC}"
+        done
+    fi
+
     # List of common test tasks to check
     local COMMON_TEST_TASKS="test|integrationTest|functionalTest|acceptanceTest|unitTest|e2eTest|smokeTest|contractTest|performanceTest|testIntegration|check|webapp|webapp_test"
 
@@ -406,12 +504,12 @@ function grdev {
     ask_confirmation() {
         local action_description="$1"
         local command_preview="$2"
-        
+
         echo -e "\n${BRIGHT_BLUE}${BOLD}Action to perform: ${NC}${CYAN}${BOLD}$action_description${NC} 📋"
         if [[ -n "$command_preview" ]]; then
             echo -e "${BRIGHT_BLUE}${BOLD}Command preview: ${NC}${BOLD}${WHITE}$command_preview${NC}"
         fi
-        
+
         # Auto-confirm if -y/--yes flag is set
         if [[ "$AUTO_YES" == true ]]; then
             echo -e "${BRIGHT_GREEN}${BOLD}Auto-confirming (--yes flag detected)... ${NC}✅"
@@ -433,11 +531,13 @@ function grdev {
     if [[ "$RUN_ONLY" == true ]]; then
         local JAR_FILE=$(find "$BUILD_DIR" -name '*.jar' ! -name '*plain.jar' -print -quit)
         if [[ -n "$JAR_FILE" ]]; then
-            local run_command="java -Xmx128m -Xms64m -jar $JAR_FILE --spring.main.banner-mode=off --spring.profiles.active=$EFFECTIVE_SPRING_PROFILE"
-            if ask_confirmation "Run existing JAR file (profile: $EFFECTIVE_SPRING_PROFILE, no Spring banner)" "$run_command"; then
+            local run_command="java$ENV_JVM_PROPS -Xmx128m -Xms64m -jar $JAR_FILE --spring.main.banner-mode=off --spring.profiles.active=$EFFECTIVE_SPRING_PROFILE"
+            local run_desc="Run existing JAR file (profile: $EFFECTIVE_SPRING_PROFILE, no Spring banner)"
+            [[ -n "$ENV_NAME" ]] && run_desc="$run_desc, env: $ENV_NAME"
+            if ask_confirmation "$run_desc" "$run_command"; then
                 echo -e "${BRIGHT_CYAN}${BOLD}➤${NC} ${CYAN}Executing JAR file...${NC}"
                 echo -e "${BRIGHT_CYAN}${BOLD}➤${NC} ${WHITE}$run_command${NC}"
-                java -Xmx128m -Xms64m -jar "$JAR_FILE" --spring.main.banner-mode=off --spring.profiles.active="$EFFECTIVE_SPRING_PROFILE"
+                eval java$ENV_JVM_PROPS -Xmx128m -Xms64m -jar "$JAR_FILE" --spring.main.banner-mode=off --spring.profiles.active="$EFFECTIVE_SPRING_PROFILE"
             fi
         else
             echo -e "${BRIGHT_RED}${BOLD}No JAR file found in ${BOLD}$BUILD_DIR${NC} ${BRIGHT_RED}${BOLD}❌${NC}"
@@ -460,7 +560,9 @@ function grdev {
             action_message="Cleaning and running with bootRun..."
         fi
         
-        local bootrun_command="$GRADLE_CMD ${clean_part}bootRun --args='--spring.main.banner-mode=off --spring.profiles.active=$EFFECTIVE_SPRING_PROFILE'"
+        local bootrun_spring_args="--spring.main.banner-mode=off --spring.profiles.active=$EFFECTIVE_SPRING_PROFILE$ENV_SPRING_ARGS"
+        local bootrun_command="$GRADLE_CMD ${clean_part}bootRun --args='$bootrun_spring_args'"
+        [[ -n "$ENV_NAME" ]] && description="$description, env: $ENV_NAME"
         if ask_confirmation "$description" "$bootrun_command"; then
             echo -e "${BRIGHT_CYAN}${BOLD}➤${NC} ${GREEN}$action_message${NC}"
             echo -e "${BRIGHT_CYAN}${BOLD}➤${NC} ${WHITE}$bootrun_command${NC}"
@@ -496,19 +598,20 @@ function grdev {
             action_message="Compiling with Gradle (skipping all test tasks)..."
         fi
 
+        [[ -n "$ENV_NAME" ]] && description="$description, env: $ENV_NAME"
         local BUILD_COMMAND="$GRADLE_CMD ${clean_part}build $TEST_TASKS"
         if ask_confirmation "$description" "$BUILD_COMMAND"; then
             echo -e "${BRIGHT_CYAN}${BOLD}➤${NC} ${GREEN}${action_message}${NC}"
             echo -e "${BRIGHT_CYAN}${BOLD}➤${NC} ${CYAN}Executing:${NC} ${BOLD}${WHITE}$BUILD_COMMAND${NC}"
-            
+
             eval $BUILD_COMMAND
-            
+
             if [[ $? -eq 0 ]]; then
                 echo -e "${BRIGHT_GREEN}${BOLD}Build successful.${NC} ${GREEN}Running JAR file... ${NC}✅"
                 local JAR_FILE=$(find "$BUILD_DIR" -name '*.jar' ! -name '*plain.jar' -print -quit)
                 if [[ -n "$JAR_FILE" ]]; then
-                    echo -e "${BRIGHT_CYAN}${BOLD}➤${NC} ${WHITE}java -Xmx128m -Xms64m -jar ${BOLD}${YELLOW}$JAR_FILE${NC}${WHITE} --spring.main.banner-mode=off --spring.profiles.active=$EFFECTIVE_SPRING_PROFILE${NC}"
-                    java -Xmx128m -Xms64m -jar "$JAR_FILE" --spring.main.banner-mode=off --spring.profiles.active="$EFFECTIVE_SPRING_PROFILE"
+                    echo -e "${BRIGHT_CYAN}${BOLD}➤${NC} ${WHITE}java$ENV_JVM_PROPS -Xmx128m -Xms64m -jar ${BOLD}${YELLOW}$JAR_FILE${NC}${WHITE} --spring.main.banner-mode=off --spring.profiles.active=$EFFECTIVE_SPRING_PROFILE${NC}"
+                    eval java$ENV_JVM_PROPS -Xmx128m -Xms64m -jar "$JAR_FILE" --spring.main.banner-mode=off --spring.profiles.active="$EFFECTIVE_SPRING_PROFILE"
                 else
                     echo -e "${BRIGHT_RED}${BOLD}No JAR file found in ${BOLD}$BUILD_DIR${NC} ${RED}after successful build ${NC}❌"
                     cd "$ORIGINAL_DIR"
