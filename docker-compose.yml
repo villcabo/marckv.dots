@@ -5,7 +5,7 @@ services:
   # DEBIAN DISTRIBUTIONS
   # =============================================================================
   
-  debian-11:
+  debian11:
     image: debian:11
     container_name: marckv-debian-11
     hostname: debian-11
@@ -18,7 +18,7 @@ services:
     networks:
       - marckv-net
 
-  debian-12:
+  debian12:
     image: debian:12
     container_name: marckv-debian-12
     hostname: debian-12
@@ -35,7 +35,7 @@ services:
   # UBUNTU DISTRIBUTIONS
   # =============================================================================
 
-  ubuntu-20:
+  ubuntu20:
     image: ubuntu:20.04
     container_name: marckv-ubuntu-20
     hostname: ubuntu-20
@@ -50,7 +50,7 @@ services:
     networks:
       - marckv-net
 
-  ubuntu-22:
+  ubuntu22:
     image: ubuntu:22.04
     container_name: marckv-ubuntu-22
     hostname: ubuntu-22
@@ -65,7 +65,7 @@ services:
     networks:
       - marckv-net
 
-  ubuntu-24:
+  ubuntu24:
     image: ubuntu:24.04
     container_name: marckv-ubuntu-24
     hostname: ubuntu-24

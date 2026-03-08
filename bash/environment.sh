@@ -27,13 +27,24 @@ export LESS_TERMCAP_us=$'\e[1;4;31m'   # begin underline
 
 export HISTSIZE=100000
 export HISTFILESIZE=200000
-# Better history handling
-export HISTCONTROL=ignoreboth:erasedups
-# History with date and time
+# ignoredups: skip consecutive duplicates. erasedups intentionally avoided —
+# on a server, keeping the full history sequence is important for auditing.
+export HISTCONTROL=ignorespace:ignoredups
+# Timestamp every history entry for audit trail
 export HISTTIMEFORMAT="%d/%m/%y %T "
-# HISTIGNORE for server environments - Exclude repetitive commands AND dangerous operations for security
-# Security: exclude dangerous commands to prevent accidental execution from history
-export HISTIGNORE="ls:ll:la:l:cd:cd -:cd ..:pwd:exit:logout:clear:history:history *:date:uptime:whoami:id:* --help:man *:ps:ps aux:top:htop:df:df -h:free:free -h:lsblk:bg:fg:jobs:rm:rm *:rmdir:reboot:shutdown:halt:poweroff:init 0:init 6:kill:killall:pkill:systemctl stop*:systemctl restart*:systemctl disable*:umount:fdisk:mkfs*:dd:shred:wipefs"
+# All commands are recorded — full audit trail on a server.
+unset HISTIGNORE
+
+# Flush history to disk after every command so it survives dropped SSH sessions.
+export PROMPT_COMMAND="history -a${PROMPT_COMMAND:+; $PROMPT_COMMAND}"
+
+# Restrict default permissions: new files are rwxr-x--- (not readable by others).
+umask 027
+
+# Auto-logout idle SSH sessions after 30 minutes of inactivity.
+# readonly prevents the user from unsetting it in the same session.
+export TMOUT=1800
+readonly TMOUT
 
 # PATH enhancements
 # Add local bin directories to PATH if they exist

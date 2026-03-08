@@ -28,6 +28,9 @@ source "$BASH_MODULES_DIR/aliases.sh"
 # Load utility functions
 source "$BASH_MODULES_DIR/functions.sh"
 
+# Load interactive help
+source "$BASH_MODULES_DIR/help.sh"
+
 # Load theme (robbyrussell by default, can be changed with BASH_THEME)
 BASH_THEME=${BASH_THEME:-robbyrussell}
 if [[ -f "$BASH_MODULES_DIR/themes/${BASH_THEME}.sh" ]]; then

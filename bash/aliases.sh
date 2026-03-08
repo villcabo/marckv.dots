@@ -53,3 +53,39 @@ alias privip='hostname -I 2>/dev/null | awk "{print \$1}" || ip -4 addr show sco
 # Shell management aliases
 alias clearhistory='history -c && history -w'
 alias reloadbash='source ~/.bashrc && echo "Bash configuration reloaded."'
+
+# systemctl shortcuts
+alias scs='sudo systemctl status'
+alias scst='sudo systemctl start'
+alias scsp='sudo systemctl stop'
+alias scr='sudo systemctl restart'
+alias sce='sudo systemctl enable'
+alias scd='sudo systemctl disable'
+alias scrl='sudo systemctl reload'
+alias scls='systemctl list-units --type=service --state=running'
+alias scfail='systemctl list-units --state=failed'
+
+# journalctl shortcuts
+alias jlog='sudo journalctl -xe'
+alias jlogf='sudo journalctl -f'
+alias jlogu='sudo journalctl -u'       # usage: jlogu nginx
+alias jlogb='sudo journalctl -b'       # logs since last boot
+alias jlog1='sudo journalctl -b -1'    # logs from previous boot
+
+# Network — active connections grouped by state
+alias conns='ss -s'
+alias listen='ss -tlnp'
+alias established='ss -tnp state established'
+
+# Server logs
+alias tailauth='sudo tail -f /var/log/auth.log'
+alias tailsys='sudo tail -f /var/log/syslog'
+alias dmesgc='sudo dmesg -T --color=always | tail -50'
+
+# Top processes by resource
+alias pscpu='ps aux --sort=-%cpu | head -11'
+alias psmem='ps aux --sort=-%mem | head -11'
+
+# Recently modified files in current directory
+# Usage: recent [n]  (default: 20 files)
+alias recent='find . -maxdepth 3 -not -path "*/\.*" -type f -printf "%T@ %Tc %p\n" 2>/dev/null | sort -rn | head -20 | cut -d" " -f2-'
