@@ -1,7 +1,7 @@
 #!/bin/bash
 # ~/.bashrc extension for Debian/Ubuntu based systems
 # This file can be sourced from your system's ~/.bashrc
-# source ~/.marck.dots/bash/.bashrc
+# source ~/.marckv.dots/bash/.bashrc
 
 # Only run if this is an interactive shell
 [[ $- != *i* ]] && return

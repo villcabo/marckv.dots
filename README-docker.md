@@ -35,15 +35,15 @@ docker-compose exec ubuntu-24 bash
 ### Instalar el bashrc personalizado dentro del contenedor:
 ```bash
 # Una vez dentro del contenedor
-~/.marck.dots/bash/install.sh
+~/.marckv.dots/bash/install.sh
 
 # O directamente
-source ~/.marck.dots/bash/.bashrc
+source ~/.marckv.dots/bash/.bashrc
 ```
 
 ### Verificar estado:
 ```bash
-~/.marck.dots/bash/install.sh status
+~/.marckv.dots/bash/install.sh status
 ```
 
 ### Detener todos los contenedores:
@@ -53,7 +53,7 @@ docker-compose down
 
 ## Características
 
-- **Volumen montado**: El directorio actual se monta en `~/.marck.dots` (solo lectura)
+- **Volumen montado**: El directorio actual se monta en `~/.marckv.dots` (solo lectura)
 - **Herramientas básicas**: Cada contenedor instala `curl` y `git` automáticamente
 - **Network aislada**: Todos los contenedores están en la misma red `marckv-net`
 - **Hostnames únicos**: Cada contenedor tiene un hostname descriptivo
@@ -67,5 +67,5 @@ El script `bash/install.sh` permite:
 
 La línea que se agrega es:
 ```bash
-[[ -s "$HOME/.marck.dots/bash/.bashrc" ]] && source "$HOME/.marck.dots/bash/.bashrc"
+[[ -s "$HOME/.marckv.dots/bash/.bashrc" ]] && source "$HOME/.marckv.dots/bash/.bashrc"
 ```

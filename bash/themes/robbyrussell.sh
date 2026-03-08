@@ -56,8 +56,8 @@ get_compact_pwd() {
         pwd_path="~${pwd_path#$home_path}"
     fi
     
-    # Special case for .marck.dots subdirectories
-    if [[ "$pwd_path" =~ ^~/.marck.dots/.+ ]]; then
+    # Special case for .marckv.dots subdirectories
+    if [[ "$pwd_path" =~ ^~/.marckv.dots/.+ ]]; then
         echo "~/.../$(basename "$PWD")"
         return
     fi

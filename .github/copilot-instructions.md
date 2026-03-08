@@ -16,7 +16,7 @@ docker compose up -d ubuntu-24
 docker compose exec ubuntu-24 bash
 
 # Navigate to project directory (already mounted)
-cd /root/.marck.dots
+cd /root/.marckv.dots
 ```
 
 ## 📋 Available Test Distributions
@@ -38,7 +38,7 @@ docker compose exec <distribution-name> bash
 
 ### 1. Test Bash Configuration
 ```bash
-cd /root/.marck.dots/installer
+cd /root/.marckv.dots/installer
 ./01-install-bash.sh           # Install
 ./01-install-bash.sh status    # Check status  
 ./01-install-bash.sh uninstall # Uninstall
@@ -46,7 +46,7 @@ cd /root/.marck.dots/installer
 
 ### 2. Test Docker Color Aliases
 ```bash
-cd /root/.marck.dots/installer
+cd /root/.marckv.dots/installer
 ./02-install-docker-color.sh          # Complete install (binary + aliases)
 ./02-install-docker-color.sh aliases  # Only aliases
 ./02-install-docker-color.sh binary   # Only binary check
@@ -106,7 +106,7 @@ After installation, verify these features:
 # Test across multiple distributions
 for dist in ubuntu-24 ubuntu-22 debian-12; do
     echo "Testing on $dist..."
-    docker compose exec $dist bash -c "cd /root/.marck.dots/installer && ./01-install-bash.sh"
+    docker compose exec $dist bash -c "cd /root/.marckv.dots/installer && ./01-install-bash.sh"
 done
 ```
 
@@ -124,12 +124,12 @@ done
 # Check installation files
 ls -la ~/.bashrc ~/.bash_aliases
 
-# Verify marck.dots loading
-grep "marck.dots" ~/.bashrc ~/.bash_aliases
+# Verify marckv.dots loading
+grep "marckv.dots" ~/.bashrc ~/.bash_aliases
 
 # Manual component testing
-source ~/.marck.dots/bash/.bashrc
-source ~/.marck.dots/bash/themes/robbyrussell.sh
+source ~/.marckv.dots/bash/.bashrc
+source ~/.marckv.dots/bash/themes/robbyrussell.sh
 ```
 
 ## 📝 Code Modification Guidelines
@@ -163,7 +163,7 @@ docker compose down --volumes --remove-orphans
 
 ## ⚠️ Important Notes
 
-- **Container environment**: All containers run as root with project mounted at `/root/.marck.dots`
+- **Container environment**: All containers run as root with project mounted at `/root/.marckv.dots`
 - **Read-only mount**: Project directory is mounted read-only to prevent accidental modifications
 - **Network**: Containers use `marckv-net` bridge network for inter-container communication
 - **Primary testing**: Use `ubuntu-24` as the primary testing environment (most recent LTS)

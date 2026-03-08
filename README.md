@@ -16,8 +16,8 @@
 ### 1. Clone Repository
 
 ```bash
-git clone https://github.com/villcabo/marckv.dots.git ~/.marck.dots
-cd ~/.marck.dots/installer
+git clone https://github.com/villcabo/marckv.dots.git ~/.marckv.dots
+cd ~/.marckv.dots/installer
 ```
 
 ### 2. Install Components
@@ -75,7 +75,7 @@ docker compose up -d ubuntu-24
 
 # Test installations  
 docker compose exec ubuntu-24 bash
-cd /root/.marck.dots/installer
+cd /root/.marckv.dots/installer
 ./01-install-bash.sh
 ```
 
@@ -161,7 +161,7 @@ The configuration automatically:
 ./02-install-docker-color.sh status
 
 # Manual verification
-grep "marck.dots" ~/.bashrc ~/.bash_aliases
+grep "marckv.dots" ~/.bashrc ~/.bash_aliases
 ```
 
 ### Docker Binary Installation

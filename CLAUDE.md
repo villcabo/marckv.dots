@@ -21,11 +21,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```bash
 docker compose up -d ubuntu-24                  # Start primary test container
 docker compose exec ubuntu-24 bash              # Enter container
-# Inside container: cd /root/.marck.dots/installer && ./01-install-bash.sh
+# Inside container: cd /root/.marckv.dots/installer && ./01-install-bash.sh
 
 # Multi-distro test
 for dist in ubuntu-24 ubuntu-22 debian-12; do
-    docker compose exec $dist bash -c "cd /root/.marck.dots/installer && ./01-install-bash.sh"
+    docker compose exec $dist bash -c "cd /root/.marckv.dots/installer && ./01-install-bash.sh"
 done
 
 docker compose down                             # Cleanup
@@ -37,7 +37,7 @@ Follows `nvim/stylua.toml`: 2-space indent, 120 column width.
 ## Architecture
 
 ### Deployment model
-No symlinks. Installers append `source` lines to `~/.bashrc` and `~/.bash_aliases` that point into the repo (e.g., `~/.marck.dots/bash/.bashrc`). Changes in the repo are immediately live. Backups are created with timestamps before any modification.
+No symlinks. Installers append `source` lines to `~/.bashrc` and `~/.bash_aliases` that point into the repo (e.g., `~/.marckv.dots/bash/.bashrc`). Changes in the repo are immediately live. Backups are created with timestamps before any modification.
 
 ### Bash module load order (bash/.bashrc)
 `colors.sh` → `environment.sh` → `completion.sh` → `aliases.sh` → `functions.sh` → `themes/robbyrussell.sh` → `welcome.sh` → `~/.bash_aliases` → `~/.bash_local` → `/etc/profile.d/*`
@@ -52,7 +52,7 @@ Colors must load first as other modules depend on them. The theme depends on fun
 - User privilege detection: root → direct install, sudo user → sudo install, regular user → `~/.local/bin`
 
 ### Docker test environment
-`docker-compose.yml` mounts the repo read-only at `/root/.marck.dots` in 5 containers (ubuntu-20/22/24, debian-11/12). Primary target: `ubuntu-24`.
+`docker-compose.yml` mounts the repo read-only at `/root/.marckv.dots` in 5 containers (ubuntu-20/22/24, debian-11/12). Primary target: `ubuntu-24`.
 
 ## Conventions
 
