@@ -249,7 +249,36 @@ dc() {
 
 # Standalone dcup (mirrors dc up with the same flag parsing)
 dcup() {
-    dc up "$@"
+    case "$1" in
+        -h|--help)
+            echo -e "${CB}${CCY}dcup${CR} — Docker Compose Up shortcut  ${CI}(mirrors: dc up)${CR}\n"
+
+            echo -e "${CCY}USAGE${CR}"
+            echo -e "  ${CB}dcup${CR} [${CYE}flags${CR}] [${CMA}service...${CR}]\n"
+
+            echo -e "${CCY}FLAGS${CR}"
+            echo -e "  ${CYE}-h${CR}, ${CYE}--help${CR}           Show this help"
+            echo -e "  ${CYE}-p${CR}                   Pull images before starting"
+            echo -e "  ${CYE}-b${CR}                   Build images before starting"
+            echo -e "  ${CYE}-r${CR}                   Force recreate containers"
+            echo -e "  ${CYE}-l${CR}                   Follow logs after up"
+            echo -e "  ${CYE}-f${CR} ${CMA}<file>${CR}             Use a specific compose file"
+
+            echo -e "\n${CCY}EXAMPLES${CR}"
+            echo -e "  ${CGR}dcup${CR}                        Start all services"
+            echo -e "  ${CGR}dcup api worker${CR}             Start specific services only"
+            echo -e "  ${CGR}dcup -r${CR}                     Force recreate all services"
+            echo -e "  ${CGR}dcup -l${CR}                     Start and follow logs"
+            echo -e "  ${CGR}dcup -rl${CR}                    Force recreate + follow logs"
+            echo -e "  ${CGR}dcup -r -l${CR}                  Same as above (flags can be split)"
+            echo -e "  ${CGR}dcup -pbl${CR}                   Pull + build + follow logs"
+            echo -e "  ${CGR}dcup -rb api${CR}                Recreate + build for 'api' service"
+            echo -e "  ${CGR}dcup -f prod.yml -r${CR}         Custom compose file + recreate"
+            ;;
+        *)
+            dc up "$@"
+            ;;
+    esac
 }
 
 # Compose aliases

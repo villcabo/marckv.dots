@@ -14,17 +14,23 @@ bashhelp() {
 
     # ── layout helpers ───────────────────────────────────────────────────────
     _h_header() {
-        echo -e "\n${BO}${C}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RE}"
-        echo -e "${BO}${C}  $1${RE}"
-        echo -e "${BO}${C}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RE}"
+        echo -e "\n${BO}${C}  ╔══════════════════════════════════════════════╗${RE}"
+        echo -e "${BO}${C}  ║  $1$(printf '%*s' $(( 44 - ${#1} )) '')║${RE}"
+        echo -e "${BO}${C}  ╚══════════════════════════════════════════════╝${RE}"
     }
     _h_cmd() {
         # $1 = command/alias   $2 = description   $3 = (optional) usage example
-        printf "  ${BO}${G}%-28s${RE}${W}%s${RE}\n" "$1" "$2"
-        [[ -n "$3" ]] && printf "  ${Y}%-28s${C}%s${RE}\n" "" "$3"
+        # Color <placeholders> in magenta; use visible length for padding
+        local raw="$1"
+        local colored
+        colored=$(printf '%s' "$raw" | sed "s|<[^>]*>|${RE}${M}&${RE}${BO}${G}|g")
+        local pad=$(( 28 - ${#raw} ))
+        (( pad < 1 )) && pad=1
+        printf "  ${BO}${G}%s%*s${RE}  ${W}%s${RE}\n" "$colored" "$pad" "" "$2"
+        [[ -n "$3" ]] && printf "  %-30s${Y}↳${RE} ${C}%s${RE}\n" "" "$3"
     }
     _h_section() {
-        echo -e "\n  ${BO}${M}▸ $1${RE}"
+        echo -e "\n  ${BO}${C}▸${RE} ${BO}${M}$1${RE}"
     }
 
     local category="${1:-all}"
@@ -36,21 +42,21 @@ bashhelp() {
         echo -e "\n${BO}${C}╔══════════════════════════════════════════════════════╗${RE}"
         echo -e "${BO}${C}║          marckv.dots — Command Reference             ║${RE}"
         echo -e "${BO}${C}╚══════════════════════════════════════════════════════╝${RE}"
-        echo -e "  Usage: ${G}bashhelp${RE} ${Y}[category]${RE}\n"
-        echo -e "  ${BO}Available categories:${RE}"
-        printf "  ${G}%-18s${RE}%s\n" "nav"       "Directory navigation"
-        printf "  ${G}%-18s${RE}%s\n" "git"       "Git aliases"
-        printf "  ${G}%-18s${RE}%s\n" "system"    "System monitoring"
-        printf "  ${G}%-18s${RE}%s\n" "processes" "Process management"
-        printf "  ${G}%-18s${RE}%s\n" "network"   "Network and connections"
-        printf "  ${G}%-18s${RE}%s\n" "services"  "systemctl and journalctl"
-        printf "  ${G}%-18s${RE}%s\n" "logs"      "Server logs"
-        printf "  ${G}%-18s${RE}%s\n" "packages"  "apt package management"
-        printf "  ${G}%-18s${RE}%s\n" "files"     "File operations"
-        printf "  ${G}%-18s${RE}%s\n" "shell"     "Shell configuration"
-        printf "  ${G}%-18s${RE}%s\n" "security"  "Server security"
-        printf "  ${G}%-18s${RE}%s\n" "docker"    "Docker and Docker Compose aliases"
-        echo -e "\n  ${Y}Example:${RE} bashhelp services"
+        echo -e "\n  ${W}Usage:${RE} ${BO}${G}bashhelp${RE} ${Y}[category]${RE}\n"
+        echo -e "  ${BO}${C}Available categories:${RE}"
+        printf "  ${BO}${G}%-18s${RE}${W}%s${RE}\n" "nav"       "Directory navigation"
+        printf "  ${BO}${G}%-18s${RE}${W}%s${RE}\n" "git"       "Git aliases"
+        printf "  ${BO}${G}%-18s${RE}${W}%s${RE}\n" "system"    "System monitoring"
+        printf "  ${BO}${G}%-18s${RE}${W}%s${RE}\n" "processes" "Process management"
+        printf "  ${BO}${G}%-18s${RE}${W}%s${RE}\n" "network"   "Network and connections"
+        printf "  ${BO}${G}%-18s${RE}${W}%s${RE}\n" "services"  "systemctl and journalctl"
+        printf "  ${BO}${G}%-18s${RE}${W}%s${RE}\n" "logs"      "Server logs"
+        printf "  ${BO}${G}%-18s${RE}${W}%s${RE}\n" "packages"  "apt package management"
+        printf "  ${BO}${G}%-18s${RE}${W}%s${RE}\n" "files"     "File operations"
+        printf "  ${BO}${G}%-18s${RE}${W}%s${RE}\n" "shell"     "Shell configuration"
+        printf "  ${BO}${G}%-18s${RE}${W}%s${RE}\n" "security"  "Server security"
+        printf "  ${BO}${G}%-18s${RE}${W}%s${RE}\n" "docker"    "Docker and Docker Compose aliases"
+        echo -e "\n  ${Y}↳ Example:${RE} ${G}bashhelp services${RE}"
         echo ""
         return 0
     fi
@@ -261,8 +267,8 @@ bashhelp() {
         ;;
 
     *)
-        echo -e "${R}Unknown category '${category}'.${RE}"
-        echo -e "Run ${G}bashhelp${RE} to see available categories."
+        echo -e "  ${R}Unknown category:${RE} ${BO}'${category}'${RE}"
+        echo -e "  Run ${BO}${G}bashhelp${RE} to see available categories."
         return 1
         ;;
     esac

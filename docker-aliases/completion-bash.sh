@@ -96,7 +96,7 @@ _dcup_completion() {
     fi
 
     if [[ "$cur" == -* ]]; then
-        local all_flags="-p -l -f -b -r"
+        local all_flags="-h --help -p -l -f -b -r"
         local used="" flag
         for (( i=1; i<COMP_CWORD; i++ )); do
             [[ "${COMP_WORDS[i]}" == -* && "${COMP_WORDS[i]}" != "-f" ]] && used+="${COMP_WORDS[i]} "

@@ -160,6 +160,8 @@ _dcup_zsh() {
     services=(${(f)"$(_get_compose_services)"})
     yml_files=(${(f)"$(ls *.yml *.yaml 2>/dev/null)"})
     flags=(
+        '-h[Show help and examples]'
+        '--help[Show help and examples]'
         '-f[Use specific compose file]'
         '-p[Pull images before up]'
         '-b[Build before up]'

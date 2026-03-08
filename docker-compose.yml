@@ -1,5 +1,19 @@
 name: marckv.dots-testings
 
+# Shared startup: installs Docker CLI + Compose plugin from official GitHub release
+x-docker-install: &docker-install
+  - bash
+  - -c
+  - |
+    set -e
+    apt update -qq
+    apt install -y -qq curl git wget docker.io
+    mkdir -p /usr/local/lib/docker/cli-plugins
+    curl -fsSL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-$(uname -m)" \
+      -o /usr/local/lib/docker/cli-plugins/docker-compose
+    chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+    exec bash
+
 services:
   # =============================================================================
   # DEBIAN DISTRIBUTIONS
@@ -15,7 +29,7 @@ services:
       - .:/root/.marckv.dots:ro
       - /var/run/docker.sock:/var/run/docker.sock
     working_dir: /root
-    command: bash -c "apt update && apt install -y curl git wget docker.io docker-compose-plugin && bash"
+    command: *docker-install
     networks:
       - marckv-net
 
@@ -29,7 +43,7 @@ services:
       - .:/root/.marckv.dots:ro
       - /var/run/docker.sock:/var/run/docker.sock
     working_dir: /root
-    command: bash -c "apt update && apt install -y curl git wget docker.io docker-compose-plugin && bash"
+    command: *docker-install
     networks:
       - marckv-net
 
@@ -49,7 +63,7 @@ services:
       - .:/root/.marckv.dots:ro
       - /var/run/docker.sock:/var/run/docker.sock
     working_dir: /root
-    command: bash -c "apt update && apt install -y curl git wget docker.io && bash"
+    command: *docker-install
     networks:
       - marckv-net
 
@@ -65,7 +79,7 @@ services:
       - .:/root/.marckv.dots:ro
       - /var/run/docker.sock:/var/run/docker.sock
     working_dir: /root
-    command: bash -c "apt update && apt install -y curl git wget docker.io docker-compose-plugin && bash"
+    command: *docker-install
     networks:
       - marckv-net
 
@@ -81,7 +95,7 @@ services:
       - .:/root/.marckv.dots:ro
       - /var/run/docker.sock:/var/run/docker.sock
     working_dir: /root
-    command: bash -c "apt update && apt install -y curl git wget docker.io docker-compose-plugin && bash"
+    command: *docker-install
     networks:
       - marckv-net
 
