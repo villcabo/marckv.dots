@@ -10,6 +10,7 @@ GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
+CYAN='\033[0;36m'
 BOLD='\033[1m'
 NC='\033[0m' # No Color
 
@@ -133,14 +134,14 @@ check_docker_color_binary() {
 install_aliases_only() {
     info "Installing Docker Color Aliases..."
     
-    # Verificar que existe el directorio marckv.dots
+    # Verify that the marckv.dots directory exists
     if [[ ! -d "$MARCKV_DOTS_DIR" ]]; then
         error "Directory $MARCKV_DOTS_DIR does not exist."
         error "Make sure the volume is properly mounted in the container."
         exit 1
     fi
     
-    # Verificar que existe el archivo docker-color_aliases.sh
+    # Verify that the docker-color_aliases.sh loader exists
     if [[ ! -f "$DOCKER_COLOR_ALIASES" ]]; then
         error "File $DOCKER_COLOR_ALIASES not found"
         exit 1
@@ -149,27 +150,27 @@ install_aliases_only() {
     info "marckv.dots directory found: $MARCKV_DOTS_DIR"
     info "Docker color aliases file: $DOCKER_COLOR_ALIASES"
     
-    # Crear ~/.bash_aliases si no existe
+    # Create ~/.bash_aliases if it does not exist
     if [[ ! -f "$BASH_ALIASES_FILE" ]]; then
         info "Creating ~/.bash_aliases since it doesn't exist..."
         touch "$BASH_ALIASES_FILE"
     fi
     
-    # Verificar si ya está instalado
+    # Check if already installed
     if grep -Fq "$LOAD_LINE" "$BASH_ALIASES_FILE"; then
         warn "Docker color aliases are already installed in $BASH_ALIASES_FILE"
         info "No changes needed."
         return 0
     fi
     
-    # Hacer backup del ~/.bash_aliases si no está vacío
+    # Back up ~/.bash_aliases if it is not empty
     if [[ -s "$BASH_ALIASES_FILE" ]]; then
         local backup_file="${BASH_ALIASES_FILE}.backup.$(date +%Y%m%d_%H%M%S)"
         info "Creating backup of ~/.bash_aliases in $backup_file"
         cp "$BASH_ALIASES_FILE" "$backup_file"
     fi
     
-    # Agregar la línea de carga al final del ~/.bash_aliases
+    # Append the load line to ~/.bash_aliases
     info "Adding Docker color aliases loading to ~/.bash_aliases..."
     echo "" >> "$BASH_ALIASES_FILE"
     echo "# marckv.dots Docker Color Aliases" >> "$BASH_ALIASES_FILE"
@@ -235,12 +236,15 @@ install_docker_color() {
     echo ""
     
     info "Features that will be available:"
-    info "  • Docker shortcuts: d ps, d logs, d x"
-    info "  • Compose shortcuts: dc up, dc down, dc logs"
-    info "  • Smart confirmations for destructive operations"
-    info "  • Enhanced autocompletion for containers and services"
-    info "  • Color-coded output integration"
-    info "  • Quick execution functions: dq, dcq"
+    info "  • Docker shortcuts: d ps, d logs, d exec, d sh/bash"
+    info "  • Compose shortcuts: dc up/down/build/logs/exec with flag parsing (-p/-b/-r/-l/-f)"
+    info "  • Smart confirmations for destructive operations (up, down, build)"
+    info "  • Shell-aware tab completion (bash: complete, zsh: compdef)"
+    info "  • Color-coded output via docker-color-output"
+    info "  • Quick exec by pattern: dq <container>, dcq <service>"
+    info "  • Smart log follower: dclt [pattern] with regex support"
+    info "  • Git properties reader: dcpr <service> [-a/-s]"
+    info "  • Modular structure: 7 focused files (docker, compose, advanced, help, completions)"
     echo ""
     
     # Ask for confirmation for the complete installation
@@ -286,7 +290,7 @@ uninstall_docker_color() {
         return 0
     fi
     
-    # Crear backup antes de modificar
+    # Create backup before modifying
     local backup_file="${BASH_ALIASES_FILE}.uninstall_backup.$(date +%Y%m%d_%H%M%S)"
     info "Creating backup in $backup_file"
     cp "$BASH_ALIASES_FILE" "$backup_file"
@@ -321,11 +325,25 @@ status_docker_color() {
     fi
     
     if [[ ! -f "$DOCKER_COLOR_ALIASES" ]]; then
-        error "Docker color aliases not found: $DOCKER_COLOR_ALIASES"
+        error "Docker color aliases loader not found: $DOCKER_COLOR_ALIASES"
         return 1
     else
-        success "Docker color aliases: $DOCKER_COLOR_ALIASES"
+        success "Docker color aliases loader: $DOCKER_COLOR_ALIASES"
     fi
+
+    # Verify all module files exist
+    local docker_aliases_dir="$MARCKV_DOTS_DIR/docker-aliases"
+    local modules=(_init.sh docker.sh compose.sh advanced.sh help.sh completion-bash.sh completion-zsh.sh)
+    local all_modules_ok=true
+    for module in "${modules[@]}"; do
+        if [[ -f "$docker_aliases_dir/$module" ]]; then
+            success "  Module: $module"
+        else
+            error "  Module missing: $module"
+            all_modules_ok=false
+        fi
+    done
+    [[ "$all_modules_ok" == false ]] && warn "Some modules are missing — reinstall may be needed"
     
     if [[ ! -f "$BASH_ALIASES_FILE" ]]; then
         warn "~/.bash_aliases doesn't exist"

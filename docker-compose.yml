@@ -4,7 +4,7 @@ services:
   # =============================================================================
   # DEBIAN DISTRIBUTIONS
   # =============================================================================
-  
+
   debian11:
     image: debian:11
     container_name: marckv-debian-11
@@ -13,8 +13,9 @@ services:
     stdin_open: true
     volumes:
       - .:/root/.marckv.dots:ro
+      - /var/run/docker.sock:/var/run/docker.sock
     working_dir: /root
-    command: bash -c "apt update && apt install -y curl git wget && bash"
+    command: bash -c "apt update && apt install -y curl git wget docker.io docker-compose-plugin && bash"
     networks:
       - marckv-net
 
@@ -26,8 +27,9 @@ services:
     stdin_open: true
     volumes:
       - .:/root/.marckv.dots:ro
+      - /var/run/docker.sock:/var/run/docker.sock
     working_dir: /root
-    command: bash -c "apt update && apt install -y curl git wget && bash"
+    command: bash -c "apt update && apt install -y curl git wget docker.io docker-compose-plugin && bash"
     networks:
       - marckv-net
 
@@ -45,8 +47,9 @@ services:
       - DEBIAN_FRONTEND=noninteractive
     volumes:
       - .:/root/.marckv.dots:ro
+      - /var/run/docker.sock:/var/run/docker.sock
     working_dir: /root
-    command: bash -c "apt update && apt install -y curl git wget && bash"
+    command: bash -c "apt update && apt install -y curl git wget docker.io && bash"
     networks:
       - marckv-net
 
@@ -60,8 +63,9 @@ services:
       - DEBIAN_FRONTEND=noninteractive
     volumes:
       - .:/root/.marckv.dots:ro
+      - /var/run/docker.sock:/var/run/docker.sock
     working_dir: /root
-    command: bash -c "apt update && apt install -y curl git wget && bash"
+    command: bash -c "apt update && apt install -y curl git wget docker.io docker-compose-plugin && bash"
     networks:
       - marckv-net
 
@@ -75,8 +79,9 @@ services:
       - DEBIAN_FRONTEND=noninteractive
     volumes:
       - .:/root/.marckv.dots:ro
+      - /var/run/docker.sock:/var/run/docker.sock
     working_dir: /root
-    command: bash -c "apt update && apt install -y curl git wget && bash"
+    command: bash -c "apt update && apt install -y curl git wget docker.io docker-compose-plugin && bash"
     networks:
       - marckv-net
 
