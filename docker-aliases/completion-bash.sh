@@ -83,6 +83,36 @@ _dc_completion() {
 }
 
 # ---------------------------------------------------------------------------
+# dcup completion — same as "dc up" but skips the subcommand layer
+# ---------------------------------------------------------------------------
+_dcup_completion() {
+    local cur prev i
+    cur="${COMP_WORDS[COMP_CWORD]}"
+    prev="${COMP_WORDS[COMP_CWORD-1]}"
+
+    if [[ "$prev" == "-f" ]]; then
+        COMPREPLY=($(compgen -W "$(ls *.yml *.yaml 2>/dev/null)" -- "$cur"))
+        return 0
+    fi
+
+    if [[ "$cur" == -* ]]; then
+        local all_flags="-p -l -f -b -r"
+        local used="" flag
+        for (( i=1; i<COMP_CWORD; i++ )); do
+            [[ "${COMP_WORDS[i]}" == -* && "${COMP_WORDS[i]}" != "-f" ]] && used+="${COMP_WORDS[i]} "
+        done
+        local avail=""
+        for flag in $all_flags; do
+            [[ "$flag" == "-f" || ! "$used" =~ $flag ]] && avail+="$flag "
+        done
+        COMPREPLY=($(compgen -W "$avail" -- "$cur"))
+        return 0
+    fi
+
+    COMPREPLY=($(compgen -W "$(_get_compose_services)" -- "$cur"))
+}
+
+# ---------------------------------------------------------------------------
 # Quick function completions
 # ---------------------------------------------------------------------------
 _dq_completion() {
@@ -128,9 +158,9 @@ _dcpr_completion() {
 # ---------------------------------------------------------------------------
 # Register all completions
 # ---------------------------------------------------------------------------
-complete -F _d_completion  d
-complete -F _dc_completion dc
-complete -F _dc_completion dcup
+complete -F _d_completion   d
+complete -F _dc_completion  dc
+complete -F _dcup_completion dcup
 
 complete -F _dq_completion            dq
 complete -F _dcq_completion           dcq

@@ -153,6 +153,35 @@ _dc_zsh() {
 }
 
 # ---------------------------------------------------------------------------
+# dcup completion — same as "dc up" but skips the subcommand layer
+# ---------------------------------------------------------------------------
+_dcup_zsh() {
+    local -a services flags yml_files
+    services=(${(f)"$(_get_compose_services)"})
+    yml_files=(${(f)"$(ls *.yml *.yaml 2>/dev/null)"})
+    flags=(
+        '-f[Use specific compose file]'
+        '-p[Pull images before up]'
+        '-b[Build before up]'
+        '-l[Follow logs after up]'
+        '-r[Force recreate containers]'
+    )
+
+    local prev="${words[$((CURRENT-1))]}"
+    if [[ "$prev" == "-f" ]]; then
+        _describe 'compose file' yml_files
+        return
+    fi
+
+    if [[ "${words[$CURRENT]}" == -* ]]; then
+        _describe 'flag' flags
+        return
+    fi
+
+    _describe 'service' services
+}
+
+# ---------------------------------------------------------------------------
 # dq completion
 # ---------------------------------------------------------------------------
 _dq_zsh() {
@@ -216,7 +245,8 @@ _dcpr_zsh() {
 # Register completions
 # ---------------------------------------------------------------------------
 compdef _d_zsh    d
-compdef _dc_zsh   dc dcup
+compdef _dc_zsh   dc
+compdef _dcup_zsh dcup
 compdef _dq_zsh   dq
 compdef _dcq_zsh  dcq dcdown dcl dcx dcs
 compdef _dc_zsh   dcps dcps1
