@@ -1,6 +1,37 @@
 #!/bin/bash
 # Utility functions for enhanced shell experience
 
+# Pull latest changes for the marckv.dots repo and reload bash config
+dotsupdate() {
+    local dots_dir="${MARCKV_DOTS_DIR:-$HOME/.marckv.dots}"
+
+    if [[ ! -d "$dots_dir/.git" ]]; then
+        echo "Error: $dots_dir is not a git repository."
+        return 1
+    fi
+
+    echo "Updating marckv.dots ($dots_dir)..."
+    local output
+    output=$(git -C "$dots_dir" pull 2>&1)
+    local exit_code=$?
+
+    echo "$output"
+
+    if [[ $exit_code -ne 0 ]]; then
+        echo "Update failed. Check the error above."
+        return $exit_code
+    fi
+
+    if echo "$output" | grep -q "Already up to date"; then
+        echo "Already up to date. No reload needed."
+        return 0
+    fi
+
+    echo "Reloading bash configuration..."
+    # shellcheck source=/dev/null
+    source "$HOME/.bashrc" && echo "Done."
+}
+
 # Create directory and cd into it
 mkcd() {
     mkdir -p "$1" && cd "$1"

@@ -178,6 +178,7 @@ bashhelp() {
     # ════════════════════════════════════════════════════════════════════════
     shell)
         _h_header "Shell Configuration"
+        _h_cmd "dotsupdate"        "Pull latest marckv.dots changes and reload bash"
         _h_cmd "reloadbash"        "Reload bash config without closing the session"
         _h_cmd "clearhistory"      "Clear history for the current session"
         _h_cmd "bashhelp [cat]"    "This help; pass a category for details"   "bashhelp services"
