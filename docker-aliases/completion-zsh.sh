@@ -41,6 +41,8 @@ _d_zsh() {
         'prunenet:Prune networks'
         'help:Show help'
         'h:Show help'
+        '-h:Show help'
+        '--help:Show help'
     )
 
     local -a containers
@@ -95,6 +97,8 @@ _dc_zsh() {
         'info:Show compose configuration'
         'help:Show help'
         'h:Show help'
+        '-h:Show help'
+        '--help:Show help'
     )
 
     local -a services

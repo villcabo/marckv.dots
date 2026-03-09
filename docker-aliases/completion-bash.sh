@@ -11,7 +11,7 @@ _d_completion() {
     prev="${COMP_WORDS[COMP_CWORD-1]}"
 
     if [[ ${COMP_CWORD} -eq 1 ]]; then
-        local cmds="ps p ps1 p1 psp images i stats s s1 logs l l100 l300 l500 x sh bash start stop restart rm rmi kill inspect top prune prunea pruneima prunevol prunenet help h"
+        local cmds="ps p ps1 p1 psp images i stats s s1 logs l l100 l300 l500 x sh bash start stop restart rm rmi kill inspect top prune prunea pruneima prunevol prunenet help h -h --help"
         COMPREPLY=($(compgen -W "$cmds" -- "$cur"))
     else
         case "$prev" in
@@ -46,7 +46,7 @@ _dc_completion() {
     fi
 
     if [[ ${COMP_CWORD} -eq 1 ]]; then
-        local cmds="up u ul ps p ps1 p1 psp stats s s1 logs l l100 l300 l500 x sh bash down d start stop restart build b pull default info help h"
+        local cmds="up u ul ps p ps1 p1 psp stats s s1 logs l l100 l300 l500 x sh bash down d start stop restart build b pull default info help h -h --help"
         COMPREPLY=($(compgen -W "$cmds" -- "$cur"))
         return 0
     fi

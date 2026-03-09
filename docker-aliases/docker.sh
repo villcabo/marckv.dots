@@ -43,7 +43,7 @@ d() {
         prunenet|prn) docker network prune -f ;;
 
         # Help
-        help|h)      _docker_help ;;
+        help|h|-h|--help) _docker_help ;;
 
         # Passthrough
         *)           docker "$@" ;;

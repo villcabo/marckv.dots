@@ -61,6 +61,11 @@ _dc_resolve_file() {
 # Main docker compose dispatcher
 # ---------------------------------------------------------------------------
 dc() {
+    # Handle help before compose file lookup so it works from any directory
+    case "$1" in
+        -h|--help|help|h|"") _compose_help; return 0 ;;
+    esac
+
     local compose_file
     compose_file=$(_get_compose_file) || {
         echo -e "${CRE}No compose file found. Set ${CB}DOCKER_COMPOSE_FILE${CR} or add docker-compose.yml ❌"
@@ -238,9 +243,6 @@ dc() {
             done
             [[ "$found_files" == false ]] && echo -e "  ${CYE}No compose files found${CR}"
             ;;
-
-        # ── help ────────────────────────────────────────────────────────────
-        help|h) _compose_help ;;
 
         # ── passthrough ─────────────────────────────────────────────────────
         *) docker compose -f "$compose_file" "$@" ;;
