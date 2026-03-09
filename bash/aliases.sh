@@ -1,6 +1,9 @@
 #!/bin/bash
 # Useful aliases for Debian/Ubuntu systems
 
+# marckv.dots
+alias marckvdots='cd "$MARCKV_DOTS_DIR"'
+
 # Enhanced ls aliases
 alias ls='ls --color=auto'
 alias ll='ls -alF'

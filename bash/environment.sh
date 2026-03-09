@@ -1,6 +1,9 @@
 #!/bin/bash
 # Environment variables and PATH configuration
 
+# marckv.dots repository location
+export MARCKV_DOTS_DIR="$HOME/.marckv.dots"
+
 # Default editor preference
 if command -v nvim >/dev/null 2>&1; then
     export EDITOR=nvim
