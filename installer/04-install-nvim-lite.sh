@@ -56,30 +56,38 @@ install_nvim_lite() {
         exit 1
     fi
 
+    # Helper: install packages via apt respecting root/sudo/no-access
+    _apt_install() {
+        if [[ $EUID -eq 0 ]]; then
+            apt-get install -y "$@"
+        elif sudo -n true 2>/dev/null; then
+            sudo apt-get install -y "$@"
+        else
+            error "Cannot install $*: no root or sudo access."
+            info "Run manually: ${BOLD}sudo apt-get install -y $*${NC}"
+            exit 1
+        fi
+    }
+
     # Check gcc — required by nvim-treesitter to compile language parsers
     if ! command -v gcc >/dev/null 2>&1; then
         warn "gcc not found — required by nvim-treesitter to compile parsers."
         if command -v apt-get >/dev/null 2>&1; then
             info "Installing gcc via apt..."
-            if [[ $EUID -eq 0 ]]; then
-                apt-get install -y gcc
-            elif sudo -n true 2>/dev/null; then
-                sudo apt-get install -y gcc
-            else
-                error "Cannot install gcc: no root or sudo access."
-                info "Run manually: ${BOLD}sudo apt-get install -y gcc${NC}"
-                exit 1
-            fi
+            _apt_install gcc
             success "gcc installed: $(gcc --version | head -n1)"
         else
             error "Cannot install gcc automatically (apt-get not available)."
-            info "Install a C compiler manually before running nvim."
-            info "Example: ${BOLD}sudo apt-get install -y gcc${NC}"
+            info "Install manually: ${BOLD}sudo apt-get install -y gcc${NC}"
             exit 1
         fi
     else
         success "gcc found: $(gcc --version | head -n1)"
     fi
+
+    # tree-sitter-cli is NOT required: nvim-lite uses only Neovim's built-in
+    # parsers (bash, lua, python, markdown, vim, vimdoc, etc.) — no compilation
+    # needed on the server. Extra parsers can be added later with :TSInstall.
 
     local nvim_version
     nvim_version=$(nvim --version | head -n1)
