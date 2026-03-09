@@ -4,8 +4,8 @@
 # Load colors if not already loaded
 [[ -z "$GREEN" ]] && source "$(dirname "${BASH_SOURCE[0]}")/colors.sh"
 
-# Display system information on login (only for interactive sessions)
-if [[ -n "$PS1" ]]; then
+# Display system information on login (only if MARCKV_WELCOME=1 and interactive session)
+if [[ "$MARCKV_WELCOME" == "1" && -n "$PS1" ]]; then
     echo -e "${BOLD}${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
     echo -e "${BOLD}${CYAN}  $(hostname)${RESET}"
     echo -e "${BOLD}${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
