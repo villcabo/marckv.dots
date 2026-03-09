@@ -98,9 +98,11 @@ dc() {
             [[ ${#_dc_services[@]} -gt 0 ]] && cmd+=" ${_dc_services[*]}"
             if eval "$cmd"; then
                 if [[ "$_dc_show_logs" == true ]]; then
-                    [[ ${#_dc_services[@]} -gt 0 ]] \
-                        && docker compose -f "$compose_file" logs -f "${_dc_services[@]}" \
-                        || docker compose -f "$compose_file" logs -f
+                    if [[ ${#_dc_services[@]} -gt 0 ]]; then
+                        docker compose -f "$compose_file" logs -f "${_dc_services[@]}"
+                    else
+                        docker compose -f "$compose_file" logs -f
+                    fi
                 fi
             fi
             ;;
