@@ -5,9 +5,6 @@ return {
   { "folke/noice.nvim", enabled = false },
   { "rcarriga/nvim-notify", enabled = false },
 
-  -- File explorers (using oil instead)
-  { "nvim-neo-tree/neo-tree.nvim", enabled = false },
-
   -- Dashboard (not needed on servers)
   { "nvimdev/dashboard-nvim", enabled = false },
 
