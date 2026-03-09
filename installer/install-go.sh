@@ -1,16 +1,16 @@
 #!/bin/bash
 
-# Script para instalar Go siguiendo las instrucciones oficiales de go.dev
-# Basado en: https://go.dev/doc/install
+# Script to install Go following the official instructions from go.dev
+# Based on: https://go.dev/doc/install
 
-# === VARIABLES CONFIGURABLES ===
-GO_VERSION=""  # Se detectará automáticamente
-GO_ARCH=""     # Se detectará automáticamente
+# === CONFIGURABLE VARIABLES ===
+GO_VERSION=""  # Auto-detected
+GO_ARCH=""     # Auto-detected
 GO_INSTALL_DIR="/usr/local"
 GO_TAR=""
 GO_DOWNLOAD_URL=""
 
-# Colores para output
+# Colors using tput
 GREEN=$(tput setaf 114)
 ORANGE=$(tput setaf 208)
 BLUE=$(tput setaf 75)
@@ -18,7 +18,7 @@ RED=$(tput setaf 196)
 BOLD=$(tput bold)
 NC=$(tput sgr0)
 
-# Funciones de mensaje
+# Logging functions
 info()    { echo -e "${BLUE}[INFO]${NC} $1"; }
 success() { echo -e "${GREEN}[OK]${NC} $1"; }
 error()   { echo -e "${RED}[ERROR]${NC} $1"; }
@@ -29,30 +29,30 @@ die() {
     exit 1
 }
 
-# Verificar permisos de root
+# Verify script is running as root
 check_root() {
     if [ "$EUID" -ne 0 ]; then
-        error "Este script debe ejecutarse como root o con sudo"
-        info "Uso: sudo $0"
+        error "This script must be run as root or with sudo"
+        info "Usage: sudo $0"
         exit 1
     fi
 }
 
-# Detectar arquitectura del sistema
+# Detect system architecture
 detect_architecture() {
     local os_type
     local arch_type
-    
-    # Este script está diseñado para Linux/WSL
+
+    # This script is designed for Linux/WSL
     if [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "cygwin" ]]; then
-        error "Este script está diseñado para Linux/WSL, no para Git Bash en Windows"
-        info "Por favor ejecuta este script en WSL o un sistema Linux"
+        error "This script is designed for Linux/WSL, not Git Bash on Windows"
+        info "Please run this script in WSL or a Linux system"
         exit 1
     fi
-    
+
     os_type="linux"
-    
-    # Detectar arquitectura
+
+    # Detect architecture
     arch_type=$(uname -m)
     case $arch_type in
         x86_64|amd64)
@@ -71,158 +71,158 @@ detect_architecture() {
             arch_type="amd64"  # Fallback
             ;;
     esac
-    
+
     echo "${os_type}-${arch_type}"
 }
 
-# Obtener la última versión de Go
+# Get the latest Go version
 get_latest_go_version() {
     local latest_version
-    
-    # Usar scraping de la página oficial de descargas
+
+    # Scrape the official downloads page
     latest_version=$(curl -s https://go.dev/dl/ | grep -oP 'go\K[0-9]+\.[0-9]+\.[0-9]+' | head -n1)
-    
-    # Fallback: versión conocida estable
+
+    # Fallback to a known stable version
     if [ -z "$latest_version" ] || [[ "$latest_version" =~ [^0-9.] ]]; then
         latest_version="1.23.3"
     fi
-    
+
     echo "$latest_version"
 }
 
-# Comparar versiones semánticamente
+# Compare version strings semantically
 compare_versions() {
     local installed="$1"
     local available="$2"
-    
+
     if [ -z "$installed" ] || [ -z "$available" ]; then
         return 1
     fi
-    
-    # Usar sort -V para comparación semántica
+
+    # Use sort -V for semantic comparison
     local higher=$(printf '%s\n%s\n' "$installed" "$available" | sort -V | tail -n1)
-    
+
     if [ "$higher" = "$available" ] && [ "$installed" != "$available" ]; then
-        return 0  # Hay una versión más nueva
+        return 0  # A newer version is available
     else
-        return 1  # Ya está actualizada
+        return 1  # Already up to date
     fi
 }
 
-# Verificar si Go ya está instalado
+# Check for an existing Go installation
 check_existing_installation() {
-    # Detectar arquitectura del sistema
+    # Detect system architecture
     GO_ARCH=$(detect_architecture)
-    info "Arquitectura detectada: $GO_ARCH"
-    
-    # Verificar en múltiples ubicaciones porque sudo puede cambiar el PATH
+    info "Detected architecture: $GO_ARCH"
+
+    # Check multiple locations because sudo may change PATH
     local go_binary=""
     local installed_version=""
-    
-    # 1. Verificar en PATH actual
+
+    # 1. Check current PATH
     if command -v go >/dev/null 2>&1; then
         go_binary=$(command -v go)
         installed_version=$(go version 2>/dev/null | awk '{print $3}' | sed 's/go//')
-    # 2. Verificar en ubicación estándar de instalación
+    # 2. Check standard install location
     elif [ -x "/usr/local/go/bin/go" ]; then
         go_binary="/usr/local/go/bin/go"
         installed_version=$(/usr/local/go/bin/go version 2>/dev/null | awk '{print $3}' | sed 's/go//')
-    # 3. Verificar en /usr/bin
+    # 3. Check /usr/bin
     elif [ -x "/usr/bin/go" ]; then
         go_binary="/usr/bin/go"
         installed_version=$(/usr/bin/go version 2>/dev/null | awk '{print $3}' | sed 's/go//')
     fi
-    
+
     if [ -n "$go_binary" ] && [ -n "$installed_version" ]; then
-        warn "Go ya está instalado en el sistema"
-        info "Versión instalada: go$installed_version"
-        info "Ubicación: $go_binary"
-        
-        # Verificar si hay una versión más nueva
-        info "Verificando actualizaciones disponibles..."
+        warn "Go is already installed"
+        info "Installed version: go$installed_version"
+        info "Location: $go_binary"
+
+        # Check if a newer version is available
+        info "Checking for available updates..."
         local latest_version
         latest_version=$(get_latest_go_version)
-        
+
         if [ -n "$latest_version" ]; then
-            info "Última versión disponible: go$latest_version"
-            
+            info "Latest available version: go$latest_version"
+
             if compare_versions "$installed_version" "$latest_version"; then
-                success "🚀 ¡Nueva versión disponible!"
-                info "Versión instalada: go$installed_version"
-                info "Versión disponible: go$latest_version"
-                
-                read -p "¿Desea actualizar a la última versión? (Y/n): " -n 1 -r
+                success "🚀 New version available!"
+                info "Installed version: go$installed_version"
+                info "Available version: go$latest_version"
+
+                read -p "Update to the latest version? (Y/n): " -n 1 -r
                 echo
                 if [[ $REPLY =~ ^[Nn]$ ]]; then
-                    info "Actualización cancelada por el usuario"
+                    info "Update cancelled"
                     exit 0
                 fi
-                
-                # Configurar variables para la nueva versión
+
+                # Set variables for the new version
                 GO_VERSION="$latest_version"
             else
-                success "✅ Ya tienes la versión más reciente instalada"
-                info "No es necesario actualizar"
+                success "✅ You already have the latest version installed"
+                info "No update needed"
                 exit 0
             fi
         else
-            warn "No se pudo verificar la versión más reciente"
-            read -p "¿Desea reinstalar Go de todas formas? (y/N): " -n 1 -r
+            warn "Could not verify the latest version"
+            read -p "Reinstall Go anyway? (y/N): " -n 1 -r
             echo
             if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-                info "Instalación cancelada por el usuario"
+                info "Installation cancelled"
                 exit 0
             fi
-            GO_VERSION="1.23.3"  # Versión fallback
+            GO_VERSION="1.23.3"  # Fallback version
         fi
     else
-        # Go no está instalado, obtener la última versión
-        info "Go no está instalado en el sistema"
+        # Go is not installed — get the latest version
+        info "Go is not installed"
         GO_VERSION=$(get_latest_go_version)
-        info "Se instalará la última versión: go$GO_VERSION"
+        info "Will install the latest version: go$GO_VERSION"
     fi
-    
-    # Configurar URLs después de determinar la versión
+
+    # Configure URLs after determining the version
     GO_TAR="/tmp/go${GO_VERSION}.${GO_ARCH}.tar.gz"
     GO_DOWNLOAD_URL="https://go.dev/dl/go${GO_VERSION}.${GO_ARCH}.tar.gz"
-    
-    # Mostrar información de lo que se va a instalar
+
+    # Show what will be installed
     echo ""
-    info "📦 Preparando instalación de Go $GO_VERSION"
+    info "📦 Preparing Go $GO_VERSION installation"
 }
 
-# Descargar Go
+# Download Go
 download_go() {
-    info "Descargando Go $GO_VERSION..."
-    
+    info "Downloading Go $GO_VERSION..."
+
     if curl -L --progress-bar -o "$GO_TAR" "$GO_DOWNLOAD_URL"; then
-        success "Go descargado correctamente"
+        success "Go downloaded successfully"
     else
-        die "Error al descargar Go desde: $GO_DOWNLOAD_URL"
+        die "Failed to download Go from: $GO_DOWNLOAD_URL"
     fi
 }
 
-# Instalar Go
+# Install Go
 install_go() {
-    info "Removiendo instalación anterior de Go (si existe)..."
+    info "Removing previous Go installation (if any)..."
     rm -rf "$GO_INSTALL_DIR/go"
-    
-    info "Instalando Go en $GO_INSTALL_DIR..."
+
+    info "Installing Go to $GO_INSTALL_DIR..."
     if tar -C "$GO_INSTALL_DIR" -xzf "$GO_TAR"; then
-        success "Go instalado correctamente"
+        success "Go installed successfully"
     else
-        die "Error al extraer Go"
+        die "Failed to extract Go"
     fi
-    
-    # Limpiar archivo temporal
+
+    # Remove temp file
     rm -f "$GO_TAR"
 }
 
-# Configurar PATH
+# Configure environment variables
 setup_environment() {
-    info "Configurando variables de entorno..."
-    
-    # Crear archivo de configuración en /etc/profile.d/
+    info "Configuring environment variables..."
+
+    # Create configuration file in /etc/profile.d/
     cat > /etc/profile.d/go.sh << 'EOF'
 # Go programming language configuration
 export GOROOT=/usr/local/go
@@ -231,62 +231,62 @@ export PATH=$GOROOT/bin:$GOPATH/bin:$PATH
 EOF
 
     chmod +x /etc/profile.d/go.sh
-    success "Variables de entorno configuradas en /etc/profile.d/go.sh"
-    
-    # Aplicar configuración en la sesión actual
+    success "Environment variables configured in /etc/profile.d/go.sh"
+
+    # Apply to current session
     export GOROOT=/usr/local/go
     export GOPATH=$HOME/go
     export PATH=$GOROOT/bin:$GOPATH/bin:$PATH
 }
 
-# Verificar instalación
+# Verify installation
 verify_installation() {
-    info "Verificando instalación..."
-    
+    info "Verifying installation..."
+
     if [ ! -x "$GO_INSTALL_DIR/go/bin/go" ]; then
-        die "Binario de Go no encontrado en $GO_INSTALL_DIR/go/bin/go"
+        die "Go binary not found at $GO_INSTALL_DIR/go/bin/go"
     fi
-    
+
     local go_version
     go_version=$("$GO_INSTALL_DIR/go/bin/go" version 2>/dev/null | awk '{print $3}')
-    
+
     if [ -n "$go_version" ]; then
-        success "Go instalado correctamente: $go_version"
-        info "Ubicación: $GO_INSTALL_DIR/go"
-        info "Variables configuradas en: /etc/profile.d/go.sh"
+        success "Go installed successfully: $go_version"
+        info "Location: $GO_INSTALL_DIR/go"
+        info "Environment configured in: /etc/profile.d/go.sh"
     else
-        die "Error: Go no responde correctamente"
+        die "Go is not responding correctly"
     fi
 }
 
-# Mostrar información final
+# Show final information
 show_final_info() {
     echo ""
-    success "🎉 ¡Instalación de Go completada!"
-    info "Para usar Go en la sesión actual, ejecuta:"
+    success "🎉 Go installation complete!"
+    info "To use Go in the current session, run:"
     echo "   source /etc/profile.d/go.sh"
-    info "O reinicia tu terminal/sesión"
+    info "Or restart your terminal/session"
     echo ""
-    info "Comandos útiles:"
-    echo "   go version      # Ver versión instalada"
-    echo "   go mod init     # Inicializar un módulo"
-    echo "   go run main.go  # Ejecutar un programa"
+    info "Useful commands:"
+    echo "   go version      # Show installed version"
+    echo "   go mod init     # Initialize a module"
+    echo "   go run main.go  # Run a program"
     echo ""
 }
 
-# === FUNCIÓN PRINCIPAL ===
+# === MAIN FUNCTION ===
 main() {
-    info "🚀 Iniciando instalador de Go"
-    
-    # Validar entorno antes que nada
+    info "🚀 Starting Go installer"
+
+    # Validate environment first
     if [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "cygwin" ]]; then
-        error "Este script debe ejecutarse en Linux o WSL, no en Git Bash"
-        info "Opciones:"
-        info "  1. Usar WSL: wsl -d Ubuntu sudo bash install-go.sh"
-        info "  2. Ejecutar en un sistema Linux real"
+        error "This script must be run on Linux or WSL, not Git Bash"
+        info "Options:"
+        info "  1. Use WSL: wsl -d Ubuntu sudo bash install-go.sh"
+        info "  2. Run on a real Linux system"
         exit 1
     fi
-    
+
     check_root
     check_existing_installation
     download_go
@@ -296,5 +296,5 @@ main() {
     show_final_info
 }
 
-# Ejecutar función principal
+# Run main function
 main "$@"

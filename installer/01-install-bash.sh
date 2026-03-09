@@ -30,49 +30,49 @@ LOAD_LINE='[[ -s "$HOME/.marckv.dots/bash/.bashrc" ]] && source "$HOME/.marckv.d
 
 install_bashrc() {
     bold "=== marckv.dots custom bashrc installer ==="
-    
-    # Verificar que existe el directorio marckv.dots
+
+    # Verify marckv.dots directory exists
     if [[ ! -d "$MARCKV_DOTS_DIR" ]]; then
         error "Directory $MARCKV_DOTS_DIR does not exist."
         error "Make sure the volume is properly mounted in the container."
         exit 1
     fi
-    
-    # Verificar que existe el bashrc personalizado
+
+    # Verify custom bashrc exists
     if [[ ! -f "$MARCK_BASHRC" ]]; then
         error "File $MARCK_BASHRC not found"
         exit 1
     fi
-    
+
     info "marckv.dots directory found: $MARCKV_DOTS_DIR"
     info "Custom bashrc file: $MARCK_BASHRC"
-    
-    # Crear ~/.bashrc si no existe
+
+    # Create ~/.bashrc if it does not exist
     if [[ ! -f "$BASHRC_FILE" ]]; then
         info "Creating ~/.bashrc since it doesn't exist..."
         touch "$BASHRC_FILE"
     fi
-    
-    # Verificar si ya está instalado
+
+    # Check if already installed
     if grep -Fq "$LOAD_LINE" "$BASHRC_FILE"; then
         warn "Custom bashrc is already installed in $BASHRC_FILE"
         info "No changes needed."
         return 0
     fi
-    
-    # Hacer backup del ~/.bashrc original
+
+    # Back up original ~/.bashrc
     if [[ -s "$BASHRC_FILE" ]]; then
         local backup_file="${BASHRC_FILE}.backup.$(date +%Y%m%d_%H%M%S)"
         info "Creating backup of ~/.bashrc in $backup_file"
         cp "$BASHRC_FILE" "$backup_file"
     fi
-    
-    # Agregar la línea de carga al final del ~/.bashrc
+
+    # Append load line to ~/.bashrc
     info "Adding custom bashrc loading to ~/.bashrc..."
     echo "" >> "$BASHRC_FILE"
     echo "# marckv.dots custom bashrc" >> "$BASHRC_FILE"
     echo "$LOAD_LINE" >> "$BASHRC_FILE"
-    
+
     success "Custom bashrc installed successfully!"
     echo ""
     bold "To apply changes:"
@@ -84,30 +84,30 @@ install_bashrc() {
 # Function to uninstall
 uninstall_bashrc() {
     bold "=== Custom bashrc uninstaller ==="
-    
+
     if [[ ! -f "$BASHRC_FILE" ]]; then
         warn "~/.bashrc doesn't exist, nothing to uninstall."
         return 0
     fi
-    
+
     if ! grep -Fq "$LOAD_LINE" "$BASHRC_FILE"; then
         warn "Custom bashrc is not installed."
         return 0
     fi
-    
-    # Crear backup antes de modificar
+
+    # Create backup before modifying
     local backup_file="${BASHRC_FILE}.uninstall_backup.$(date +%Y%m%d_%H%M%S)"
     info "Creating backup in $backup_file"
     cp "$BASHRC_FILE" "$backup_file"
-    
+
     # Remove lines related to marckv.dots
     info "Removing marckv.dots configuration from ~/.bashrc..."
-    sed -i '/# marckv.dots bashrc personalizado/d' "$BASHRC_FILE"
+    sed -i '/# marckv.dots custom bashrc/d' "$BASHRC_FILE"
     sed -i '\|'"$LOAD_LINE"'|d' "$BASHRC_FILE"
-    
+
     # Remove empty lines at the end
     sed -i '${/^[[:space:]]*$/d;}' "$BASHRC_FILE"
-    
+
     success "Custom bashrc uninstalled successfully!"
     info "Backup created in: $backup_file"
 }
@@ -115,21 +115,21 @@ uninstall_bashrc() {
 # Function to show status
 status_bashrc() {
     bold "=== Custom bashrc status ==="
-    
+
     if [[ ! -d "$MARCKV_DOTS_DIR" ]]; then
         error "marckv.dots directory not found: $MARCKV_DOTS_DIR"
         return 1
     else
         success "marckv.dots directory: $MARCKV_DOTS_DIR"
     fi
-    
+
     if [[ ! -f "$MARCK_BASHRC" ]]; then
         error "Custom bashrc not found: $MARCK_BASHRC"
         return 1
     else
         success "Custom bashrc: $MARCK_BASHRC"
     fi
-    
+
     if [[ ! -f "$BASHRC_FILE" ]]; then
         warn "~/.bashrc doesn't exist"
     elif grep -Fq "$LOAD_LINE" "$BASHRC_FILE"; then
@@ -137,7 +137,7 @@ status_bashrc() {
     else
         warn "Custom bashrc is NOT installed in ~/.bashrc"
     fi
-    
+
     echo ""
     info "System: $(uname -sr)"
     if command -v lsb_release >/dev/null 2>&1; then
@@ -158,7 +158,7 @@ case "${1:-install}" in
         status_bashrc
         ;;
     *)
-        bold "🚀 marckv.dots custom bashrc installer"
+        bold "marckv.dots custom bashrc installer"
         echo ""
         echo -e "${BLUE}Usage:${NC}"
         echo -e "  ${GREEN}$0 [install|i]${NC}    - Install custom bashrc (default)"
@@ -166,10 +166,10 @@ case "${1:-install}" in
         echo -e "  ${GREEN}$0 status|s${NC}       - Show installation status"
         echo ""
         echo -e "${YELLOW}Examples:${NC}"
-        echo -e "  ${CYAN}$0${NC}                 # Install"
-        echo -e "  ${CYAN}$0 install${NC}         # Install"
-        echo -e "  ${CYAN}$0 uninstall${NC}       # Uninstall"
-        echo -e "  ${CYAN}$0 status${NC}          # Check status"
+        echo -e "  ${GREEN}$0${NC}                 # Install"
+        echo -e "  ${GREEN}$0 install${NC}         # Install"
+        echo -e "  ${GREEN}$0 uninstall${NC}       # Uninstall"
+        echo -e "  ${GREEN}$0 status${NC}          # Check status"
         echo ""
         ;;
 esac
