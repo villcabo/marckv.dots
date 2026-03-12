@@ -61,5 +61,11 @@ Colors must load first as other modules depend on them. The theme depends on fun
 - **Constants**: UPPERCASE (`MARCK_DOTS_DIR`, `BASH_MODULES_DIR`)
 - **Colors**: tput with ANSI fallback pattern (see `bash/colors.sh`)
 - **Logging**: `info()`, `success()`, `warn()`, `error()` functions with colored `[INFO]`/`[OK]`/`[WARN]`/`[ERROR]` prefixes
-- **Commits**: Conventional Commits (`feat:`, `fix:`, `refactor:`)
+- **Commits**: Conventional Commits ([conventionalcommits.org](https://www.conventionalcommits.org/en/v1.0.0/))
+  - Only commit when explicitly asked by the user
+  - Single line, maximum 100 characters
+  - Format: `<type>[optional scope]: <description>`
+  - Types: `feat`, `fix`, `refactor`, `docs`, `chore`, `style`, `test`
+  - Examples: `feat(docker): add dip command to search containers by IP`
+  - No body, no footer, no multi-line messages
 - **New features**: Add as modular files in existing directories, not monolithic scripts

@@ -248,6 +248,20 @@ _dcpr_zsh() {
 }
 
 # ---------------------------------------------------------------------------
+# dip completion — completes with container IPs
+# ---------------------------------------------------------------------------
+_dip_zsh() {
+    local -a ips
+    # Extract all IPs from running containers for completion
+    local raw
+    raw=$(docker inspect $(docker ps -q 2>/dev/null) \
+        --format '{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}' 2>/dev/null)
+    ips=(${(u)${=raw}})  # unique, split on whitespace
+    ips=("${(@)ips:#}")  # remove empty entries
+    _describe 'ip address' ips
+}
+
+# ---------------------------------------------------------------------------
 # Register completions
 # ---------------------------------------------------------------------------
 compdef _d_zsh    d
@@ -259,3 +273,4 @@ compdef _dc_zsh   dcps dcps1
 compdef _dq_zsh   dl dx
 compdef _dclt_zsh dclt
 compdef _dcpr_zsh dcpr
+compdef _dip_zsh  dip

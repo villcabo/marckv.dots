@@ -40,6 +40,8 @@ _docker_help() {
 
     echo -e "\n${CCY}QUICK FUNCTIONS${CR}"
     echo -e "  ${CGR}dq${CR} ${CMA}<pattern> <cmd>${CR}      Exec in first container matching pattern"
+    echo -e "  ${CGR}dip${CR}                    List all containers with their IP addresses"
+    echo -e "  ${CGR}dip${CR} ${CMA}<ip>${CR}               Find container by IP (or partial IP)"
     echo -e "  ${CGR}dstatus${CR}                Quick overview of containers and services"
     echo -e "  ${CGR}dcleanup${CR}               Full system cleanup"
 

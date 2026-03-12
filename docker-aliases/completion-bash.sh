@@ -158,8 +158,8 @@ _dcpr_completion() {
 # ---------------------------------------------------------------------------
 # Register all completions
 # ---------------------------------------------------------------------------
-complete -F _d_completion   d
-complete -F _dc_completion  dc
+complete -F _d_completion    d
+complete -F _dc_completion   dc
 complete -F _dcup_completion dcup
 
 complete -F _dq_completion            dq
