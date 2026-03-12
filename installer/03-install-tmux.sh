@@ -43,6 +43,13 @@ done
 
 bold "=== marckv.dots tmux installer ==="
 
+# Check tmux is installed
+if ! command -v tmux &>/dev/null; then
+    error "tmux is not installed. Install it first:"
+    echo -e "  ${YELLOW}sudo apt install tmux${NC}"
+    exit 1
+fi
+
 # Verify source config exists
 if [[ ! -f "$SOURCE_TMUX_CONF" ]]; then
     error "Source file not found: $SOURCE_TMUX_CONF"
@@ -69,3 +76,18 @@ fi
 
 ln -s "$SOURCE_TMUX_CONF" "$TARGET_TMUX_CONF"
 success "Symlink created: $TARGET_TMUX_CONF -> $SOURCE_TMUX_CONF"
+
+# Install TPM (Tmux Plugin Manager)
+TPM_DIR="$HOME/.tmux/plugins/tpm"
+if [[ -d "$TPM_DIR" ]]; then
+    warn "TPM already installed at $TPM_DIR"
+else
+    info "Installing TPM (Tmux Plugin Manager)..."
+    git clone https://github.com/tmux-plugins/tpm "$TPM_DIR"
+    success "TPM installed at $TPM_DIR"
+fi
+
+echo ""
+info "Next steps:"
+echo -e "  1. Open tmux: ${YELLOW}tmux${NC}"
+echo -e "  2. Install plugins: ${YELLOW}Ctrl+a  I${NC}  (capital i)"
