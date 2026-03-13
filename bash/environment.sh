@@ -44,13 +44,6 @@ export PROMPT_COMMAND="history -a${PROMPT_COMMAND:+; $PROMPT_COMMAND}"
 # Restrict default permissions: new files are rwxr-x--- (not readable by others).
 umask 027
 
-# Auto-logout idle SSH sessions after 30 minutes of inactivity.
-# Guard against readonly TMOUT already set by the system (e.g. Debian 12 /etc/profile.d/).
-if ! readonly -p | grep -q ' TMOUT='; then
-    export TMOUT=1800
-    readonly TMOUT
-fi
-
 # PATH enhancements
 # Add local bin directories to PATH if they exist
 for dir in "$HOME/.local/bin" "$HOME/bin" "/usr/local/bin"; do
