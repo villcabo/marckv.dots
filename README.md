@@ -1,6 +1,6 @@
 # marckv.dots
 
-Personal dotfiles for Linux — enhanced bash, Docker aliases with colored output, Neovim, Kitty, and Tmux. Targets Debian/Ubuntu systems.
+Personal dotfiles for Linux — enhanced bash, Docker aliases with colored output, Neovim, Kitty, and Tmux. Targets Debian/Ubuntu systems (Ubuntu 20/22/24, Debian 11/12).
 
 ## Installation
 
@@ -11,16 +11,61 @@ git clone https://github.com/villcabo/marckv.dots.git ~/.marckv.dots
 cd ~/.marckv.dots/installer
 ```
 
-### 2. Install components
+### 2. Dependencies
+
+Install the dependencies for the components you plan to use.
+
+#### Bash config
+
+No extra dependencies required.
+
+#### Docker aliases
+
+Requires Docker installed on the system.
+
+#### Tmux
+
+```bash
+# Debian / Ubuntu
+sudo apt install tmux git
+```
+
+#### Neovim (nvim-lite — server-focused)
+
+```bash
+# Debian / Ubuntu — required
+sudo apt install gcc make libc6-dev git ripgrep
+
+# Debian / Ubuntu — optional (better file finder)
+sudo apt install fd-find
+```
+
+| Dependency | Why |
+|---|---|
+| `gcc`, `make`, `libc6-dev` | Treesitter compiles parsers for syntax highlighting |
+| `git` | Lazy.nvim and plugin manager clone plugins |
+| `ripgrep` | fzf-lua live grep (`<leader>sg`) |
+| `fzf` (v0.40+) | Fuzzy finder for file/grep picker (`<leader>ff`, `<leader>sg`) — install from [GitHub](https://github.com/junegunn/fzf#installation), apt version is too old |
+| `fd-find` | Faster file finder for fzf-lua — optional, falls back to `find` |
+
+> Without `gcc`/`make`/`libc6-dev`, nvim-lite falls back to Neovim's built-in parsers (bash, lua, python, markdown, vim). You still get syntax highlighting, just for fewer languages.
+
+#### Claude Code / OpenCode
+
+Requires `claude` or `opencode` CLI installed before running their respective installers.
+
+### 3. Install components
 
 Each script is independent — install only what you need.
 
 ```bash
 ./01-install-bash.sh                    # Custom bash config (robbyrussell theme, aliases, functions)
 ./02-install-docker-color.sh            # Docker aliases + docker-color-output binary
-./03-install-tmux.sh                    # Tmux config (symlink)
+./03-install-tmux.sh                    # Tmux config (symlink) + TPM plugin manager
 ./04-install-nvim-lite.sh               # Neovim config — server-focused, minimal (symlink)
 ./04-install-nvim-lite.sh --copy        # Same but copies the directory (no repo dependency)
+./05-install-claude.sh                  # Claude Code config (skills, output-styles, theme)
+./06-install-opencode.sh                # OpenCode config (skills, themes, agents)
 ```
 
 Scripts that require root/sudo:
@@ -32,7 +77,7 @@ sudo ./install-go.sh                    # Go (latest stable, system-wide)
 ./install-bash-extensions-gradle-functions.sh  # Gradle helper functions
 ```
 
-### 3. Apply
+### 4. Apply
 
 ```bash
 source ~/.bashrc
@@ -51,6 +96,8 @@ source ~/.bashrc
 ├── nvim-lite/              # Minimal Neovim config for servers (LazyVim)
 ├── kitty/                  # Kitty terminal config
 ├── tmux/                   # Tmux config
+├── claude/                 # Claude Code config (skills, output-styles, theme)
+├── opencode/               # OpenCode config (skills, themes, agents)
 └── installer/              # Installation scripts
 ```
 
@@ -59,7 +106,7 @@ source ~/.bashrc
 - **User-only**: No sudo needed, installs to `~/.local/bin`
 - **Architecture**: Supports x86_64 and aarch64
 
-## 🤝 Contributing
+## Contributing
 
 1. Use the Docker Compose testing environment
 2. Test changes across multiple distributions
@@ -67,13 +114,13 @@ source ~/.bashrc
 4. Update documentation and help messages
 5. Ensure backward compatibility and proper cleanup
 
-## 📄 License
+## License
 
 This project is open source and available under the MIT License.
 
 ---
 
-## 👨‍💻 Author
+## Author
 
 <div align="center">
   <img src="https://github.com/villcabo.png" width="100" height="100" style="border-radius: 50%;" alt="villcabo">
@@ -101,6 +148,6 @@ This project is open source and available under the MIT License.
 
 ---
 
-⭐ **If this project helped you, please consider giving it a star!** ⭐
+**If this project helped you, please consider giving it a star!**
 
-*Built with ❤️ by villcabo*
+*Built by villcabo*
