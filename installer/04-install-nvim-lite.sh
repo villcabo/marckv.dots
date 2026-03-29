@@ -28,16 +28,26 @@ TARGET_NVIM_LITE="$HOME/.config/nvim"
 
 # Parse flags
 use_copy=false
+use_sync=false
+use_deps=false
 for arg in "$@"; do
     case "$arg" in
         -c|--copy) use_copy=true ;;
+        -s|--sync) use_sync=true ;;
+        -d|--deps) use_deps=true ;;
         -h|--help)
             bold "marckv.dots nvim-lite installer"
             echo ""
-            echo -e "${BLUE}Usage:${NC} $0 [-c|--copy]"
+            echo -e "${BLUE}Usage:${NC} $0 [-c|--copy] [-s|--sync] [-d|--deps]"
             echo ""
             echo -e "  ${YELLOW}-c, --copy${NC}   Copy the config directory instead of creating a symlink."
             echo -e "               Useful for remote servers where the repo won't be available."
+            echo ""
+            echo -e "  ${YELLOW}-s, --sync${NC}   Install plugins and treesitter parsers headlessly."
+            echo -e "               Run this after install to avoid waiting on first launch."
+            echo ""
+            echo -e "  ${YELLOW}-d, --deps${NC}   Check and install system dependencies (gcc, make, ripgrep, fzf, fd)."
+            echo -e "               Requires root or sudo. Installs fzf from GitHub (apt version is too old)."
             echo ""
             echo -e "  By default, a symlink is created so changes in the repo reflect immediately."
             echo ""
@@ -45,6 +55,120 @@ for arg in "$@"; do
             ;;
     esac
 done
+
+# Helper: install packages via apt respecting root/sudo/no-access
+_apt_install() {
+    if [[ $EUID -eq 0 ]]; then
+        apt-get update -qq && apt-get install -y -qq "$@"
+    elif sudo -n true 2>/dev/null; then
+        sudo apt-get update -qq && sudo apt-get install -y -qq "$@"
+    else
+        error "Cannot install $*: no root or sudo access."
+        info "Run manually: ${BOLD}sudo apt-get install -y $*${NC}"
+        return 1
+    fi
+}
+
+# Install fzf from GitHub (apt version is too old for fzf-lua)
+_install_fzf() {
+    local fzf_version arch
+    fzf_version=$(curl -s https://api.github.com/repos/junegunn/fzf/releases/latest | grep '"tag_name":' | sed -E 's/.*"v([^"]+)".*/\1/')
+    arch=$(uname -m)
+    case "$arch" in
+        x86_64)  arch="amd64" ;;
+        aarch64) arch="arm64" ;;
+    esac
+    curl -fsSL "https://github.com/junegunn/fzf/releases/download/v${fzf_version}/fzf-${fzf_version}-linux_${arch}.tar.gz" \
+        -o /tmp/fzf.tar.gz \
+        && tar -C /usr/local/bin -xzf /tmp/fzf.tar.gz fzf \
+        && rm /tmp/fzf.tar.gz
+}
+
+# Deps mode: check and install system dependencies
+if [[ "$use_deps" == true ]]; then
+    bold "=== nvim-lite dependencies ==="
+    echo ""
+
+    # apt packages: command_name -> package_name
+    APT_DEPS="gcc:gcc make:make cc-headers:libc6-dev rg:ripgrep fd:fd-find git:git curl:curl"
+    missing_apt=()
+
+    for entry in $APT_DEPS; do
+        cmd="${entry%%:*}"
+        pkg="${entry##*:}"
+        # Special case: libc6-dev has no command, check header file
+        if [[ "$cmd" == "cc-headers" ]]; then
+            if ! echo '#include <stdint.h>' | gcc -E -x c - &>/dev/null 2>&1; then
+                warn "libc6-dev not found (C headers missing)"
+                missing_apt+=("$pkg")
+            else
+                success "libc6-dev found"
+            fi
+        elif command -v "$cmd" &>/dev/null; then
+            success "$pkg found: $($cmd --version 2>&1 | head -n1)"
+        else
+            warn "$pkg not found"
+            missing_apt+=("$pkg")
+        fi
+    done
+
+    # Install missing apt packages
+    if [[ ${#missing_apt[@]} -gt 0 ]]; then
+        echo ""
+        info "Installing via apt: ${missing_apt[*]}"
+        _apt_install "${missing_apt[@]}" && success "apt packages installed" || error "Failed to install apt packages"
+    fi
+
+    # fzf: must be v0.40+ (apt version is too old)
+    echo ""
+    if command -v fzf &>/dev/null; then
+        fzf_ver=$(fzf --version 2>&1 | grep -oE '[0-9]+\.[0-9]+' | head -1)
+        fzf_major=$(echo "$fzf_ver" | cut -d. -f1)
+        fzf_minor=$(echo "$fzf_ver" | cut -d. -f2)
+        if [[ "$fzf_major" -eq 0 && "$fzf_minor" -lt 40 ]]; then
+            warn "fzf found but too old (v$fzf_ver, need v0.40+)"
+            info "Installing latest fzf from GitHub..."
+            _install_fzf && success "fzf installed: $(fzf --version 2>&1 | head -1)" || error "Failed to install fzf"
+        else
+            success "fzf found: v$fzf_ver"
+        fi
+    else
+        warn "fzf not found"
+        info "Installing latest fzf from GitHub..."
+        _install_fzf && success "fzf installed: $(fzf --version 2>&1 | head -1)" || error "Failed to install fzf"
+    fi
+
+    echo ""
+    success "Dependencies check complete."
+    exit 0
+fi
+
+# Sync mode: install plugins + parsers headlessly and exit
+if [[ "$use_sync" == true ]]; then
+    bold "=== nvim-lite sync (headless) ==="
+
+    if ! command -v nvim >/dev/null 2>&1; then
+        error "Neovim is not installed."
+        exit 1
+    fi
+
+    if [[ ! -d "$TARGET_NVIM_LITE" ]]; then
+        error "nvim-lite is not installed. Run ${BOLD}$0${NC} first."
+        exit 1
+    fi
+
+    info "Installing plugins..."
+    nvim --headless "+Lazy! sync" +qa 2>&1
+    success "Plugins installed"
+
+    info "Compiling treesitter parsers..."
+    nvim --headless "+TSUpdateSync" +qa 2>&1
+    success "Treesitter parsers compiled"
+
+    echo ""
+    success "nvim-lite is ready to use."
+    exit 0
+fi
 
 if [[ "$use_copy" == true ]]; then
     bold "=== marckv.dots nvim-lite installer (copy mode) ==="
@@ -64,39 +188,6 @@ if ! command -v nvim >/dev/null 2>&1; then
     info "Install Neovim first: ${BOLD}sudo ./install-nvim.sh${NC}"
     exit 1
 fi
-
-# Helper: install packages via apt respecting root/sudo/no-access
-_apt_install() {
-    if [[ $EUID -eq 0 ]]; then
-        apt-get install -y "$@"
-    elif sudo -n true 2>/dev/null; then
-        sudo apt-get install -y "$@"
-    else
-        error "Cannot install $*: no root or sudo access."
-        info "Run manually: ${BOLD}sudo apt-get install -y $*${NC}"
-        exit 1
-    fi
-}
-
-# Check gcc — required by nvim-treesitter to compile language parsers
-if ! command -v gcc >/dev/null 2>&1; then
-    warn "gcc not found — required by nvim-treesitter to compile parsers."
-    if command -v apt-get >/dev/null 2>&1; then
-        info "Installing gcc via apt..."
-        _apt_install gcc
-        success "gcc installed: $(gcc --version | head -n1)"
-    else
-        error "Cannot install gcc automatically (apt-get not available)."
-        info "Install manually: ${BOLD}sudo apt-get install -y gcc${NC}"
-        exit 1
-    fi
-else
-    success "gcc found: $(gcc --version | head -n1)"
-fi
-
-# tree-sitter-cli is NOT required: nvim-lite uses only Neovim's built-in
-# parsers (bash, lua, python, markdown, vim, vimdoc, etc.) — no compilation
-# needed on the server. Extra parsers can be added later with :TSInstall.
 
 nvim_version=$(nvim --version | head -n1)
 info "Neovim found: $nvim_version"
