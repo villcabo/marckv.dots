@@ -40,6 +40,12 @@ return {
         opts.ensure_installed = {}
         opts.auto_install = false
       end
+
+      -- Force gcc compiler instead of tree-sitter CLI bundled binary.
+      -- The bundled tree-sitter may require a newer GLIBC than the system has
+      -- (e.g. Debian 12 has GLIBC 2.36 but tree-sitter needs 2.39).
+      require("nvim-treesitter.install").compilers = { "gcc", "cc", "clang" }
+
       return opts
     end,
   },
