@@ -13,6 +13,5 @@ return {
 
   -- Visual heavy
   { "b0o/incline.nvim", enabled = false },
-  { "sphamba/smear-cursor.nvim", enabled = false },
   { "willothy/veil.nvim", enabled = false },
 }

@@ -45,7 +45,7 @@ return {
     requires = { "nvim-tree/nvim-web-devicons", opt = true },
     opts = {
       options = {
-        theme = "catppuccin",
+        theme = "gentleman-kanagawa-blur",
         icons_enabled = true,
       },
       sections = {
@@ -79,13 +79,12 @@ return {
     },
   },
 
-  -- snacks.picker: show hidden files (e.g. .env)
+  -- fzf-lua: show hidden files
   {
-    "folke/snacks.nvim",
+    "ibhagwan/fzf-lua",
     opts = {
-      picker = {
-        hidden = true,
-      },
+      files = { fd_opts = "--type f --hidden --exclude .git" },
+      grep = { rg_opts = "--hidden --glob '!.git' --column --line-number --no-heading --color=always --smart-case" },
     },
   },
 

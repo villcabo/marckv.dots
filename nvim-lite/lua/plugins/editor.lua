@@ -120,12 +120,7 @@ return {
         use_libuv_file_watcher = true,
       },
       default_component_configs = {
-        indent = { with_expanders = false },
-        icon = {
-          folder_closed = "▶",
-          folder_open   = "▼",
-          folder_empty  = "▷",
-        },
+        indent = { with_expanders = true },
       },
     },
   },
