@@ -1,6 +1,5 @@
--- Spell-checking
-vim.opt.spell = true
-vim.opt.spelllang = { "en" }
+-- Spell-checking disabled (not useful on servers)
+vim.opt.spell = false
 
 -- Bootstrap lazy.nvim
 local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
@@ -34,7 +33,7 @@ end
 require("lazy").setup({
   spec = {
     { "LazyVim/LazyVim", import = "lazyvim.plugins" },
-    { import = "lazyvim.plugins.extras.editor.snacks_picker" },
+    { import = "lazyvim.plugins.extras.editor.fzf" },
     { import = "lazyvim.plugins.extras.coding.mini-surround" },
     { import = "plugins" },
   },
@@ -47,12 +46,9 @@ require("lazy").setup({
   performance = {
     rtp = {
       disabled_plugins = {
-        "gzip",
         "matchit",
-        "tarPlugin",
         "tohtml",
         "tutor",
-        "zipPlugin",
       },
     },
   },
