@@ -56,24 +56,35 @@ for arg in "$@"; do
     esac
 done
 
-# Helper: install packages via apt respecting root/sudo/no-access
+# Detect privilege level once: root / sudo / user
+# Sets PRIV_MODE to: "root", "sudo", or "user"
+if [[ $EUID -eq 0 ]]; then
+    PRIV_MODE="root"
+elif command -v sudo &>/dev/null; then
+    PRIV_MODE="sudo"
+else
+    PRIV_MODE="user"
+fi
+
+# Run a command with appropriate privileges
+_run() {
+    case "$PRIV_MODE" in
+        root) "$@" ;;
+        sudo) sudo "$@" ;;
+        user)
+            error "Cannot run: $*"
+            info "No root or sudo access. Run manually with: ${BOLD}sudo $*${NC}"
+            return 1
+            ;;
+    esac
+}
+
+# Helper: install packages via apt
 _apt_install() {
     local apt_cmd="apt-get install -y $*"
-    if [[ $EUID -eq 0 ]]; then
-        info "Running: ${BOLD}apt-get update${NC}"
-        apt-get update -qq
-        info "Running: ${BOLD}${apt_cmd}${NC}"
-        apt-get install -y "$@"
-    elif sudo -n true 2>/dev/null; then
-        info "Running: ${BOLD}sudo apt-get update${NC}"
-        sudo apt-get update -qq
-        info "Running: ${BOLD}sudo ${apt_cmd}${NC}"
-        sudo apt-get install -y "$@"
-    else
-        error "Cannot install $*: no root or sudo access."
-        info "Run manually: ${BOLD}sudo ${apt_cmd}${NC}"
-        return 1
-    fi
+    info "Running: ${BOLD}${apt_cmd}${NC}"
+    _run apt-get update -qq || return 1
+    _run apt-get install -y "$@"
 }
 
 # Install fzf from GitHub (apt version is too old for fzf-lua)
@@ -93,20 +104,18 @@ _install_fzf() {
     esac
     fzf_url="https://github.com/junegunn/fzf/releases/download/v${fzf_version}/fzf-${fzf_version}-linux_${arch}.tar.gz"
     local fzf_bin="/usr/local/bin"
-    if [[ $EUID -ne 0 ]] && ! sudo -n true 2>/dev/null; then
+    if [[ "$PRIV_MODE" == "user" ]]; then
         fzf_bin="$HOME/.local/bin"
         mkdir -p "$fzf_bin"
     fi
+    local tmp_file
+    tmp_file=$(mktemp /tmp/fzf-XXXXXX.tar.gz)
     info "Downloading: ${BOLD}fzf v${fzf_version} (${arch})${NC}"
     info "URL: ${fzf_url}"
     info "Install to: ${BOLD}${fzf_bin}/fzf${NC}"
-    curl -fsSL "$fzf_url" -o /tmp/fzf.tar.gz || { error "Failed to download fzf"; return 1; }
-    if [[ "$fzf_bin" == "/usr/local/bin" && $EUID -ne 0 ]]; then
-        sudo tar -C "$fzf_bin" -xzf /tmp/fzf.tar.gz fzf
-    else
-        tar -C "$fzf_bin" -xzf /tmp/fzf.tar.gz fzf
-    fi
-    rm -f /tmp/fzf.tar.gz
+    curl -fSL "$fzf_url" -o "$tmp_file" || { error "Failed to download fzf"; rm -f "$tmp_file"; return 1; }
+    _run tar -C "$fzf_bin" -xzf "$tmp_file" fzf || { error "Failed to extract fzf to ${fzf_bin}"; rm -f "$tmp_file"; return 1; }
+    rm -f "$tmp_file"
 }
 
 # Deps mode: check and install system dependencies
