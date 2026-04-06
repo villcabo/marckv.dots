@@ -6,14 +6,14 @@
 # Sets variables: _dc_file, _dc_opts, _dc_show_logs, _dc_services[]
 # ---------------------------------------------------------------------------
 _dc_parse_args() {
-    _dc_file=""
+    _dc_files=()
     _dc_opts=""
     _dc_show_logs=false
     _dc_services=()
 
     while [[ $# -gt 0 ]]; do
         if [[ "$1" == "-f" && -n "$2" && "$2" != -* ]]; then
-            _dc_file="$2"
+            _dc_files+=("$2")
             shift 2
         elif [[ "$1" == -* ]]; then
             local flags="${1#-}"
@@ -41,19 +41,29 @@ _dc_parse_args() {
 # Usage: _dc_resolve_file [custom_file]
 # Sets: _dc_resolved_file
 # ---------------------------------------------------------------------------
+# Resolve compose files from _dc_files array or auto-detect.
+# Sets: _dc_resolved_files[] and _dc_file_flags (for command building)
 _dc_resolve_file() {
-    local custom="$1"
-    if [[ -n "$custom" ]]; then
-        if [[ ! -f "$custom" ]]; then
-            echo -e "${CRE}Compose file ${CB}$custom${CR} not found ❌"
-            return 1
-        fi
-        _dc_resolved_file="$custom"
+    _dc_resolved_files=()
+    _dc_file_flags=""
+
+    if [[ ${#_dc_files[@]} -gt 0 ]]; then
+        for f in "${_dc_files[@]}"; do
+            if [[ ! -f "$f" ]]; then
+                echo -e "${CRE}Compose file ${CB}$f${CR} not found ❌"
+                return 1
+            fi
+            _dc_resolved_files+=("$f")
+            _dc_file_flags+=" -f \"$f\""
+        done
     else
-        _dc_resolved_file=$(_get_compose_file) || {
+        local detected
+        detected=$(_get_compose_file) || {
             echo -e "${CRE}No compose file found. Set ${CB}DOCKER_COMPOSE_FILE${CR} or add docker-compose.yml ❌"
             return 1
         }
+        _dc_resolved_files+=("$detected")
+        _dc_file_flags=" -f \"$detected\""
     fi
 }
 
@@ -77,8 +87,7 @@ dc() {
         up|u)
             shift
             _dc_parse_args "$@"
-            _dc_resolve_file "$_dc_file" || return 1
-            compose_file="$_dc_resolved_file"
+            _dc_resolve_file || return 1
 
             local all_services target_services
             all_services=($(_get_compose_services))
@@ -86,7 +95,9 @@ dc() {
 
             echo -e "${CB}${CYE}DOCKER COMPOSE UP${CR} 🐳"
             echo -e "${CCY}Action:${CR} Start services"
-            echo -e "${CCY}Compose file:${CR} ${CB}$compose_file${CR}"
+            for f in "${_dc_resolved_files[@]}"; do
+                echo -e "${CCY}Compose file:${CR} ${CB}$f${CR}"
+            done
             [[ -n "$_dc_opts" ]] && echo -e "${CCY}Options:${CR}${CB}$_dc_opts${CR}"
             echo -e "${CCY}Affected services:${CR} ${CB}${CGR}${target_services[*]}${CR}"
             [[ "$_dc_show_logs" == true ]] && echo -e "${CCY}After up:${CR} ${CB}Show logs${CR}"
@@ -94,15 +105,13 @@ dc() {
 
             _confirm_operation "Continue with operation?" || { echo -e "${CB}${CYE}Cancelled${CR} ⚠️"; return 1; }
 
-            local cmd="docker compose -f \"$compose_file\" up -d${_dc_opts}"
+            local cmd="docker compose${_dc_file_flags} up -d${_dc_opts}"
             [[ ${#_dc_services[@]} -gt 0 ]] && cmd+=" ${_dc_services[*]}"
             if eval "$cmd"; then
                 if [[ "$_dc_show_logs" == true ]]; then
-                    if [[ ${#_dc_services[@]} -gt 0 ]]; then
-                        docker compose -f "$compose_file" logs -f "${_dc_services[@]}"
-                    else
-                        docker compose -f "$compose_file" logs -f
-                    fi
+                    local log_cmd="docker compose${_dc_file_flags} logs -f"
+                    [[ ${#_dc_services[@]} -gt 0 ]] && log_cmd+=" ${_dc_services[*]}"
+                    eval "$log_cmd"
                 fi
             fi
             ;;
@@ -135,8 +144,7 @@ dc() {
         down|d)
             shift
             _dc_parse_args "$@"
-            _dc_resolve_file "$_dc_file" || return 1
-            compose_file="$_dc_resolved_file"
+            _dc_resolve_file || return 1
 
             local all_services target_services
             all_services=($(_get_compose_services))
@@ -144,14 +152,16 @@ dc() {
 
             echo -e "${CB}${CRE}DOCKER COMPOSE DOWN${CR} 🛑"
             echo -e "${CCY}Action:${CR} Stop and remove services"
-            echo -e "${CCY}Compose file:${CR} ${CB}$compose_file${CR}"
+            for f in "${_dc_resolved_files[@]}"; do
+                echo -e "${CCY}Compose file:${CR} ${CB}$f${CR}"
+            done
             [[ -n "$_dc_opts" ]] && echo -e "${CCY}Options:${CR}${CB}$_dc_opts${CR}"
             echo -e "${CCY}Affected services:${CR} ${CB}${CGR}${target_services[*]}${CR}"
             echo ""
 
             _confirm_operation "Continue with operation?" || { echo -e "${CB}${CYE}Cancelled${CR} ⚠️"; return 1; }
 
-            local cmd="docker compose -f \"$compose_file\" down${_dc_opts}"
+            local cmd="docker compose${_dc_file_flags} down${_dc_opts}"
             [[ ${#_dc_services[@]} -gt 0 ]] && cmd+=" ${_dc_services[*]}"
             eval "$cmd"
             ;;
@@ -166,8 +176,7 @@ dc() {
         build|b)
             shift
             _dc_parse_args "$@"
-            _dc_resolve_file "$_dc_file" || return 1
-            compose_file="$_dc_resolved_file"
+            _dc_resolve_file || return 1
 
             local all_services target_services
             all_services=($(_get_compose_services))
@@ -175,14 +184,16 @@ dc() {
 
             echo -e "${CB}${CCY}DOCKER COMPOSE BUILD${CR} 🔨"
             echo -e "${CCY}Action:${CR} Build services"
-            echo -e "${CCY}Compose file:${CR} ${CB}$compose_file${CR}"
+            for f in "${_dc_resolved_files[@]}"; do
+                echo -e "${CCY}Compose file:${CR} ${CB}$f${CR}"
+            done
             [[ -n "$_dc_opts" ]] && echo -e "${CCY}Options:${CR}${CB}$_dc_opts${CR}"
             echo -e "${CCY}Affected services:${CR} ${CB}${CGR}${target_services[*]}${CR}"
             echo ""
 
             _confirm_operation "Continue with operation?" || { echo -e "${CB}${CYE}Cancelled${CR} ⚠️"; return 1; }
 
-            local cmd="docker compose -f \"$compose_file\" build${_dc_opts}"
+            local cmd="docker compose${_dc_file_flags} build${_dc_opts}"
             [[ ${#_dc_services[@]} -gt 0 ]] && cmd+=" ${_dc_services[*]}"
             eval "$cmd"
             ;;
@@ -266,18 +277,18 @@ dcup() {
             echo -e "  ${CYE}-b${CR}                   Build images before starting"
             echo -e "  ${CYE}-r${CR}                   Force recreate containers"
             echo -e "  ${CYE}-l${CR}                   Follow logs after up"
-            echo -e "  ${CYE}-f${CR} ${CMA}<file>${CR}             Use a specific compose file"
+            echo -e "  ${CYE}-f${CR} ${CMA}<file>${CR}             Use a specific compose file (repeatable)"
 
             echo -e "\n${CCY}EXAMPLES${CR}"
-            echo -e "  ${CGR}dcup${CR}                        Start all services"
-            echo -e "  ${CGR}dcup api worker${CR}             Start specific services only"
-            echo -e "  ${CGR}dcup -r${CR}                     Force recreate all services"
-            echo -e "  ${CGR}dcup -l${CR}                     Start and follow logs"
-            echo -e "  ${CGR}dcup -rl${CR}                    Force recreate + follow logs"
-            echo -e "  ${CGR}dcup -r -l${CR}                  Same as above (flags can be split)"
-            echo -e "  ${CGR}dcup -pbl${CR}                   Pull + build + follow logs"
-            echo -e "  ${CGR}dcup -rb api${CR}                Recreate + build for 'api' service"
-            echo -e "  ${CGR}dcup -f prod.yml -r${CR}         Custom compose file + recreate"
+            echo -e "  ${CGR}dcup${CR}                                   Start all services"
+            echo -e "  ${CGR}dcup api worker${CR}                        Start specific services only"
+            echo -e "  ${CGR}dcup -r${CR}                                Force recreate all services"
+            echo -e "  ${CGR}dcup -l${CR}                                Start and follow logs"
+            echo -e "  ${CGR}dcup -rl${CR}                               Force recreate + follow logs"
+            echo -e "  ${CGR}dcup -pbl${CR}                              Pull + build + follow logs"
+            echo -e "  ${CGR}dcup -rb api${CR}                           Recreate + build for 'api' service"
+            echo -e "  ${CGR}dcup -f prod.yml -r${CR}                    Custom compose file + recreate"
+            echo -e "  ${CGR}dcup -f app.yml -f app.override.yml${CR}    Multiple compose files"
             ;;
         *)
             dc up "$@"
