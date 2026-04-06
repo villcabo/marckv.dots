@@ -3,3 +3,7 @@
 
 -- Disable auto-format on save (server files must be saved as-is)
 vim.g.autoformat = false
+
+-- Global statusline always at the bottom
+vim.o.laststatus = 3
+vim.o.cmdheight = 0
