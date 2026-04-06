@@ -58,28 +58,43 @@ done
 
 # Helper: install packages via apt respecting root/sudo/no-access
 _apt_install() {
+    local apt_cmd="apt-get install -y $*"
     if [[ $EUID -eq 0 ]]; then
-        apt-get update -qq && apt-get install -y -qq "$@"
+        info "Running: ${BOLD}apt-get update${NC}"
+        apt-get update -qq
+        info "Running: ${BOLD}${apt_cmd}${NC}"
+        apt-get install -y "$@"
     elif sudo -n true 2>/dev/null; then
-        sudo apt-get update -qq && sudo apt-get install -y -qq "$@"
+        info "Running: ${BOLD}sudo apt-get update${NC}"
+        sudo apt-get update -qq
+        info "Running: ${BOLD}sudo ${apt_cmd}${NC}"
+        sudo apt-get install -y "$@"
     else
         error "Cannot install $*: no root or sudo access."
-        info "Run manually: ${BOLD}sudo apt-get install -y $*${NC}"
+        info "Run manually: ${BOLD}sudo ${apt_cmd}${NC}"
         return 1
     fi
 }
 
 # Install fzf from GitHub (apt version is too old for fzf-lua)
 _install_fzf() {
-    local fzf_version arch
+    local fzf_version arch fzf_url
+    info "Fetching latest fzf version from GitHub API..."
     fzf_version=$(curl -s https://api.github.com/repos/junegunn/fzf/releases/latest | grep '"tag_name":' | sed -E 's/.*"v([^"]+)".*/\1/')
+    if [[ -z "$fzf_version" ]]; then
+        error "Failed to fetch fzf version from GitHub API"
+        info "Run manually: ${BOLD}curl -s https://api.github.com/repos/junegunn/fzf/releases/latest${NC}"
+        return 1
+    fi
     arch=$(uname -m)
     case "$arch" in
         x86_64)  arch="amd64" ;;
         aarch64) arch="arm64" ;;
     esac
-    curl -fsSL "https://github.com/junegunn/fzf/releases/download/v${fzf_version}/fzf-${fzf_version}-linux_${arch}.tar.gz" \
-        -o /tmp/fzf.tar.gz \
+    fzf_url="https://github.com/junegunn/fzf/releases/download/v${fzf_version}/fzf-${fzf_version}-linux_${arch}.tar.gz"
+    info "Downloading: ${BOLD}fzf v${fzf_version} (${arch})${NC}"
+    info "URL: ${fzf_url}"
+    curl -fsSL "$fzf_url" -o /tmp/fzf.tar.gz \
         && tar -C /usr/local/bin -xzf /tmp/fzf.tar.gz fzf \
         && rm /tmp/fzf.tar.gz
 }
@@ -115,8 +130,11 @@ if [[ "$use_deps" == true ]]; then
     # Install missing apt packages
     if [[ ${#missing_apt[@]} -gt 0 ]]; then
         echo ""
-        info "Installing via apt: ${missing_apt[*]}"
-        _apt_install "${missing_apt[@]}" && success "apt packages installed" || error "Failed to install apt packages"
+        info "Missing packages: ${BOLD}${missing_apt[*]}${NC}"
+        _apt_install "${missing_apt[@]}" && success "apt packages installed" || error "Failed to install: ${missing_apt[*]}"
+    else
+        echo ""
+        success "All apt dependencies are installed"
     fi
 
     # fzf: must be v0.40+ (apt version is too old)
