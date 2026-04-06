@@ -5,7 +5,7 @@ return {
   { "folke/noice.nvim", enabled = false },
   { "rcarriga/nvim-notify", enabled = false },
 
-  -- Dashboard (not needed on servers)
+  -- Dashboard (use snacks.dashboard instead)
   { "nvimdev/dashboard-nvim", enabled = false },
 
   -- Completion engine (heavy)
