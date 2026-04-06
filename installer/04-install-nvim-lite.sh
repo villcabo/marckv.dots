@@ -103,9 +103,10 @@ _install_fzf() {
         aarch64) arch="arm64" ;;
     esac
     fzf_url="https://github.com/junegunn/fzf/releases/download/v${fzf_version}/fzf-${fzf_version}-linux_${arch}.tar.gz"
-    local fzf_bin="/usr/local/bin"
-    if [[ "$PRIV_MODE" == "user" ]]; then
-        fzf_bin="$HOME/.local/bin"
+    local fzf_bin="$HOME/.local/bin"
+    if [[ "$PRIV_MODE" == "root" ]]; then
+        fzf_bin="/usr/local/bin"
+    else
         mkdir -p "$fzf_bin"
     fi
     local tmp_file
@@ -114,7 +115,7 @@ _install_fzf() {
     info "URL: ${fzf_url}"
     info "Install to: ${BOLD}${fzf_bin}/fzf${NC}"
     curl -fSL "$fzf_url" -o "$tmp_file" || { error "Failed to download fzf"; rm -f "$tmp_file"; return 1; }
-    _run tar -C "$fzf_bin" -xzf "$tmp_file" fzf || { error "Failed to extract fzf to ${fzf_bin}"; rm -f "$tmp_file"; return 1; }
+    tar -C "$fzf_bin" -xzf "$tmp_file" fzf || { error "Failed to extract fzf to ${fzf_bin}"; rm -f "$tmp_file"; return 1; }
     rm -f "$tmp_file"
 }
 
