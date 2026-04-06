@@ -92,11 +92,21 @@ _install_fzf() {
         aarch64) arch="arm64" ;;
     esac
     fzf_url="https://github.com/junegunn/fzf/releases/download/v${fzf_version}/fzf-${fzf_version}-linux_${arch}.tar.gz"
+    local fzf_bin="/usr/local/bin"
+    if [[ $EUID -ne 0 ]] && ! sudo -n true 2>/dev/null; then
+        fzf_bin="$HOME/.local/bin"
+        mkdir -p "$fzf_bin"
+    fi
     info "Downloading: ${BOLD}fzf v${fzf_version} (${arch})${NC}"
     info "URL: ${fzf_url}"
-    curl -fsSL "$fzf_url" -o /tmp/fzf.tar.gz \
-        && tar -C /usr/local/bin -xzf /tmp/fzf.tar.gz fzf \
-        && rm /tmp/fzf.tar.gz
+    info "Install to: ${BOLD}${fzf_bin}/fzf${NC}"
+    curl -fsSL "$fzf_url" -o /tmp/fzf.tar.gz || { error "Failed to download fzf"; return 1; }
+    if [[ "$fzf_bin" == "/usr/local/bin" && $EUID -ne 0 ]]; then
+        sudo tar -C "$fzf_bin" -xzf /tmp/fzf.tar.gz fzf
+    else
+        tar -C "$fzf_bin" -xzf /tmp/fzf.tar.gz fzf
+    fi
+    rm -f /tmp/fzf.tar.gz
 }
 
 # Deps mode: check and install system dependencies
@@ -104,8 +114,8 @@ if [[ "$use_deps" == true ]]; then
     bold "=== nvim-lite dependencies ==="
     echo ""
 
-    # apt packages: command_name -> package_name
-    APT_DEPS="gcc:gcc make:make cc-headers:libc6-dev rg:ripgrep fd:fd-find git:git curl:curl"
+    # apt packages: command_name -> package_name (use | for alternative command names)
+    APT_DEPS="gcc:gcc make:make cc-headers:libc6-dev rg:ripgrep fd|fdfind:fd-find git:git curl:curl"
     missing_apt=()
 
     for entry in $APT_DEPS; do
@@ -118,6 +128,20 @@ if [[ "$use_deps" == true ]]; then
                 missing_apt+=("$pkg")
             else
                 success "libc6-dev found"
+            fi
+        elif [[ "$cmd" == *"|"* ]]; then
+            # Multiple possible command names (e.g. fd|fdfind)
+            found_alt=false
+            for alt in ${cmd//|/ }; do
+                if command -v "$alt" &>/dev/null; then
+                    success "$pkg found: $($alt --version 2>&1 | head -n1)"
+                    found_alt=true
+                    break
+                fi
+            done
+            if [[ "$found_alt" == false ]]; then
+                warn "$pkg not found (checked: ${cmd//|/, })"
+                missing_apt+=("$pkg")
             fi
         elif command -v "$cmd" &>/dev/null; then
             success "$pkg found: $($cmd --version 2>&1 | head -n1)"

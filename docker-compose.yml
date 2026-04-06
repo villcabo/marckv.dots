@@ -33,6 +33,15 @@ services:
     container_name: marckv-debian12
     hostname: debian12
 
+  debian13:
+    <<: *common
+    build:
+      context: .
+      args:
+        BASE_IMAGE: debian:trixie
+    container_name: marckv-debian13
+    hostname: debian13
+
   # =============================================================================
   # UBUNTU DISTRIBUTIONS
   # =============================================================================
