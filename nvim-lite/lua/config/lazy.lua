@@ -29,10 +29,27 @@ if vim.fn.has("wsl") == 1 then
   }
 end
 
+-- Detect Neovim version — LazyVim >= 15.0 requires Neovim 0.11.2+
+-- On older Neovim (e.g. Debian 11 / Ubuntu 20 stuck on v0.10.x due to GLIBC),
+-- pin LazyVim to the last v14.x tag which supports Neovim 0.10.x.
+local nvim_ver = vim.version()
+local lazyvim_spec = { "LazyVim/LazyVim", import = "lazyvim.plugins" }
+if nvim_ver.major == 0 and nvim_ver.minor < 11 then
+  -- Use explicit tag and pin=true to prevent lazy.nvim from auto-updating.
+  -- v14.15.1 is the last v14.x release compatible with Neovim 0.10.x.
+  lazyvim_spec.tag = "v14.15.1"
+  lazyvim_spec.pin = true
+  vim.notify(
+    "nvim-lite: detected Neovim " .. nvim_ver.major .. "." .. nvim_ver.minor ..
+    " — pinning LazyVim to v14.15.1 for compatibility",
+    vim.log.levels.WARN
+  )
+end
+
 -- Setup lazy.nvim
 require("lazy").setup({
   spec = {
-    { "LazyVim/LazyVim", import = "lazyvim.plugins" },
+    lazyvim_spec,
     { import = "lazyvim.plugins.extras.editor.fzf" },
     { import = "lazyvim.plugins.extras.coding.mini-surround" },
     { import = "plugins" },

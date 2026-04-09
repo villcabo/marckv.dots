@@ -210,12 +210,14 @@ if [[ "$use_sync" == true ]]; then
     fi
 
     info "Installing plugins..."
-    nvim --headless "+Lazy! sync" +qa 2>&1
+    nvim --headless "+Lazy! sync" +qa 2>&1 || warn "Lazy sync reported errors (may be non-fatal)"
     success "Plugins installed"
 
-    info "Compiling treesitter parsers..."
-    nvim --headless "+TSUpdateSync" +qa 2>&1
-    success "Treesitter parsers compiled"
+    info "Compiling treesitter parsers (if supported)..."
+    # TSUpdateSync was removed in newer nvim-treesitter — ignore errors gracefully.
+    # Lazy sync above already installs parsers declared in ensure_installed.
+    nvim --headless "+lua pcall(function() vim.cmd('TSUpdateSync') end)" +qa 2>&1 || true
+    success "Treesitter parsers step complete"
 
     echo ""
     success "nvim-lite is ready to use."
