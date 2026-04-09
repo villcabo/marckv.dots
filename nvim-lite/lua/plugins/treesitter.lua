@@ -53,18 +53,41 @@ local server_parsers = {
   "terraform",
 }
 
+-- Detect Neovim version to pin nvim-treesitter on older systems.
+-- nvim-treesitter deprecated the `master` branch in favor of `main`,
+-- and the new version requires Neovim 0.10+. On Neovim 0.10.x
+-- (Debian 11 / Ubuntu 20 due to GLIBC), we pin nvim-treesitter to
+-- the last known-good commit on master that works with LazyVim v14.
+local nvim_ver = vim.version()
+local is_old_nvim = nvim_ver.major == 0 and nvim_ver.minor < 11
+
+local ts_spec = {
+  "nvim-treesitter/nvim-treesitter",
+  opts = function(_, opts)
+    if can_compile then
+      opts.ensure_installed = server_parsers
+      opts.auto_install = true
+    else
+      opts.ensure_installed = {}
+      opts.auto_install = false
+    end
+    return opts
+  end,
+}
+
+if is_old_nvim then
+  -- Force the legacy `master` branch which still exposes the classic
+  -- `nvim-treesitter.configs` module that LazyVim v14 depends on.
+  -- The new `main` branch is a rewrite that drops this module.
+  ts_spec.branch = "master"
+end
+
 return {
-  {
-    "nvim-treesitter/nvim-treesitter",
-    opts = function(_, opts)
-      if can_compile then
-        opts.ensure_installed = server_parsers
-        opts.auto_install = true
-      else
-        opts.ensure_installed = {}
-        opts.auto_install = false
-      end
-      return opts
-    end,
-  },
+  ts_spec,
+  -- On old Neovim, also pin nvim-treesitter-textobjects to a compatible commit
+  is_old_nvim and {
+    "nvim-treesitter/nvim-treesitter-textobjects",
+    branch = "master",
+    pin = true,
+  } or nil,
 }
