@@ -283,6 +283,14 @@ fi
 if [[ "$use_copy" == true ]]; then
     cp -r "$SOURCE_NVIM_LITE" "$TARGET_NVIM_LITE"
     success "Directory copied: $SOURCE_NVIM_LITE → $TARGET_NVIM_LITE"
+    # Remove lazy-lock.json so each host resolves plugins for its Neovim version.
+    # On older Neovim (e.g. Debian 11 / Ubuntu 20), this is critical so the
+    # LazyVim tag pin in lazy.lua actually gets applied instead of being
+    # overridden by a lockfile generated on a newer system.
+    if [[ -f "$TARGET_NVIM_LITE/lazy-lock.json" ]]; then
+        rm -f "$TARGET_NVIM_LITE/lazy-lock.json"
+        info "Removed copied lazy-lock.json so plugins resolve to this host's Neovim version"
+    fi
 else
     ln -s "$SOURCE_NVIM_LITE" "$TARGET_NVIM_LITE"
     success "Symlink created: $TARGET_NVIM_LITE -> $SOURCE_NVIM_LITE"
