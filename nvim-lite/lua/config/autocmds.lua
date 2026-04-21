@@ -1,43 +1,15 @@
 -- Autocmds are automatically loaded on the VeryLazy event
 -- Default autocmds that are always set: https://github.com/LazyVim/LazyVim/blob/main/lua/lazyvim/config/autocmds.lua
+--
+-- Filetype DETECTION lives in config/filetypes.lua.
+-- This file only applies HIGHLIGHTS and behavior for specific filetypes.
 
 local autocmd = vim.api.nvim_create_autocmd
 local augroup = vim.api.nvim_create_augroup("nvim-lite", { clear = true })
 
--- Filetype detection for server files
-autocmd({ "BufRead", "BufNewFile" }, {
-  group = augroup,
-  pattern = { "*.log", "*.log.*", "/var/log/*" },
-  callback = function()
-    vim.bo.filetype = "log"
-  end,
-})
-
-autocmd({ "BufRead", "BufNewFile" }, {
-  group = augroup,
-  pattern = { ".env", ".env.*", "*.env" },
-  callback = function()
-    vim.bo.filetype = "sh"
-  end,
-})
-
-autocmd({ "BufRead", "BufNewFile" }, {
-  group = augroup,
-  pattern = { "nginx.conf", "*/nginx/*.conf", "*/nginx/**/*.conf" },
-  callback = function()
-    vim.bo.filetype = "nginx"
-  end,
-})
-
-autocmd({ "BufRead", "BufNewFile" }, {
-  group = augroup,
-  pattern = { "docker-compose*.yml", "docker-compose*.yaml", "compose*.yml", "compose*.yaml" },
-  callback = function()
-    vim.bo.filetype = "yaml.docker-compose"
-  end,
-})
-
--- Log file highlights (applied when filetype is "log")
+-- ---------------------------------------------------------------------------
+-- log: highlights + read-only
+-- ---------------------------------------------------------------------------
 autocmd("FileType", {
   group = augroup,
   pattern = "log",
@@ -63,5 +35,25 @@ autocmd("FileType", {
 
     vim.bo[buf].readonly = true
     vim.bo[buf].modifiable = false
+  end,
+})
+
+-- ---------------------------------------------------------------------------
+-- authorized_keys: highlights (no built-in syntax on minimal setups)
+-- ---------------------------------------------------------------------------
+autocmd("FileType", {
+  group = augroup,
+  pattern = "authorized_keys",
+  callback = function()
+    -- Comments (# at start of line)
+    vim.fn.matchadd("Comment", [=[^\s*#.*$]=])
+    -- Key types (ssh-rsa, ssh-ed25519, ecdsa-sha2-*, sk-ecdsa-*, sk-ssh-ed25519, etc.)
+    vim.fn.matchadd("Keyword", [=[\v^(ssh-(rsa|dss|ed25519)|ecdsa-sha2-\S+|sk-(ecdsa-sha2-\S+|ssh-ed25519)(\S*)?)>]=])
+    -- Base64 key blobs (long alphanumeric chunks)
+    vim.fn.matchadd("String", [=[\v\s\zs[A-Za-z0-9+/=]{40,}\ze]=])
+    -- Comment/label at end of line (usually user@host)
+    vim.fn.matchadd("Identifier", [=[\v\s\zs\S+\@\S+\ze\s*$]=])
+    -- Options (prefix before key type: command="...", no-pty, from="...", etc.)
+    vim.fn.matchadd("Type", [=[\v^[^#]*\ze\s+(ssh-|ecdsa-|sk-)]=])
   end,
 })
