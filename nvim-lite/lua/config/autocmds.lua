@@ -45,8 +45,11 @@ autocmd("FileType", {
   group = augroup,
   pattern = "authorized_keys",
   callback = function()
-    -- Comments (# at start of line)
-    vim.fn.matchadd("Comment", [=[^\s*#.*$]=])
+    -- Enable `gcc` / `gc` line commenting
+    vim.bo.commentstring = "# %s"
+
+    -- Comment line — HIGH priority so it wins over the key-type matches below
+    vim.fn.matchadd("Comment", [=[^\s*#.*$]=], 100)
     -- Key types (ssh-rsa, ssh-ed25519, ecdsa-sha2-*, sk-ecdsa-*, sk-ssh-ed25519, etc.)
     vim.fn.matchadd("Keyword", [=[\v^(ssh-(rsa|dss|ed25519)|ecdsa-sha2-\S+|sk-(ecdsa-sha2-\S+|ssh-ed25519)(\S*)?)>]=])
     -- Base64 key blobs (long alphanumeric chunks)
