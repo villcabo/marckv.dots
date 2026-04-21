@@ -25,4 +25,6 @@ if os.getenv("SSH_TTY") or os.getenv("SSH_CONNECTION") then
       ["*"] = require("vim.ui.clipboard.osc52").paste("*"),
     },
   }
+  -- Make y/yy/d/p use the system clipboard by default (no need for "+y).
+  vim.opt.clipboard = "unnamedplus"
 end
