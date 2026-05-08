@@ -39,6 +39,62 @@ autocmd("FileType", {
 })
 
 -- ---------------------------------------------------------------------------
+-- Highlight duplicate KEY=VALUE entries in env/properties/conf/ini files.
+-- All lines with the same KEY get marked with WarningMsg (yellow).
+-- ---------------------------------------------------------------------------
+local dup_ns = vim.api.nvim_create_namespace("nvim_lite_dup_keys")
+
+local function highlight_duplicate_keys(buf)
+  buf = buf or vim.api.nvim_get_current_buf()
+  if not vim.api.nvim_buf_is_valid(buf) then
+    return
+  end
+  vim.api.nvim_buf_clear_namespace(buf, dup_ns, 0, -1)
+
+  local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
+  local seen = {}     -- key -> first line index (0-based)
+  local dup_lines = {} -- set of line indices to highlight
+
+  for i, line in ipairs(lines) do
+    local lnum = i - 1
+    -- Skip comments (#, ;) and section headers ([section])
+    if not line:match("^%s*[#;]") and not line:match("^%s*%[") then
+      -- Match KEY=VALUE — KEY allows letters, digits, _, ., -
+      local key = line:match("^%s*([%w_%.%-]+)%s*=")
+      if key then
+        if seen[key] then
+          dup_lines[seen[key]] = true
+          dup_lines[lnum] = true
+        else
+          seen[key] = lnum
+        end
+      end
+    end
+  end
+
+  for lnum in pairs(dup_lines) do
+    vim.api.nvim_buf_add_highlight(buf, dup_ns, "WarningMsg", lnum, 0, -1)
+  end
+end
+
+autocmd({ "BufReadPost", "BufWritePost", "TextChanged", "InsertLeave" }, {
+  group = augroup,
+  pattern = { "*.env", "*.env.*", ".env", ".env.*", "*.properties", "*.conf", "*.ini", "*.cfg" },
+  callback = function(args)
+    highlight_duplicate_keys(args.buf)
+  end,
+})
+
+-- Also trigger by filetype (covers cases where pattern doesn't match the path)
+autocmd("FileType", {
+  group = augroup,
+  pattern = { "env", "properties", "conf", "dosini", "config" },
+  callback = function(args)
+    highlight_duplicate_keys(args.buf)
+  end,
+})
+
+-- ---------------------------------------------------------------------------
 -- authorized_keys: highlights (no built-in syntax on minimal setups)
 -- ---------------------------------------------------------------------------
 autocmd("FileType", {
