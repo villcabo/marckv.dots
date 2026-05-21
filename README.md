@@ -50,10 +50,6 @@ sudo apt install fd-find
 
 > Without `gcc`/`make`/`libc6-dev`, nvim-lite falls back to Neovim's built-in parsers (bash, lua, python, markdown, vim). You still get syntax highlighting, just for fewer languages.
 
-#### Claude Code / OpenCode
-
-Requires `claude` or `opencode` CLI installed before running their respective installers.
-
 ### 3. Install components
 
 Each script is independent — install only what you need.
@@ -64,17 +60,14 @@ Each script is independent — install only what you need.
 ./03-install-tmux.sh                    # Tmux config (symlink) + TPM plugin manager
 ./04-install-nvim-lite.sh               # Neovim config — server-focused, minimal (symlink)
 ./04-install-nvim-lite.sh --copy        # Same but copies the directory (no repo dependency)
-./05-install-claude.sh                  # Claude Code config (skills, output-styles, theme)
-./06-install-opencode.sh                # OpenCode config (skills, themes, agents)
 ```
 
-Scripts that require root/sudo:
+Helper scripts:
 
 ```bash
-sudo ./install-nvim.sh                  # Neovim binary (latest stable, system-wide)
-sudo ./install-go.sh                    # Go (latest stable, system-wide)
-./install-node.sh                       # Node.js LTS (/opt/nodejs)
-./install-bash-extensions-gradle-functions.sh  # Gradle helper functions
+sudo ./install-nvim.sh                          # Neovim binary (latest stable, system-wide)
+./install-bash-extensions-gradle-functions.sh   # Gradle helper functions
+./clean-nvim-data.sh                            # Wipe ~/.local/share/nvim, ~/.cache/nvim, etc.
 ```
 
 ### 4. Apply
@@ -96,8 +89,6 @@ source ~/.bashrc
 ├── nvim-lite/              # Minimal Neovim config for servers (LazyVim)
 ├── kitty/                  # Kitty terminal config
 ├── tmux/                   # Tmux config
-├── claude/                 # Claude Code config (skills, output-styles, theme)
-├── opencode/               # OpenCode config (skills, themes, agents)
 └── installer/              # Installation scripts
 ```
 

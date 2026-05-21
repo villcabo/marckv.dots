@@ -4,17 +4,27 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**marckv.dots** is a personal Linux dotfiles repository providing modular bash configuration, Docker aliases with colored output, Neovim (LazyVim) config, Kitty terminal config, and Tmux config. Targets Debian/Ubuntu systems (Ubuntu 20/22/24, Debian 11/12).
+**marckv.dots** is a personal Linux dotfiles repo: modular bash, Docker aliases with colored output, Neovim (LazyVim — full `nvim/` and server-focused `nvim-lite/`), Kitty, and Tmux. Targets Debian/Ubuntu (Ubuntu 20/22/24, Debian 11/12).
 
 ## Commands
 
-### Installation (run from `installer/` directory)
+### Installation (run from `installer/`)
+
+Core installers — numbered prefixes define execution order. Each supports `install` (default), `status`, and `uninstall`:
+
 ```bash
-./01-install-bash.sh                    # Install bash configuration
-./01-install-bash.sh status             # Check installation status
-./01-install-bash.sh uninstall          # Remove bash configuration
-./02-install-docker-color.sh            # Install docker aliases + binary
-./02-install-docker-color.sh status     # Check docker installation status
+./01-install-bash.sh                    # Bash modules (robbyrussell theme, aliases, functions)
+./02-install-docker-color.sh            # Docker aliases + docker-color-output binary
+./03-install-tmux.sh                    # Tmux config (symlink) + TPM
+./04-install-nvim-lite.sh [--copy]      # Server-focused Neovim config (symlink, or copy)
+```
+
+Helpers (not part of the numbered lifecycle):
+
+```bash
+sudo ./install-nvim.sh                  # Neovim binary, system-wide
+./install-bash-extensions-gradle-functions.sh   # Adds bash-extensions/bash_gradle_functions.sh
+./clean-nvim-data.sh                    # Wipe ~/.local/share/nvim, ~/.cache/nvim, etc.
 ```
 
 ### Testing (always use Docker, never test on host)
@@ -45,11 +55,19 @@ No symlinks. Installers append `source` lines to `~/.bashrc` and `~/.bash_aliase
 Colors must load first as other modules depend on them. The theme depends on functions from `colors.sh` and `functions.sh`.
 
 ### Installer conventions
-- Numbered prefixes for core installers (`01-`, `02-`) define execution order
-- Every installer supports: install, status, and uninstall lifecycle
+- Numbered prefixes (`01-` … `04-`) on core installers define execution order
+- Every core installer supports the `install` / `status` / `uninstall` lifecycle — keep parity when adding new ones
 - Destructive operations require preview + explicit confirmation
 - Architecture detection (x86_64/aarch64) for binary downloads
 - User privilege detection: root → direct install, sudo user → sudo install, regular user → `~/.local/bin`
+- `04-install-nvim-lite.sh` defaults to a symlink (live edits from repo); `--copy` snapshots the dir so the host no longer depends on the repo path
+
+### Component layout
+- `bash/` — modules loaded by `bash/.bashrc` (see load order above)
+- `bash-extensions/` — optional add-ons sourced separately (e.g. `bash_gradle_functions.sh`)
+- `docker-aliases/` — docker/compose shortcuts with completion
+- `nvim/` vs `nvim-lite/` — full LazyVim setup vs. minimal server profile; both have their own `stylua.toml`
+- `kitty/`, `tmux/` — terminal/multiplexer configs
 
 ### Docker test environment
 `docker-compose.yml` mounts the repo read-only at `/root/.marckv.dots` in 5 containers (ubuntu-20/22/24, debian-11/12). Primary target: `ubuntu-24`.
