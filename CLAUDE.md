@@ -76,7 +76,7 @@ Colors must load first as other modules depend on them. The theme depends on fun
 
 - **Shell**: `#!/bin/bash` or `#!/usr/bin/env bash`, use `set -e`
 - **Functions**: snake_case (`get_compact_pwd`, `git_prompt_info`)
-- **Constants**: UPPERCASE (`MARCK_DOTS_DIR`, `BASH_MODULES_DIR`)
+- **Constants**: UPPERCASE (`MARCKV_DOTS_DIR`, `BASH_MODULES_DIR`)
 - **Colors**: tput with ANSI fallback pattern (see `bash/colors.sh`)
 - **Logging**: `info()`, `success()`, `warn()`, `error()` functions with colored `[INFO]`/`[OK]`/`[WARN]`/`[ERROR]` prefixes
 - **Commits**: Conventional Commits ([conventionalcommits.org](https://www.conventionalcommits.org/en/v1.0.0/))
