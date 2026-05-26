@@ -39,8 +39,9 @@ autocmd("FileType", {
 })
 
 -- ---------------------------------------------------------------------------
--- Highlight duplicate KEY=VALUE entries in env/properties/conf/ini files.
--- All lines with the same KEY get marked with WarningMsg (yellow).
+-- Mark duplicate KEY=VALUE entries in env/properties/conf/ini files.
+-- Lines sharing the same KEY get a sign in the gutter + virtual text marker.
+-- nginx is excluded: it uses directive syntax (`limit_req zone=...`), not KEY=VALUE.
 -- ---------------------------------------------------------------------------
 local dup_ns = vim.api.nvim_create_namespace("nvim_lite_dup_keys")
 
@@ -51,9 +52,14 @@ local function highlight_duplicate_keys(buf)
   end
   vim.api.nvim_buf_clear_namespace(buf, dup_ns, 0, -1)
 
+  -- nginx .conf files are directive-based, not KEY=VALUE — never mark them.
+  if vim.bo[buf].filetype == "nginx" then
+    return
+  end
+
   local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
   local seen = {}     -- key -> first line index (0-based)
-  local dup_lines = {} -- set of line indices to highlight
+  local dup_lines = {} -- set of line indices to mark
 
   for i, line in ipairs(lines) do
     local lnum = i - 1
@@ -73,7 +79,12 @@ local function highlight_duplicate_keys(buf)
   end
 
   for lnum in pairs(dup_lines) do
-    vim.api.nvim_buf_add_highlight(buf, dup_ns, "WarningMsg", lnum, 0, -1)
+    vim.api.nvim_buf_set_extmark(buf, dup_ns, lnum, 0, {
+      sign_text = "▌",
+      sign_hl_group = "WarningMsg",
+      virt_text = { { " ← clave duplicada", "WarningMsg" } },
+      virt_text_pos = "eol",
+    })
   end
 end
 
