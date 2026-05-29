@@ -29,8 +29,9 @@ vim.filetype.add({
     -- nginx configs anywhere under an nginx/ directory
     [".*/nginx/.*%.conf"] = "nginx",
 
-    -- docker-compose variants
-    ["docker%-compose.*%.ya?ml"] = "yaml.docker-compose",
-    ["compose.*%.ya?ml"] = "yaml.docker-compose",
+    -- docker-compose variants → yaml puro (sin el sufijo .docker-compose,
+    -- que sin yaml-language-server solo rompe el highlight de treesitter).
+    ["docker%-compose.*%.ya?ml"] = "yaml",
+    ["compose.*%.ya?ml"] = "yaml",
   },
 })
