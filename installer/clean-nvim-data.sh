@@ -1,7 +1,8 @@
 #!/bin/bash
 
-# Script to clean Neovim config and data directories before a fresh install
-# Shows a preview of what will be deleted and asks for confirmation
+# Script to clean Neovim data directories before a fresh install
+# By default only data is removed (share/state/cache); pass --config to also
+# remove the config dir. Shows a preview of what will be deleted and asks for confirmation.
 
 set -e
 
@@ -63,20 +64,43 @@ print_dir_entry() {
 }
 
 main() {
-    bold "=== Neovim full cleaner ==="
+    local include_config=false
+
+    for arg in "$@"; do
+        case "$arg" in
+            -c|--config) include_config=true ;;
+            -h|--help)
+                bold "Usage: $0 [--config]"
+                echo "  Cleans Neovim data dirs: share, state, cache (for NVIM_APPNAME=$APPNAME)."
+                echo ""
+                echo -e "  ${BOLD}-c, --config${NC}   Also remove the config dir ($CONFIG_DIR)."
+                echo "                 If it's a symlink, only the link is removed."
+                exit 0
+                ;;
+            *)
+                error "Unknown argument: $arg (use --help)"
+                exit 1
+                ;;
+        esac
+    done
+
+    bold "=== Neovim cleaner ==="
     info "Scanning directories for NVIM_APPNAME=${BOLD}$APPNAME${NC}..."
+    [[ "$include_config" == false ]] && info "Config dir preserved (pass ${BOLD}--config${NC} to also remove it)."
     echo ""
 
     local has_config=false
     local config_is_symlink=false
     local found_data=()
 
-    # Check config directory
-    if [[ -L "$CONFIG_DIR" ]]; then
-        has_config=true
-        config_is_symlink=true
-    elif [[ -d "$CONFIG_DIR" ]]; then
-        has_config=true
+    # Check config directory (only when --config is passed)
+    if [[ "$include_config" == true ]]; then
+        if [[ -L "$CONFIG_DIR" ]]; then
+            has_config=true
+            config_is_symlink=true
+        elif [[ -d "$CONFIG_DIR" ]]; then
+            has_config=true
+        fi
     fi
 
     # Check data directories
