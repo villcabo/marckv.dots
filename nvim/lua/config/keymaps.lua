@@ -161,3 +161,6 @@ function SaveFile()
     vim.notify("Error: " .. err, vim.log.levels.ERROR) -- Show the error message if it fails
   end
 end
+
+-- Cambiar filetype del buffer (estilo "Change Language Mode" de VSCode)
+vim.keymap.set("n", "<leader>cf", "<cmd>FzfLua filetypes<cr>", { desc = "Change filetype" })
