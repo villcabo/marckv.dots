@@ -3,8 +3,9 @@
 -- Node.js configuration - always use latest stable version
 vim.g.node_host_prog = vim.fn.exepath("node") or "/usr/local/bin/node"
 
--- Spell-checking
-vim.opt.spell = true -- activa spell checker
+-- Spell-checking: off por defecto, se activa solo en filetypes de texto
+-- (markdown, gitcommit, etc.) vía autocmd en lua/config/autocmds.lua.
+vim.opt.spell = false
 vim.opt.spelllang = { "en" }
 
 -- Define the path to the lazy.nvim plugin
