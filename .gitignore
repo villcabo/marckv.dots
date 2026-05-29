@@ -1,5 +1,8 @@
 /.idea/
 
+# Claude Code local settings (per-machine, not shared)
+.claude/
+
 # nvim-lite runs on multiple distros with different Neovim versions.
 # A shared lockfile would pin plugins to versions incompatible with older
 # Neovim (e.g. Debian 11 stuck on 0.10.x). Let each host resolve its own.
