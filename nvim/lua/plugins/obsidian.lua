@@ -2,10 +2,7 @@ return {
   "obsidian-nvim/obsidian.nvim",
   version = "*", -- recommended, use latest release instead of latest commit
   lazy = false,
-  enabled = function()
-    -- Disable Obsidian when running from Oil Simple (to avoid path issues in Zed context)
-    return not vim.g.disable_obsidian
-  end,
+  enabled = false, -- usar la app standalone de Obsidian; evita escaneo rg sobre $HOME
   dependencies = {
     -- Required.
     "nvim-lua/plenary.nvim",

@@ -14,10 +14,6 @@ return {
     enabled = false,
   },
   {
-    "CopilotC-Nvim/CopilotChat.nvim",
-    enabled = false,
-  },
-  {
     "NickvanDyke/opencode.nvim",
     enabled = false,
   },
@@ -30,10 +26,6 @@ return {
     enabled = false,
   },
   {
-    "sphamba/smear-cursor.nvim",
-    enabled = false,
-  },
-  {
     -- AI de pago (Claude) — reemplazado por Copilot free tier
     "coder/claudecode.nvim",
     enabled = false,
@@ -41,11 +33,6 @@ return {
   {
     -- Solo wrappea el gemini CLI, no provee autocomplete inline
     "jonroosevelt/gemini-cli.nvim",
-    enabled = false,
-  },
-  {
-    -- Plugin de notas Obsidian — usar la app standalone
-    "obsidian-nvim/obsidian.nvim",
     enabled = false,
   },
   {
