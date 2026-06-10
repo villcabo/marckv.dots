@@ -8,7 +8,7 @@ d() {
         ps|p)        shift; docker ps "$@" | docker-color-output ;;
         ps1|p1)      shift; docker ps --format "table {{.ID}}\t{{.Names}}\t{{.RunningFor}}\t{{.Status}}\t{{.Image}}" "$@" | docker-color-output ;;
         psp)         shift; docker ps --format "table {{.ID}}\t{{.Names}}\t{{.Ports}}" "$@" | docker-color-output ;;
-        images|i)    shift; docker images "$@" | docker-color-output ;;
+        images|i)    shift; docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.CreatedSince}}\t{{.Size}}" "$@" | docker-color-output ;;
 
         # Stats and logs
         stats|s)     shift; docker stats "$@" | docker-color-output ;;
