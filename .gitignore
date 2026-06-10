@@ -7,3 +7,4 @@
 # A shared lockfile would pin plugins to versions incompatible with older
 # Neovim (e.g. Debian 11 stuck on 0.10.x). Let each host resolve its own.
 nvim-lite/lazy-lock.json
+nvim/lazy-lock.json
