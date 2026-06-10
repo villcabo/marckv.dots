@@ -214,6 +214,9 @@ return {
     opts = {
       notifier = {},
       image = {},
+      win = {
+        backdrop = false,
+      },
       picker = {
         exclude = {
           ".git",

@@ -2,6 +2,15 @@
 -- Default autocmds that are always set: https://github.com/LazyVim/LazyVim/blob/main/lua/lazyvim/config/autocmds.lua
 -- Add any additional autocmds here
 
+-- Re-apply colorscheme when background option changes (dark ↔ light)
+vim.api.nvim_create_autocmd("OptionSet", {
+  pattern = "background",
+  callback = function()
+    local colorscheme = vim.g.colors_name or "gentleman-kanagawa-blur"
+    vim.cmd.colorscheme(colorscheme)
+  end,
+})
+
 -- Spell-check solo en filetypes de texto (no en código/yaml/etc.),
 -- para no marcar en amarillo términos técnicos ni palabras en español.
 vim.api.nvim_create_autocmd("FileType", {
