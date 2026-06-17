@@ -2,7 +2,7 @@
 # Help functions for docker-aliases
 
 _docker_help() {
-    echo -e "${CB}${CCY}🐳 Docker Helper${CR}  ${CI}(d <subcommand>)${CR}\n"
+    echo -e "${CB}${CCY}Docker Helper${CR}  ${CI}(d <subcommand>)${CR}\n"
 
     echo -e "${CCY}BASIC${CR}"
     echo -e "  ${CGR}d ps${CR},  ${CGR}d p${CR}             List running containers"
@@ -27,7 +27,8 @@ _docker_help() {
     echo -e "\n${CCY}CLEANUP${CR}"
     echo -e "  ${CGR}d prune${CR}                Clean system — delegates to dprune"
     echo -e "  ${CGR}dprune${CR}                 docker system prune -f (safe)"
-    echo -e "  ${CGR}dprune --all${CR}           docker system prune -af"
+    echo -e "  ${CGR}dprune --all${CR}           docker system prune -af (preview + confirm)"
+    echo -e "  ${CGR}dprune --all -y${CR}        Skip confirmation"
     echo -e "  ${CGR}dprune --images${CR}        docker image prune -f"
     echo -e "  ${CGR}dprune --volumes${CR}       docker volume prune -f"
     echo -e "  ${CGR}dprune --networks${CR}      docker network prune -f"
@@ -51,17 +52,22 @@ _docker_help() {
     echo -e "  ${CGR}dq nginx ls${CR}            Run ls in first container matching 'nginx'"
     echo -e "  ${CGR}dstats --once${CR}          One-shot stats snapshot"
     echo -e "  ${CGR}dprune --volumes${CR}       Prune unused volumes"
+
+    echo -e "\n${CCY}CONFIGURATION${CR}"
+    echo -e "  ${CYE}DOCKER_ALIASES_NERD_FONT=0${CR}   Force ASCII icons (default: Nerd Font)"
+    echo -e "  ${CYE}DOCKER_ALIASES_AUTO_YES=1${CR}    Skip all confirmation prompts"
 }
 
 _compose_help() {
-    echo -e "${CB}${CCY}🐙 Docker Compose Helper${CR}  ${CI}(dc <subcommand>)${CR}\n"
+    echo -e "${CB}${CCY}Docker Compose Helper${CR}  ${CI}(dc <subcommand>)${CR}\n"
 
     echo -e "${CCY}UP / DOWN${CR}"
-    echo -e "  ${CGR}dc up${CR}, ${CGR}dc u${CR}             Start services (with confirmation)"
+    echo -e "  ${CGR}dc up${CR}, ${CGR}dc u${CR}             Start services (preview + confirm)"
     echo -e "  ${CGR}dc up -p${CR}              Pull before up"
     echo -e "  ${CGR}dc up -r${CR}              Force recreate"
     echo -e "  ${CGR}dc up -b${CR}              Build before up"
     echo -e "  ${CGR}dc up -l${CR}              Up + follow logs"
+    echo -e "  ${CGR}dc up -y${CR}              Skip confirmation"
     echo -e "  ${CGR}dc up -f${CR} ${CMA}<file>${CR}        Use a specific compose file"
     echo -e "  ${CGR}dc down${CR}, ${CGR}dc d${CR}          Stop and remove services"
 
@@ -71,11 +77,13 @@ _compose_help() {
     echo -e "  ${CYE}-b${CR}         Build before up"
     echo -e "  ${CYE}-l${CR}         Show logs after up"
     echo -e "  ${CYE}-r${CR}         Force recreate containers"
+    echo -e "  ${CYE}-y${CR}         Skip confirmation (or use ${CYE}--yes${CR})"
 
     echo -e "\n${CCY}FLAG COMBINATIONS${CR}"
     echo -e "  ${CGR}dc up -pl${CR}                  Pull + logs"
     echo -e "  ${CGR}dc up -rbl${CR}                 Recreate + build + logs"
     echo -e "  ${CGR}dc up -f prod.yml -pl${CR}      Use prod.yml + pull + logs"
+    echo -e "  ${CGR}dc up -y api worker${CR}         Skip confirm + specific services"
 
     echo -e "\n${CCY}STATUS${CR}"
     echo -e "  ${CGR}dc ps${CR}, ${CGR}dc p${CR}            List services"
@@ -114,6 +122,12 @@ _compose_help() {
     echo -e "  ${CGR}dc ps -c${CR}                   Compact service list"
     echo -e "  ${CGR}dcq data psql${CR}              psql in first service matching 'data'"
     echo -e "  ${CGR}dclt -n 300 api${CR}            Follow last 300 log lines for 'api'"
+
+    echo -e "\n${CCY}CONFIGURATION${CR}"
+    echo -e "  ${CYE}DOCKER_COMPOSE_FILE=file.yml${CR}     Override compose file"
+    echo -e "  ${CYE}DOCKER_ALIASES_NERD_FONT=0${CR}      Force ASCII icons (default: Nerd Font)"
+    echo -e "  ${CYE}DOCKER_ALIASES_AUTO_YES=1${CR}       Skip all confirmation prompts"
+    echo -e "  ${CYE}DOCKER_ALIASES_LOG_LINES=200${CR}    Default tail lines for dclt (default: 100)"
 }
 
 alias dhelp='_docker_help'
