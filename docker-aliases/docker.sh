@@ -11,8 +11,7 @@ d() {
         images|i)    shift; docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.CreatedSince}}\t{{.Size}}" "$@" | docker-color-output ;;
 
         # Stats and logs
-        stats|s)     shift; docker stats "$@" | docker-color-output ;;
-        s1)          shift; docker stats --no-stream "$@" | docker-color-output ;;
+        stats)       shift; dstats "$@" ;;
         logs|l)      shift; docker logs -f "$@" ;;
         l100)        shift; docker logs --tail 100 -f "$@" ;;
         l300)        shift; docker logs --tail 300 -f "$@" ;;
@@ -28,19 +27,9 @@ d() {
         stop)        shift; docker stop "$@" ;;
         restart)     shift; docker restart "$@" ;;
         rm)          shift; docker rm "$@" ;;
-        rmi)         shift; docker rmi "$@" ;;
-        kill)        shift; docker kill "$@" ;;
-
-        # Information
-        inspect)     shift; docker inspect "$@" ;;
-        top)         shift; docker top "$@" ;;
 
         # Cleanup
-        prune|pr)    docker system prune -f ;;
-        prunea|prf)  docker system prune -af ;;
-        pruneima|pri) docker image prune -f ;;
-        prunevol|prv) docker volume prune -f ;;
-        prunenet|prn) docker network prune -f ;;
+        prune)       shift; dprune "$@" ;;
 
         # Help
         help|h|-h|--help) _docker_help ;;
@@ -50,14 +39,45 @@ d() {
     esac
 }
 
+# ---------------------------------------------------------------------------
+# dstats — Live or snapshot docker stats
+#
+# Usage:
+#   dstats            Live resource stats (streaming)
+#   dstats --once     Single snapshot (no-stream)
+# ---------------------------------------------------------------------------
+dstats() {
+    case "$1" in
+        --once) shift; docker stats --no-stream "$@" | docker-color-output ;;
+        *)      docker stats "$@" | docker-color-output ;;
+    esac
+}
+
+# ---------------------------------------------------------------------------
+# dprune — Unified prune command
+#
+# Usage:
+#   dprune              docker system prune -f (safe)
+#   dprune --all        docker system prune -af
+#   dprune --images     docker image prune -f
+#   dprune --volumes    docker volume prune -f
+#   dprune --networks   docker network prune -f
+# ---------------------------------------------------------------------------
+dprune() {
+    case "$1" in
+        --all)      docker system prune -af ;;
+        --images)   docker image prune -f ;;
+        --volumes)  docker volume prune -f ;;
+        --networks) docker network prune -f ;;
+        *)          docker system prune -f ;;
+    esac
+}
+
 # Standalone aliases for the most common docker subcommands
 alias dps='d ps'
-alias dps1='d ps1'
 alias di='d images'
 alias dl='d logs'
 alias dlt='d l100'
-alias dpri='d image prune'
-alias ds='d stats'
 alias dx='d x'
 
 # Orden: helpers (_prefijo) primero, luego consumidores.

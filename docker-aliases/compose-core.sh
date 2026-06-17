@@ -119,24 +119,29 @@ dc() {
             fi
             ;;
 
-        # ── up + logs immediately ───────────────────────────────────────────
-        ul)
-            shift
-            docker compose -f "$compose_file" up -d "$@" && docker compose -f "$compose_file" logs -f "$@"
-            ;;
-
         # ── status ──────────────────────────────────────────────────────────
-        ps|p)   shift; docker compose -f "$compose_file" ps "$@" | docker-color-output ;;
-        ps1|p1) shift; docker compose -f "$compose_file" ps --format "table {{.Name}}\t{{.Service}}\t{{.RunningFor}}\t{{.Status}}\t{{.Image}}" "$@" | docker-color-output ;;
-        psp)    shift; docker compose -f "$compose_file" ps --format "table {{.Name}}\t{{.Service}}\t{{.Ports}}" "$@" | docker-color-output ;;
+        ps|p)
+            shift
+            local fmt_flag=""
+            local remaining_args=()
+            while [[ $# -gt 0 ]]; do
+                case "$1" in
+                    -c) fmt_flag="compact" ;;
+                    -p) fmt_flag="ports" ;;
+                    *)  remaining_args+=("$1") ;;
+                esac
+                shift
+            done
+            case "$fmt_flag" in
+                compact) docker compose -f "$compose_file" ps --format "table {{.Name}}\t{{.Service}}\t{{.RunningFor}}\t{{.Status}}\t{{.Image}}" "${remaining_args[@]}" | docker-color-output ;;
+                ports)   docker compose -f "$compose_file" ps --format "table {{.Name}}\t{{.Service}}\t{{.Ports}}" "${remaining_args[@]}" | docker-color-output ;;
+                *)       docker compose -f "$compose_file" ps "${remaining_args[@]}" | docker-color-output ;;
+            esac
+            ;;
 
         # ── logs & stats ────────────────────────────────────────────────────
         stats|s) shift; docker compose -f "$compose_file" stats "$@" | docker-color-output ;;
-        s1)      shift; docker compose -f "$compose_file" stats --no-stream "$@" | docker-color-output ;;
         logs|l)  shift; docker compose -f "$compose_file" logs --tail 100 -f "$@" ;;
-        l100)    shift; docker compose -f "$compose_file" logs --tail 100 -f "$@" ;;
-        l300)    shift; docker compose -f "$compose_file" logs --tail 300 -f "$@" ;;
-        l500)    shift; docker compose -f "$compose_file" logs --tail 500 -f "$@" ;;
 
         # ── exec ────────────────────────────────────────────────────────────
         x)    shift; docker compose -f "$compose_file" exec "$@" ;;
@@ -201,33 +206,6 @@ dc() {
             eval "$cmd"
             ;;
 
-        # ── default compose file management ─────────────────────────────────
-        default)
-            shift
-            if [[ -z "$1" ]]; then
-                if [[ -f ".env" ]] && grep -q "^DOCKER_COMPOSE_FILE=" .env; then
-                    local current_file
-                    current_file=$(grep "^DOCKER_COMPOSE_FILE=" .env | cut -d'=' -f2)
-                    echo -e "${CGR}Current default: ${CB}$current_file${CR} 📋"
-                else
-                    echo -e "${CYE}No default compose file set${CR} ⚠️"
-                fi
-            elif [[ "$1" == "remove" || "$1" == "rm" ]]; then
-                if [[ -f ".env" ]] && grep -q "^DOCKER_COMPOSE_FILE=" .env; then
-                    sed -i '/^DOCKER_COMPOSE_FILE=/d' .env
-                    echo -e "${CGR}Default compose file removed${CR} ✅"
-                else
-                    echo -e "${CYE}No default compose file set${CR} ⚠️"
-                fi
-            else
-                local file="$1"
-                [[ ! -f "$file" ]] && echo -e "${CRE}File ${CB}$file${CR} not found ❌" && return 1
-                [[ -f ".env" ]] && sed -i '/^DOCKER_COMPOSE_FILE=/d' .env
-                echo "DOCKER_COMPOSE_FILE=$file" >> .env
-                echo -e "${CGR}Default compose file set to: ${CB}$file${CR} ✅"
-            fi
-            ;;
-
         # ── info ────────────────────────────────────────────────────────────
         info)
             echo -e "${CB}${CCY}=== DOCKER COMPOSE CONFIGURATION ===${CR}"
@@ -241,12 +219,10 @@ dc() {
                 echo -e "${CCY}Active compose file:${CR} ${CRE}None found${CR}"
             fi
 
-            if [[ -f ".env" ]] && grep -q "^DOCKER_COMPOSE_FILE=" .env; then
-                local default_file
-                default_file=$(grep "^DOCKER_COMPOSE_FILE=" .env | cut -d'=' -f2)
-                echo -e "${CCY}Default setting:${CR} ${CB}DOCKER_COMPOSE_FILE=$default_file${CR}"
+            if [[ -n "$DOCKER_COMPOSE_FILE" ]]; then
+                echo -e "${CCY}DOCKER_COMPOSE_FILE:${CR} ${CB}$DOCKER_COMPOSE_FILE${CR}"
             else
-                echo -e "${CCY}Default setting:${CR} ${CYE}Not configured${CR}"
+                echo -e "${CCY}DOCKER_COMPOSE_FILE:${CR} ${CYE}Not set${CR}"
             fi
 
             echo -e "${CCY}Available compose files:${CR}"
@@ -301,7 +277,6 @@ dcup() {
 
 # Compose aliases
 alias dcps='dc ps'
-alias dcps1='dc ps1'
 alias dcl='dc logs'
 alias dcdown='dc down'
 alias dcs='dc stats'
@@ -365,18 +340,11 @@ dstatus() {
     fi
 }
 
-# Full system cleanup
-dcleanup() {
-    echo -e "${CYE}${CB}Cleaning Docker...${CR} 🧹"
-    docker system prune -f
-    docker network prune -f
-    echo -e "${CGR}${CB}Cleanup completed${CR} ✅"
-}
-
 # ---------------------------------------------------------------------------
 # dclt — Follow logs for services matching one or more patterns
 #
 # Usage: dclt [options] [pattern...]
+#   -n <N>        Tail N lines (default: ${DOCKER_ALIASES_LOG_LINES:-100})
 #   -r, --regex   Match patterns as regex (default: literal)
 #   -w, --wait    Ask for confirmation before showing logs
 # ---------------------------------------------------------------------------
@@ -384,6 +352,7 @@ dclt() {
     local regex_mode=false
     local ask_confirm=false
     local patterns=()
+    local tail_lines="${DOCKER_ALIASES_LOG_LINES:-100}"
 
     local compose_file
     compose_file=$(_get_compose_file) || {
@@ -399,6 +368,9 @@ dclt() {
                 --wait)  ask_confirm=true ;;
                 *) echo "❌ Unknown option: $1" >&2; return 1 ;;
             esac
+        elif [[ "$1" == "-n" ]]; then
+            shift
+            tail_lines="$1"
         elif [[ "$1" == -* && "$1" != "-" ]]; then
             local flags="${1#-}"
             local i=0
@@ -466,5 +438,5 @@ dclt() {
         _confirm_operation "Show logs for these services?" || return 0
     fi
 
-    docker compose -f "$compose_file" logs --tail 100 -f "${unique_services[@]}"
+    docker compose -f "$compose_file" logs --tail "$tail_lines" -f "${unique_services[@]}"
 }
