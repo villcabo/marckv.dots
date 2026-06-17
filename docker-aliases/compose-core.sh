@@ -14,10 +14,23 @@ _dc_parse_args() {
     _dc_show_logs=false
     _dc_services=()
     _dc_yes=false
+    _dc_profiles=()
+    _dc_env_files=()
 
     while [[ $# -gt 0 ]]; do
         if [[ "$1" == "-f" && -n "$2" && "$2" != -* ]]; then
             _dc_files+=("$2")
+            shift 2
+        elif [[ "$1" == "-P" && -n "$2" ]]; then
+            # Comma-separated profiles: -P dev,debug → --profile dev --profile debug
+            IFS=',' read -ra _profiles_tmp <<< "$2"
+            for _p in "${_profiles_tmp[@]}"; do
+                _dc_profiles+=("$_p")
+            done
+            unset _profiles_tmp _p
+            shift 2
+        elif [[ "$1" == "-e" && -n "$2" ]]; then
+            _dc_env_files+=("$2")
             shift 2
         elif [[ "$1" == "--yes" || "$1" == "-y" ]]; then
             _dc_yes=true
@@ -42,6 +55,24 @@ _dc_parse_args() {
             shift
         fi
     done
+}
+
+# ---------------------------------------------------------------------------
+# Internal helper: build --profile flags string from _dc_profiles[]
+# Sets: _dc_profile_flags  (prepended before subcommand)
+# Sets: _dc_env_file_flags (appended after subcommand)
+# ---------------------------------------------------------------------------
+_dc_build_extra_flags() {
+    _dc_profile_flags=""
+    _dc_env_file_flags=""
+
+    for _prof in "${_dc_profiles[@]}"; do
+        _dc_profile_flags+=" --profile $_prof"
+    done
+    for _ef in "${_dc_env_files[@]}"; do
+        _dc_env_file_flags+=" --env-file $_ef"
+    done
+    unset _prof _ef
 }
 
 # ---------------------------------------------------------------------------
@@ -96,6 +127,7 @@ dc() {
             shift
             _dc_parse_args "$@"
             _dc_resolve_file || return 1
+            _dc_build_extra_flags
 
             local all_services target_services
             all_services=($(_get_compose_services))
@@ -118,11 +150,12 @@ dc() {
                 _confirm_operation "Continue?" "$acol" || { echo -e "${CB}${CYE}Cancelled${CR}"; return 1; }
             fi
 
-            local cmd="docker compose${_dc_file_flags} up -d${_dc_opts}"
+            # Profiles before subcommand; env-files after subcommand
+            local cmd="docker compose${_dc_file_flags}${_dc_profile_flags} up -d${_dc_opts}${_dc_env_file_flags}"
             [[ ${#_dc_services[@]} -gt 0 ]] && cmd+=" ${_dc_services[*]}"
             if eval "$cmd"; then
                 if [[ "$_dc_show_logs" == true ]]; then
-                    local log_cmd="docker compose${_dc_file_flags} logs -f"
+                    local log_cmd="docker compose${_dc_file_flags}${_dc_profile_flags} logs -f"
                     [[ ${#_dc_services[@]} -gt 0 ]] && log_cmd+=" ${_dc_services[*]}"
                     eval "$log_cmd"
                 fi
@@ -163,6 +196,7 @@ dc() {
             shift
             _dc_parse_args "$@"
             _dc_resolve_file || return 1
+            _dc_build_extra_flags
 
             local all_services target_services
             all_services=($(_get_compose_services))
@@ -182,7 +216,7 @@ dc() {
                 _confirm_operation "Continue?" "$acol" || { echo -e "${CB}${CYE}Cancelled${CR}"; return 1; }
             fi
 
-            local cmd="docker compose${_dc_file_flags} down${_dc_opts}"
+            local cmd="docker compose${_dc_file_flags}${_dc_profile_flags} down${_dc_opts}${_dc_env_file_flags}"
             [[ ${#_dc_services[@]} -gt 0 ]] && cmd+=" ${_dc_services[*]}"
             eval "$cmd"
             ;;
@@ -198,6 +232,7 @@ dc() {
             shift
             _dc_parse_args "$@"
             _dc_resolve_file || return 1
+            _dc_build_extra_flags
 
             local all_services target_services
             all_services=($(_get_compose_services))
@@ -219,7 +254,7 @@ dc() {
                 _confirm_operation "Continue?" "$acol" || { echo -e "${CB}${CYE}Cancelled${CR}"; return 1; }
             fi
 
-            local cmd="docker compose${_dc_file_flags} build${_dc_opts}"
+            local cmd="docker compose${_dc_file_flags}${_dc_profile_flags} build${_dc_opts}${_dc_env_file_flags}"
             [[ ${#_dc_services[@]} -gt 0 ]] && cmd+=" ${_dc_services[*]}"
             eval "$cmd"
             ;;

@@ -201,3 +201,9 @@ _get_compose_services() {
         docker compose -f "$compose_file" config --services 2>/dev/null
     fi
 }
+
+_get_compose_profiles() {
+    local compose_file
+    compose_file=$(_get_compose_file) || return 1
+    docker compose -f "$compose_file" config --profiles 2>/dev/null | sort -u
+}
