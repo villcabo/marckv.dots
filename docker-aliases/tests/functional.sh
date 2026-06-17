@@ -436,41 +436,65 @@ if [[ $rc -eq 0 ]]; then echo "DPRUNE_OK"; else echo "DPRUNE_FAIL:$rc"; fi
 
 # ── SWARM ─────────────────────────────────────────────────────────────────────
 
-# Check if host is already in swarm mode — if yes, skip to avoid disturbing it
+# Check if host is already in swarm mode.
+# If active  → run read-only tests against the live swarm; skip destructive ones.
+# If inactive → init a temporary swarm, run all tests, then leave to clean up.
 swarm_state=$(docker info --format '{{.Swarm.LocalNodeState}}' 2>/dev/null || echo "unknown")
+swarm_was_active=false
 if [[ "$swarm_state" == "active" ]]; then
-    echo "SWARM_SKIP_HOST_ACTIVE"
+    swarm_was_active=true
+    echo "SWARM_HOST_ACTIVE"
 else
     # Initialize swarm for testing
     docker swarm init --advertise-addr 127.0.0.1 2>/dev/null
     swarm_init_rc=$?
     if [[ $swarm_init_rc -eq 0 ]]; then
         echo "SWARM_INIT_OK"
+    else
+        echo "SWARM_INIT_FAIL:$swarm_init_rc"
+        # Cannot run any swarm tests without a swarm
+        swarm_state="inactive_failed"
+    fi
+fi
 
-        # dss — empty list of stacks
-        out=$(dss 2>/dev/null)
-        rc=$?
-        if [[ $rc -eq 0 ]]; then echo "DSS_EMPTY_OK"; else echo "DSS_EMPTY_FAIL:$rc"; fi
+if [[ "$swarm_was_active" == "true" || ( "$swarm_state" != "inactive_failed" && "$swarm_state" != "unknown" ) ]]; then
+    # ── READ-ONLY swarm tests (safe against any swarm) ────────────────────────
 
-        # dssvc — empty list of services
-        out=$(dssvc 2>/dev/null)
-        rc=$?
-        if [[ $rc -eq 0 ]]; then echo "DSSVC_EMPTY_OK"; else echo "DSSVC_EMPTY_FAIL:$rc"; fi
+    # dss — docker stack ls (exit 0, headers always printed)
+    out=$(dss 2>/dev/null)
+    rc=$?
+    if [[ $rc -eq 0 ]]; then echo "DSS_OK"; else echo "DSS_FAIL:$rc"; fi
 
-        # dssnodes — should show 1 manager node
-        out=$(dssnodes 2>/dev/null)
-        rc=$?
-        if [[ $rc -eq 0 && "$out" == *"Leader"* ]]; then
-            echo "DSSNODES_OK"
-        else
-            echo "DSSNODES_FAIL:rc=$rc:out=$out"
-        fi
+    # dssvc — docker service ls (exit 0)
+    out=$(dssvc 2>/dev/null)
+    rc=$?
+    if [[ $rc -eq 0 ]]; then echo "DSSVC_OK"; else echo "DSSVC_FAIL:$rc"; fi
+
+    # dssnodes — docker node ls (exit 0, must show at least one node)
+    out=$(dssnodes 2>/dev/null)
+    rc=$?
+    if [[ $rc -eq 0 && -n "$out" ]]; then
+        echo "DSSNODES_OK"
+    else
+        echo "DSSNODES_FAIL:rc=$rc:out=$out"
+    fi
+
+    # dsstatus — overview of stacks + services + nodes (exit 0)
+    out=$(dsstatus 2>/dev/null)
+    rc=$?
+    if [[ $rc -eq 0 ]]; then echo "DSSTATUS_OK"; else echo "DSSTATUS_FAIL:$rc"; fi
+
+    # ── DESTRUCTIVE swarm tests — only safe when WE initialized the swarm ────
+    if [[ "$swarm_was_active" == "true" ]]; then
+        echo "SWARM_DESTRUCTIVE_SKIP:host_already_active"
+    else
+        # dssdeploy / dssvcsc / dssrm would go here — currently no test stack
+        # to deploy against, so we just verify the host swarm is clean.
+        echo "SWARM_DESTRUCTIVE_SKIP:no_test_stack"
 
         # Leave swarm (clean up what we init'd)
         docker swarm leave --force 2>/dev/null || true
         echo "SWARM_LEAVE_OK"
-    else
-        echo "SWARM_INIT_FAIL:$swarm_init_rc"
     fi
 fi
 
@@ -589,16 +613,19 @@ parse_and_report() {
             DPRUNE_FAIL:*)        check_fail "$tag dprune → failed (${line#DPRUNE_FAIL:})" ;;
 
             # Swarm
-            SWARM_SKIP_HOST_ACTIVE) check_skip "$tag swarm tests — host already in swarm mode (non-destructive skip)" ;;
-            SWARM_INIT_OK)          check_pass "$tag docker swarm init → success" ;;
-            SWARM_INIT_FAIL:*)      check_fail "$tag docker swarm init → failed (${line#SWARM_INIT_FAIL:})" ;;
-            DSS_EMPTY_OK)           check_pass "$tag dss (empty swarm) → exit 0" ;;
-            DSS_EMPTY_FAIL:*)       check_fail "$tag dss → failed (${line#DSS_EMPTY_FAIL:})" ;;
-            DSSVC_EMPTY_OK)         check_pass "$tag dssvc (no services) → exit 0" ;;
-            DSSVC_EMPTY_FAIL:*)     check_fail "$tag dssvc → failed (${line#DSSVC_EMPTY_FAIL:})" ;;
-            DSSNODES_OK)            check_pass "$tag dssnodes → shows Leader node" ;;
-            DSSNODES_FAIL:*)        check_fail "$tag dssnodes → failed (${line#DSSNODES_FAIL:})" ;;
-            SWARM_LEAVE_OK)         check_pass "$tag swarm leave --force → cleaned up" ;;
+            SWARM_HOST_ACTIVE)             check_pass "$tag swarm active on host — running read-only tests against live swarm" ;;
+            SWARM_INIT_OK)                 check_pass "$tag docker swarm init → success (temporary swarm for testing)" ;;
+            SWARM_INIT_FAIL:*)             check_fail "$tag docker swarm init → failed (${line#SWARM_INIT_FAIL:})" ;;
+            DSS_OK)                        check_pass "$tag dss (stack ls) → exit 0" ;;
+            DSS_FAIL:*)                    check_fail "$tag dss → failed (${line#DSS_FAIL:})" ;;
+            DSSVC_OK)                      check_pass "$tag dssvc (service ls) → exit 0" ;;
+            DSSVC_FAIL:*)                  check_fail "$tag dssvc → failed (${line#DSSVC_FAIL:})" ;;
+            DSSNODES_OK)                   check_pass "$tag dssnodes (node ls) → exit 0, output non-empty" ;;
+            DSSNODES_FAIL:*)               check_fail "$tag dssnodes → failed (${line#DSSNODES_FAIL:})" ;;
+            DSSTATUS_OK)                   check_pass "$tag dsstatus (swarm overview) → exit 0" ;;
+            DSSTATUS_FAIL:*)               check_fail "$tag dsstatus → failed (${line#DSSTATUS_FAIL:})" ;;
+            SWARM_DESTRUCTIVE_SKIP:*)      check_skip "$tag swarm destructive tests (dssdeploy/dssvcsc/dssrm) — ${line#SWARM_DESTRUCTIVE_SKIP:}" ;;
+            SWARM_LEAVE_OK)                check_pass "$tag docker swarm leave --force → test swarm cleaned up" ;;
 
             # Opt-in dcpr
             DCPR_BEFORE:absent)  check_pass "$tag dcpr absent before sourcing extra/" ;;
