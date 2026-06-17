@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# smoke.sh — Smoke test suite for docker-aliases restructure
+# smoke.sh — Smoke test suite for docker-aliases (post-triage)
 #
 # Tests: bash + zsh, ubuntu24 + debian12 containers
 # Usage: cd ~/.marckv.dots && ./docker-aliases/tests/smoke.sh [options]
@@ -108,10 +108,17 @@ check_pass() { TOTAL_PASS=$((TOTAL_PASS + 1)); pass "$1"; }
 check_fail() { TOTAL_FAIL=$((TOTAL_FAIL + 1)); fail "$1"; }
 
 # ---------------------------------------------------------------------------
-# Expected symbols
+# Expected symbols (post-triage)
 # ---------------------------------------------------------------------------
-EXPECTED_FUNCTIONS=(d dc dcup dq dcq dstatus dcleanup dclt dip _dip_impl _dc_parse_args _dc_resolve_file)
-EXPECTED_ALIASES=(dps dps1 di dl dlt dpri ds dx dcps dcps1 dcl dcdown dcs dcx)
+# Functions present after triage
+EXPECTED_FUNCTIONS=(d dc dcup dq dcq dstatus dclt dip dstats dprune _dip_impl _dc_parse_args _dc_resolve_file)
+# dcleanup is DROPPED — must NOT appear
+DROPPED_FUNCTIONS=(dcleanup)
+
+# Aliases present after triage (ds renamed to dstats — ds alias dropped)
+EXPECTED_ALIASES=(dps di dl dlt dx dcps dcl dcdown dcs dcx)
+# dps1 dcps1 dpri ds dockerhelp are DROPPED
+DROPPED_ALIASES=(dps1 dcps1 dpri ds dockerhelp)
 
 # ---------------------------------------------------------------------------
 # bash_test_script: inline script run inside the container via bash
@@ -128,17 +135,36 @@ source docker-aliases/docker-color_aliases.sh 2>/dev/null
 rc=\$?
 echo \"SOURCE_EXIT:\$rc\"
 
-# --- Functions ---
-for fn in d dc dcup dq dcq dstatus dcleanup dclt dip _dip_impl _dc_parse_args _dc_resolve_file; do
+# --- Functions that MUST exist ---
+for fn in d dc dcup dq dcq dstatus dclt dip dstats dprune _dip_impl _dc_parse_args _dc_resolve_file; do
     if declare -f \"\$fn\" > /dev/null 2>&1; then echo \"FUNC_OK:\$fn\"; else echo \"FUNC_MISSING:\$fn\"; fi
 done
 
-# --- Aliases ---
-for al in dps dps1 di dl dlt dpri ds dx dcps dcps1 dcl dcdown dcs dcx; do
+# --- Functions that must NOT exist ---
+for fn in dcleanup; do
+    if declare -f \"\$fn\" > /dev/null 2>&1; then echo \"FUNC_DROPPED_PRESENT:\$fn\"; else echo \"FUNC_DROPPED_OK:\$fn\"; fi
+done
+
+# --- Aliases that MUST exist ---
+for al in dps di dl dlt dx dcps dcl dcdown dcs dcx; do
     if alias \"\$al\" > /dev/null 2>&1; then echo \"ALIAS_OK:\$al\"; else echo \"ALIAS_MISSING:\$al\"; fi
 done
 
-# --- dcpr absent ---
+# --- Aliases that must NOT exist ---
+for al in dps1 dcps1 dpri ds dockerhelp; do
+    if alias \"\$al\" > /dev/null 2>&1; then echo \"ALIAS_DROPPED_PRESENT:\$al\"; else echo \"ALIAS_DROPPED_OK:\$al\"; fi
+done
+
+# --- dstats --once flag parses without error ---
+type dstats > /dev/null 2>&1 && echo 'DSTATS_DEFINED:ok' || echo 'DSTATS_DEFINED:missing'
+
+# --- dprune flags parse without error ---
+type dprune > /dev/null 2>&1 && echo 'DPRUNE_DEFINED:ok' || echo 'DPRUNE_DEFINED:missing'
+
+# --- dclt -n flag accepted ---
+type dclt > /dev/null 2>&1 && echo 'DCLT_DEFINED:ok' || echo 'DCLT_DEFINED:missing'
+
+# --- dcpr absent by default ---
 if type dcpr > /dev/null 2>&1; then echo 'DCPR_DEFAULT:present'; else echo 'DCPR_DEFAULT:absent'; fi
 
 # --- dcpr opt-in ---
@@ -158,6 +184,8 @@ echo \"STUB_SWARM:\$BEFORE:\$AFTER2\"
 # --- Completions ---
 complete -p d  2>/dev/null | grep -q '_d_completion'  && echo 'COMP_D:ok'  || echo 'COMP_D:missing'
 complete -p dc 2>/dev/null | grep -q '_dc_completion' && echo 'COMP_DC:ok' || echo 'COMP_DC:missing'
+complete -p dstats 2>/dev/null | grep -q '_dstats_completion' && echo 'COMP_DSTATS:ok' || echo 'COMP_DSTATS:missing'
+complete -p dprune 2>/dev/null | grep -q '_dprune_completion' && echo 'COMP_DPRUNE:ok' || echo 'COMP_DPRUNE:missing'
 " 2>/dev/null
 }
 
@@ -180,17 +208,36 @@ source docker-aliases/docker-color_aliases.sh 2>/dev/null
 rc=\$?
 echo \"SOURCE_EXIT:\$rc\"
 
-# --- Functions ---
-for fn in d dc dcup dq dcq dstatus dcleanup dclt dip _dip_impl _dc_parse_args _dc_resolve_file; do
+# --- Functions that MUST exist ---
+for fn in d dc dcup dq dcq dstatus dclt dip dstats dprune _dip_impl _dc_parse_args _dc_resolve_file; do
     if typeset -f \"\$fn\" > /dev/null 2>&1; then echo \"FUNC_OK:\$fn\"; else echo \"FUNC_MISSING:\$fn\"; fi
 done
 
-# --- Aliases ---
-for al in dps dps1 di dl dlt dpri ds dx dcps dcps1 dcl dcdown dcs dcx; do
+# --- Functions that must NOT exist ---
+for fn in dcleanup; do
+    if typeset -f \"\$fn\" > /dev/null 2>&1; then echo \"FUNC_DROPPED_PRESENT:\$fn\"; else echo \"FUNC_DROPPED_OK:\$fn\"; fi
+done
+
+# --- Aliases that MUST exist ---
+for al in dps di dl dlt dx dcps dcl dcdown dcs dcx; do
     if alias \"\$al\" > /dev/null 2>&1; then echo \"ALIAS_OK:\$al\"; else echo \"ALIAS_MISSING:\$al\"; fi
 done
 
-# --- dcpr absent ---
+# --- Aliases that must NOT exist ---
+for al in dps1 dcps1 dpri ds dockerhelp; do
+    if alias \"\$al\" > /dev/null 2>&1; then echo \"ALIAS_DROPPED_PRESENT:\$al\"; else echo \"ALIAS_DROPPED_OK:\$al\"; fi
+done
+
+# --- dstats --once flag parses without error ---
+type dstats > /dev/null 2>&1 && echo 'DSTATS_DEFINED:ok' || echo 'DSTATS_DEFINED:missing'
+
+# --- dprune flags parse without error ---
+type dprune > /dev/null 2>&1 && echo 'DPRUNE_DEFINED:ok' || echo 'DPRUNE_DEFINED:missing'
+
+# --- dclt -n flag accepted ---
+type dclt > /dev/null 2>&1 && echo 'DCLT_DEFINED:ok' || echo 'DCLT_DEFINED:missing'
+
+# --- dcpr absent by default ---
 type dcpr > /dev/null 2>&1 && echo 'DCPR_DEFAULT:present' || echo 'DCPR_DEFAULT:absent'
 
 # --- dcpr opt-in ---
@@ -222,14 +269,33 @@ parse_and_report() {
         case "$line" in
             SOURCE_EXIT:0)   check_pass "$tag loader source → exit 0" ;;
             SOURCE_EXIT:*)   check_fail "$tag loader source → exit non-0 ($line)" ;;
+
             FUNC_OK:*)       check_pass "$tag function ${line#FUNC_OK:}" ;;
             FUNC_MISSING:*)  check_fail "$tag function MISSING: ${line#FUNC_MISSING:}" ;;
-            ALIAS_OK:*)      check_pass "$tag alias ${line#ALIAS_OK:}" ;;
-            ALIAS_MISSING:*) check_fail "$tag alias MISSING: ${line#ALIAS_MISSING:}" ;;
+
+            FUNC_DROPPED_OK:*)      check_pass "$tag dropped function absent: ${line#FUNC_DROPPED_OK:}" ;;
+            FUNC_DROPPED_PRESENT:*) check_fail "$tag dropped function still present: ${line#FUNC_DROPPED_PRESENT:}" ;;
+
+            ALIAS_OK:*)       check_pass "$tag alias ${line#ALIAS_OK:}" ;;
+            ALIAS_MISSING:*)  check_fail "$tag alias MISSING: ${line#ALIAS_MISSING:}" ;;
+
+            ALIAS_DROPPED_OK:*)      check_pass "$tag dropped alias absent: ${line#ALIAS_DROPPED_OK:}" ;;
+            ALIAS_DROPPED_PRESENT:*) check_fail "$tag dropped alias still present: ${line#ALIAS_DROPPED_PRESENT:}" ;;
+
+            DSTATS_DEFINED:ok)      check_pass "$tag dstats defined" ;;
+            DSTATS_DEFINED:missing) check_fail "$tag dstats NOT defined" ;;
+
+            DPRUNE_DEFINED:ok)      check_pass "$tag dprune defined" ;;
+            DPRUNE_DEFINED:missing) check_fail "$tag dprune NOT defined" ;;
+
+            DCLT_DEFINED:ok)        check_pass "$tag dclt defined" ;;
+            DCLT_DEFINED:missing)   check_fail "$tag dclt NOT defined" ;;
+
             DCPR_DEFAULT:absent)  check_pass "$tag dcpr absent by default (opt-in only)" ;;
             DCPR_DEFAULT:present) check_fail "$tag dcpr should NOT be defined by default" ;;
             DCPR_OPTIN:present)   check_pass "$tag dcpr available after explicit source" ;;
             DCPR_OPTIN:absent)    check_fail "$tag dcpr NOT available after opt-in source" ;;
+
             STUB_MODERN:*)
                 IFS=':' read -r _ before after <<< "$line"
                 if [[ "$before" == "$after" ]]; then
@@ -246,10 +312,15 @@ parse_and_report() {
                     check_fail "$tag swarm.sh stub: added functions (before=$before after=$after)"
                 fi
                 ;;
-            COMP_D:ok)      check_pass "$tag complete -p d registered" ;;
-            COMP_D:missing) check_fail "$tag complete -p d NOT registered" ;;
-            COMP_DC:ok)     check_pass "$tag complete -p dc registered" ;;
-            COMP_DC:missing) check_fail "$tag complete -p dc NOT registered" ;;
+
+            COMP_D:ok)          check_pass "$tag complete -p d registered" ;;
+            COMP_D:missing)     check_fail "$tag complete -p d NOT registered" ;;
+            COMP_DC:ok)         check_pass "$tag complete -p dc registered" ;;
+            COMP_DC:missing)    check_fail "$tag complete -p dc NOT registered" ;;
+            COMP_DSTATS:ok)     check_pass "$tag complete -p dstats registered" ;;
+            COMP_DSTATS:missing) check_fail "$tag complete -p dstats NOT registered" ;;
+            COMP_DPRUNE:ok)     check_pass "$tag complete -p dprune registered" ;;
+            COMP_DPRUNE:missing) check_fail "$tag complete -p dprune NOT registered" ;;
         esac
     done <<< "$output"
 }
