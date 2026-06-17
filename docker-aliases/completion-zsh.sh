@@ -101,6 +101,16 @@ _dc_zsh() {
         '--yes[Skip confirmation]'
     )
 
+    local -a build_flags
+    build_flags=(
+        '-f[Use specific compose file]:compose file:->yml'
+        '-P[Compose profile (comma-separated)]:profile:->profiles'
+        '-e[Env-file override]:env file:_files -g "*.env* .env*"'
+        '-y[Skip confirmation]'
+        '--yes[Skip confirmation]'
+        '--bake[Use buildx bake for parallel/multi-arch build]'
+    )
+
     local -a ps_flags
     ps_flags=(
         '-c[Compact format]'
@@ -132,8 +142,11 @@ _dc_zsh() {
     # Flag completion
     if [[ "${words[$CURRENT]}" == -* ]]; then
         case "$cmd" in
-            up|u|down|d|build|b)
+            up|u|down|d)
                 _describe 'flag' up_flags
+                ;;
+            build|b)
+                _describe 'flag' build_flags
                 ;;
             ps|p)
                 _describe 'flag' ps_flags

@@ -105,8 +105,14 @@ _compose_help() {
 
     echo -e "\n${CCY}CONTROL${CR}"
     echo -e "  ${CGR}dc start${CR}/${CGR}stop${CR}/${CGR}restart${CR} ${CMA}<service>${CR}"
-    echo -e "  ${CGR}dc build${CR}, ${CGR}dc b${CR}         Build services"
     echo -e "  ${CGR}dc pull${CR}               Pull images"
+
+    echo -e "\n${CCY}BUILD${CR}"
+    echo -e "  ${CGR}dc build${CR}, ${CGR}dc b${CR}         Build services (docker compose build)"
+    echo -e "  ${CGR}dc build --bake${CR}        Build via buildx bake — parallel, multi-arch, monorepos"
+    echo -e "  ${CGR}dc build --bake api${CR}    Bake a specific target"
+    echo -e "  ${CI}Use ${CYE}--bake${CR}${CI} when you have many images, need multi-arch releases, or compose builds${CR}"
+    echo -e "  ${CI}become the bottleneck. Requires ${CYE}docker buildx${CR}${CI} (Docker 19.03+).${CR}"
 
     echo -e "\n${CCY}SMART FUNCTIONS${CR}"
     echo -e "  ${CGR}dcq${CR} ${CMA}<pattern> <cmd>${CR}    Exec in first service matching pattern"

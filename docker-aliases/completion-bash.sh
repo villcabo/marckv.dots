@@ -63,8 +63,20 @@ _dc_completion() {
 
     if [[ "$cur" == -* ]]; then
         case "$command" in
-            up|u|down|d|build|b)
+            up|u|down|d)
                 local all_flags="-p -l -f -b -r -P -e"
+                local used="" flag
+                for (( i=1; i<COMP_CWORD; i++ )); do
+                    [[ "${COMP_WORDS[i]}" == -* && "${COMP_WORDS[i]}" != "-f" ]] && used+="${COMP_WORDS[i]} "
+                done
+                local avail=""
+                for flag in $all_flags; do
+                    [[ "$flag" == "-f" || ! "$used" =~ $flag ]] && avail+="$flag "
+                done
+                COMPREPLY=($(compgen -W "$avail" -- "$cur"))
+                ;;
+            build|b)
+                local all_flags="-p -l -f -b -r -P -e --bake"
                 local used="" flag
                 for (( i=1; i<COMP_CWORD; i++ )); do
                     [[ "${COMP_WORDS[i]}" == -* && "${COMP_WORDS[i]}" != "-f" ]] && used+="${COMP_WORDS[i]} "
