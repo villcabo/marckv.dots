@@ -16,6 +16,7 @@ _dc_parse_args() {
     _dc_yes=false
     _dc_profiles=()
     _dc_env_files=()
+    _dc_bake=false
 
     while [[ $# -gt 0 ]]; do
         if [[ "$1" == "-f" && -n "$2" && "$2" != -* ]]; then
@@ -39,6 +40,9 @@ _dc_parse_args() {
         elif [[ "$1" == "-e" && -n "$2" ]]; then
             _dc_env_files+=("$2")
             shift 2
+        elif [[ "$1" == "--bake" ]]; then
+            _dc_bake=true
+            shift
         elif [[ "$1" == "--yes" || "$1" == "-y" ]]; then
             _dc_yes=true
             shift
@@ -250,20 +254,49 @@ dc() {
             local flags_str
             flags_str=$(echo "$_dc_opts" | xargs)
 
-            _render_preview "compose build" "$files_str" "$svc_str" "$flags_str"
+            if [[ "$_dc_bake" == true ]]; then
+                # Sanity check: buildx must be available
+                if ! command -v docker > /dev/null 2>&1 || ! docker buildx version > /dev/null 2>&1; then
+                    echo -e "${CRE}docker buildx is not available on this system.${CR}"
+                    echo -e "${CB}Install the buildx plugin or upgrade Docker to use ${CYE}--bake${CR}."
+                    return 1
+                fi
 
-            local skip_confirm=false
-            [[ "$_dc_yes" == true ]] && skip_confirm=true
+                _render_preview "compose build (bake)" "$files_str" "$svc_str" "$flags_str"
 
-            if [[ "$skip_confirm" == false ]]; then
-                local acol
-                acol=$(_action_color "build")
-                _confirm_operation "Continue?" "$acol" || { echo -e "${CB}${CYE}Cancelled${CR}"; return 1; }
+                local skip_confirm=false
+                [[ "$_dc_yes" == true ]] && skip_confirm=true
+
+                if [[ "$skip_confirm" == false ]]; then
+                    local acol
+                    acol=$(_action_color "build")
+                    _confirm_operation "Continue?" "$acol" || { echo -e "${CB}${CYE}Cancelled${CR}"; return 1; }
+                fi
+
+                local bake_cmd="docker buildx bake"
+                # Pass compose file(s) via -f (bake uses same flag)
+                for _bf in "${_dc_resolved_files[@]}"; do
+                    bake_cmd+=" -f \"$_bf\""
+                done
+                # Pass targets (service names) as positional args
+                [[ ${#_dc_services[@]} -gt 0 ]] && bake_cmd+=" ${_dc_services[*]}"
+                eval "$bake_cmd"
+            else
+                _render_preview "compose build" "$files_str" "$svc_str" "$flags_str"
+
+                local skip_confirm=false
+                [[ "$_dc_yes" == true ]] && skip_confirm=true
+
+                if [[ "$skip_confirm" == false ]]; then
+                    local acol
+                    acol=$(_action_color "build")
+                    _confirm_operation "Continue?" "$acol" || { echo -e "${CB}${CYE}Cancelled${CR}"; return 1; }
+                fi
+
+                local cmd="docker compose${_dc_file_flags}${_dc_profile_flags} build${_dc_opts}${_dc_env_file_flags}"
+                [[ ${#_dc_services[@]} -gt 0 ]] && cmd+=" ${_dc_services[*]}"
+                eval "$cmd"
             fi
-
-            local cmd="docker compose${_dc_file_flags}${_dc_profile_flags} build${_dc_opts}${_dc_env_file_flags}"
-            [[ ${#_dc_services[@]} -gt 0 ]] && cmd+=" ${_dc_services[*]}"
-            eval "$cmd"
             ;;
 
         # ── info ────────────────────────────────────────────────────────────
