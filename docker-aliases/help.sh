@@ -54,8 +54,10 @@ _docker_help() {
     echo -e "  ${CGR}dprune --volumes${CR}       Prune unused volumes"
 
     echo -e "\n${CCY}CONFIGURATION${CR}"
-    echo -e "  ${CYE}DOCKER_ALIASES_NERD_FONT=0${CR}   Force ASCII icons (default: Nerd Font)"
-    echo -e "  ${CYE}DOCKER_ALIASES_AUTO_YES=1${CR}    Skip all confirmation prompts"
+    echo -e "  ${CYE}DOCKER_ALIASES_NERD_FONT=0${CR}    Force ASCII icons (default: Nerd Font)"
+    echo -e "  ${CYE}DOCKER_ALIASES_AUTO_YES=1${CR}     Skip all confirmation prompts"
+    echo -e "  ${CYE}DOCKER_ALIASES_CACHE_TTL=N${CR}   Completion cache TTL in seconds (default: 5)"
+    echo -e "                               Set to 0 to disable caching."
 
     echo -e "\n${CCY}SEE ALSO${CR}"
     echo -e "  Run ${CGR}dsshelp${CR} for Docker Swarm commands (${CYE}dss*${CR} namespace)."
@@ -144,6 +146,8 @@ _compose_help() {
     echo -e "  ${CYE}DOCKER_ALIASES_NERD_FONT=0${CR}      Force ASCII icons (default: Nerd Font)"
     echo -e "  ${CYE}DOCKER_ALIASES_AUTO_YES=1${CR}       Skip all confirmation prompts"
     echo -e "  ${CYE}DOCKER_ALIASES_LOG_LINES=200${CR}    Default tail lines for dclt (default: 100)"
+    echo -e "  ${CYE}DOCKER_ALIASES_CACHE_TTL=N${CR}      Completion cache TTL in seconds (default: 5)"
+    echo -e "                               Set to 0 to disable caching."
 }
 
 _modern_compose_help() {
