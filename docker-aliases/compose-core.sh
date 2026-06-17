@@ -23,11 +23,18 @@ _dc_parse_args() {
             shift 2
         elif [[ "$1" == "-P" && -n "$2" ]]; then
             # Comma-separated profiles: -P dev,debug → --profile dev --profile debug
-            IFS=',' read -ra _profiles_tmp <<< "$2"
-            for _p in "${_profiles_tmp[@]}"; do
+            # Use parameter substitution — portable across bash and zsh
+            local _raw_profiles="$2"
+            while [[ -n "$_raw_profiles" ]]; do
+                local _p="${_raw_profiles%%,*}"
                 _dc_profiles+=("$_p")
+                if [[ "$_raw_profiles" == *,* ]]; then
+                    _raw_profiles="${_raw_profiles#*,}"
+                else
+                    _raw_profiles=""
+                fi
             done
-            unset _profiles_tmp _p
+            unset _p _raw_profiles
             shift 2
         elif [[ "$1" == "-e" && -n "$2" ]]; then
             _dc_env_files+=("$2")
