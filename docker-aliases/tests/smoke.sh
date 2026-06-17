@@ -186,6 +186,32 @@ complete -p d  2>/dev/null | grep -q '_d_completion'  && echo 'COMP_D:ok'  || ec
 complete -p dc 2>/dev/null | grep -q '_dc_completion' && echo 'COMP_DC:ok' || echo 'COMP_DC:missing'
 complete -p dstats 2>/dev/null | grep -q '_dstats_completion' && echo 'COMP_DSTATS:ok' || echo 'COMP_DSTATS:missing'
 complete -p dprune 2>/dev/null | grep -q '_dprune_completion' && echo 'COMP_DPRUNE:ok' || echo 'COMP_DPRUNE:missing'
+
+# ── Phase 3 UX tests ─────────────────────────────────────────────────────
+
+# --- _icon: known keys return non-empty (Nerd Font mode) ---
+for key in docker file services flags confirm; do
+    val=\$(_icon \"\$key\" 2>/dev/null)
+    if [[ -n \"\$val\" ]]; then echo \"ICON_OK:\$key\"; else echo \"ICON_EMPTY:\$key\"; fi
+done
+
+# --- _icon: ASCII fallback when DOCKER_ALIASES_NERD_FONT=0 ---
+ascii_docker=\$(DOCKER_ALIASES_NERD_FONT=0 _icon docker 2>/dev/null)
+if [[ \"\$ascii_docker\" == '[docker]' ]]; then echo 'ICON_ASCII:ok'; else echo \"ICON_ASCII:wrong:\$ascii_docker\"; fi
+
+# --- _render_preview: runs without error and produces output ---
+preview_out=\$(_render_preview 'compose up' 'docker-compose.yml' 'api worker' '--build' 2>/dev/null)
+if [[ -n \"\$preview_out\" ]]; then echo 'RENDER_PREVIEW:ok'; else echo 'RENDER_PREVIEW:empty'; fi
+
+# --- _confirm_operation: DOCKER_ALIASES_AUTO_YES=1 returns 0 and produces no prompt ---
+prompt_out=\$(DOCKER_ALIASES_AUTO_YES=1 _confirm_operation 'Continue?' 2>/dev/null)
+rc=\$?
+if [[ \$rc -eq 0 && -z \"\$prompt_out\" ]]; then echo 'AUTO_YES:ok'; else echo \"AUTO_YES:fail:rc=\$rc:out=\$prompt_out\"; fi
+
+# --- New helper functions exist ---
+for fn in _use_nerd_font _icon _action_color _render_preview; do
+    if declare -f \"\$fn\" > /dev/null 2>&1; then echo \"UX_FUNC_OK:\$fn\"; else echo \"UX_FUNC_MISSING:\$fn\"; fi
+done
 " 2>/dev/null
 }
 
@@ -253,6 +279,32 @@ echo \"STUB_MODERN:\$BEFORE:\$AFTER\"
 source docker-aliases/swarm.sh
 AFTER2=\$(typeset -f | grep '^[a-z_]' | wc -l)
 echo \"STUB_SWARM:\$BEFORE:\$AFTER2\"
+
+# ── Phase 3 UX tests ─────────────────────────────────────────────────────
+
+# --- _icon: known keys return non-empty (Nerd Font mode) ---
+for key in docker file services flags confirm; do
+    val=\$(_icon \"\$key\" 2>/dev/null)
+    if [[ -n \"\$val\" ]]; then echo \"ICON_OK:\$key\"; else echo \"ICON_EMPTY:\$key\"; fi
+done
+
+# --- _icon: ASCII fallback when DOCKER_ALIASES_NERD_FONT=0 ---
+ascii_docker=\$(DOCKER_ALIASES_NERD_FONT=0 _icon docker 2>/dev/null)
+if [[ \"\$ascii_docker\" == '[docker]' ]]; then echo 'ICON_ASCII:ok'; else echo \"ICON_ASCII:wrong:\$ascii_docker\"; fi
+
+# --- _render_preview: runs without error and produces output ---
+preview_out=\$(_render_preview 'compose up' 'docker-compose.yml' 'api worker' '--build' 2>/dev/null)
+if [[ -n \"\$preview_out\" ]]; then echo 'RENDER_PREVIEW:ok'; else echo 'RENDER_PREVIEW:empty'; fi
+
+# --- _confirm_operation: DOCKER_ALIASES_AUTO_YES=1 returns 0 and produces no prompt ---
+prompt_out=\$(DOCKER_ALIASES_AUTO_YES=1 _confirm_operation 'Continue?' 2>/dev/null)
+rc=\$?
+if [[ \$rc -eq 0 && -z \"\$prompt_out\" ]]; then echo 'AUTO_YES:ok'; else echo \"AUTO_YES:fail:rc=\$rc:out=\$prompt_out\"; fi
+
+# --- New helper functions exist ---
+for fn in _use_nerd_font _icon _action_color _render_preview; do
+    if typeset -f \"\$fn\" > /dev/null 2>&1; then echo \"UX_FUNC_OK:\$fn\"; else echo \"UX_FUNC_MISSING:\$fn\"; fi
+done
 " 2>/dev/null
 }
 
@@ -321,6 +373,22 @@ parse_and_report() {
             COMP_DSTATS:missing) check_fail "$tag complete -p dstats NOT registered" ;;
             COMP_DPRUNE:ok)     check_pass "$tag complete -p dprune registered" ;;
             COMP_DPRUNE:missing) check_fail "$tag complete -p dprune NOT registered" ;;
+
+            # Phase 3 UX checks
+            ICON_OK:*)       check_pass "$tag _icon ${line#ICON_OK:} returns non-empty" ;;
+            ICON_EMPTY:*)    check_fail "$tag _icon ${line#ICON_EMPTY:} returned empty" ;;
+
+            ICON_ASCII:ok)   check_pass "$tag _icon docker → ASCII fallback [docker] when NERD_FONT=0" ;;
+            ICON_ASCII:*)    check_fail "$tag _icon ASCII fallback wrong: $line" ;;
+
+            RENDER_PREVIEW:ok)    check_pass "$tag _render_preview produces output" ;;
+            RENDER_PREVIEW:empty) check_fail "$tag _render_preview returned empty output" ;;
+
+            AUTO_YES:ok)   check_pass "$tag _confirm_operation returns 0 with DOCKER_ALIASES_AUTO_YES=1" ;;
+            AUTO_YES:*)    check_fail "$tag _confirm_operation auto-yes failed: $line" ;;
+
+            UX_FUNC_OK:*)      check_pass "$tag UX helper ${line#UX_FUNC_OK:} defined" ;;
+            UX_FUNC_MISSING:*) check_fail "$tag UX helper MISSING: ${line#UX_FUNC_MISSING:}" ;;
         esac
     done <<< "$output"
 }
