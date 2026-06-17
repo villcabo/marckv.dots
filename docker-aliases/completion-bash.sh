@@ -51,10 +51,20 @@ _dc_completion() {
         return 0
     fi
 
+    # After -P: suggest profiles; after -e: suggest .env* files
+    if [[ "$prev" == "-P" ]]; then
+        COMPREPLY=($(compgen -W "$(_get_compose_profiles 2>/dev/null)" -- "$cur"))
+        return 0
+    fi
+    if [[ "$prev" == "-e" ]]; then
+        COMPREPLY=($(compgen -f -G ".env*" -- "$cur"))
+        return 0
+    fi
+
     if [[ "$cur" == -* ]]; then
         case "$command" in
             up|u|down|d|build|b)
-                local all_flags="-p -l -f -b -r"
+                local all_flags="-p -l -f -b -r -P -e"
                 local used="" flag
                 for (( i=1; i<COMP_CWORD; i++ )); do
                     [[ "${COMP_WORDS[i]}" == -* && "${COMP_WORDS[i]}" != "-f" ]] && used+="${COMP_WORDS[i]} "
@@ -149,6 +159,90 @@ _dc_containers_completion() {
 }
 
 # ---------------------------------------------------------------------------
+# dcw completion — compose watch
+# ---------------------------------------------------------------------------
+_dcw_completion() {
+    local cur prev i
+    cur="${COMP_WORDS[COMP_CWORD]}"
+    prev="${COMP_WORDS[COMP_CWORD-1]}"
+
+    case "$prev" in
+        -f)
+            COMPREPLY=($(compgen -W "$(ls *.yml *.yaml 2>/dev/null)" -- "$cur"))
+            return 0
+            ;;
+        -P)
+            COMPREPLY=($(compgen -W "$(_get_compose_profiles 2>/dev/null)" -- "$cur"))
+            return 0
+            ;;
+    esac
+
+    if [[ "$cur" == -* ]]; then
+        local all_flags="-f -P -y --yes -h --help"
+        # Exclude already-used single-use flags
+        local used="" flag
+        for (( i=1; i<COMP_CWORD; i++ )); do
+            [[ "${COMP_WORDS[i]}" == -* && "${COMP_WORDS[i]}" != "-f" && "${COMP_WORDS[i]}" != "-P" ]] && used+="${COMP_WORDS[i]} "
+        done
+        local avail=""
+        for flag in $all_flags; do
+            [[ ! "$used" =~ $flag ]] && avail+="$flag "
+        done
+        COMPREPLY=($(compgen -W "$avail" -- "$cur"))
+        return 0
+    fi
+
+    COMPREPLY=($(compgen -W "$(_get_compose_services)" -- "$cur"))
+}
+
+# ---------------------------------------------------------------------------
+# dcrun completion — one-shot run
+# ---------------------------------------------------------------------------
+_dcrun_completion() {
+    local cur prev i
+    cur="${COMP_WORDS[COMP_CWORD]}"
+    prev="${COMP_WORDS[COMP_CWORD-1]}"
+
+    case "$prev" in
+        -P)
+            COMPREPLY=($(compgen -W "$(_get_compose_profiles 2>/dev/null)" -- "$cur"))
+            return 0
+            ;;
+        -e)
+            # Complete .env* files
+            COMPREPLY=($(compgen -f -G ".env*" -- "$cur"))
+            return 0
+            ;;
+        -f)
+            COMPREPLY=($(compgen -W "$(ls *.yml *.yaml 2>/dev/null)" -- "$cur"))
+            return 0
+            ;;
+    esac
+
+    if [[ "$cur" == -* ]]; then
+        COMPREPLY=($(compgen -W "-P -e -f --no-rm -h --help" -- "$cur"))
+        return 0
+    fi
+
+    # First non-flag argument → service name; after that → shell commands
+    local service_pos=0
+    for (( i=1; i<COMP_CWORD; i++ )); do
+        if [[ "${COMP_WORDS[i]}" != -* ]]; then
+            # check it's not a value for a flag
+            local pprev="${COMP_WORDS[i-1]}"
+            if [[ "$pprev" != "-P" && "$pprev" != "-e" && "$pprev" != "-f" ]]; then
+                service_pos=$i
+                break
+            fi
+        fi
+    done
+
+    if [[ $service_pos -eq 0 ]]; then
+        COMPREPLY=($(compgen -W "$(_get_compose_services)" -- "$cur"))
+    fi
+}
+
+# ---------------------------------------------------------------------------
 # dclt completion
 # ---------------------------------------------------------------------------
 _dclt_completion() {
@@ -191,3 +285,5 @@ complete -F _dc_services_completion   dcdown dcl dcx dcs dcps
 complete -F _dc_containers_completion dl dx
 complete -F _dclt_completion          dclt
 complete -F _dcpr_completion          dcpr
+complete -F _dcw_completion           dcw
+complete -F _dcrun_completion         dcrun

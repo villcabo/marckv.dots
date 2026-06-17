@@ -95,6 +95,10 @@ _dc_zsh() {
         '-b[Build before up]'
         '-l[Follow logs after up]'
         '-r[Force recreate containers]'
+        '-P[Compose profile (comma-separated)]:profile:->profiles'
+        '-e[Env-file override]:env file:_files -g "*.env* .env*"'
+        '-y[Skip confirmation]'
+        '--yes[Skip confirmation]'
     )
 
     local -a ps_flags
@@ -109,6 +113,14 @@ _dc_zsh() {
     # After -f: complete yml files
     if [[ "$prev" == "-f" ]]; then
         _describe 'compose file' yml_files
+        return
+    fi
+
+    # After -P: complete profiles
+    if [[ "$prev" == "-P" ]]; then
+        local -a profiles
+        profiles=(${(f)"$(_get_compose_profiles 2>/dev/null)"})
+        _describe 'profile' profiles
         return
     fi
 
@@ -256,6 +268,95 @@ _dcpr_zsh() {
 }
 
 # ---------------------------------------------------------------------------
+# dcw completion — compose watch
+# ---------------------------------------------------------------------------
+_dcw_zsh() {
+    local -a services flags yml_files profiles
+    services=(${(f)"$(_get_compose_services)"})
+    yml_files=(${(f)"$(ls *.yml *.yaml 2>/dev/null)"})
+    profiles=(${(f)"$(_get_compose_profiles 2>/dev/null)"})
+    flags=(
+        '-h[Show help and examples]'
+        '--help[Show help and examples]'
+        '-f[Use specific compose file]:compose file:(${yml_files[@]})'
+        '-P[Compose profile (comma-separated)]:profile:(${profiles[@]})'
+        '-y[Skip confirmation]'
+        '--yes[Skip confirmation]'
+    )
+
+    local prev="${words[$((CURRENT-1))]}"
+
+    if [[ "$prev" == "-f" ]]; then
+        _describe 'compose file' yml_files
+        return
+    fi
+
+    if [[ "$prev" == "-P" ]]; then
+        _describe 'profile' profiles
+        return
+    fi
+
+    if [[ "${words[$CURRENT]}" == -* ]]; then
+        _describe 'flag' flags
+        return
+    fi
+
+    _describe 'service' services
+}
+
+# ---------------------------------------------------------------------------
+# dcrun completion — one-shot run --rm
+# ---------------------------------------------------------------------------
+_dcrun_zsh() {
+    local -a services flags yml_files profiles
+    services=(${(f)"$(_get_compose_services)"})
+    yml_files=(${(f)"$(ls *.yml *.yaml 2>/dev/null)"})
+    profiles=(${(f)"$(_get_compose_profiles 2>/dev/null)"})
+    flags=(
+        '-h[Show help and examples]'
+        '--help[Show help and examples]'
+        '-P[Compose profile (comma-separated)]:profile:(${profiles[@]})'
+        '-e[Env-file override]:env file:_files -g "*.env* .env*"'
+        '-f[Use specific compose file]:compose file:(${yml_files[@]})'
+        '--no-rm[Keep container after run]'
+    )
+
+    local prev="${words[$((CURRENT-1))]}"
+
+    if [[ "$prev" == "-P" ]]; then
+        _describe 'profile' profiles
+        return
+    fi
+
+    if [[ "$prev" == "-f" ]]; then
+        _describe 'compose file' yml_files
+        return
+    fi
+
+    if [[ "${words[$CURRENT]}" == -* ]]; then
+        _describe 'flag' flags
+        return
+    fi
+
+    # First positional = service name
+    local service_seen=false
+    local w
+    for w in "${words[@]:1:$((CURRENT-2))}"; do
+        if [[ "$w" != -* ]]; then
+            local wprev="${words[$((${words[(i)$w]}-1))]}"
+            if [[ "$wprev" != "-P" && "$wprev" != "-e" && "$wprev" != "-f" ]]; then
+                service_seen=true
+                break
+            fi
+        fi
+    done
+
+    if [[ "$service_seen" == false ]]; then
+        _describe 'service' services
+    fi
+}
+
+# ---------------------------------------------------------------------------
 # dip completion — completes with container IPs
 # ---------------------------------------------------------------------------
 _dip_zsh() {
@@ -286,3 +387,5 @@ compdef _dq_zsh   dl dx
 compdef _dclt_zsh dclt
 compdef _dcpr_zsh dcpr
 compdef _dip_zsh  dip
+compdef _dcw_zsh  dcw
+compdef _dcrun_zsh dcrun
