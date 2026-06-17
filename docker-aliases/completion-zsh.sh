@@ -357,6 +357,134 @@ _dcrun_zsh() {
 }
 
 # ---------------------------------------------------------------------------
+# dss completion — no args
+# ---------------------------------------------------------------------------
+_dss_zsh() {
+    :   # no completions
+}
+
+# ---------------------------------------------------------------------------
+# dssps completion — suggest stacks
+# ---------------------------------------------------------------------------
+_dssps_zsh() {
+    local -a stacks
+    stacks=(${(f)"$(_get_swarm_stacks)"})
+    _describe 'stack' stacks
+}
+
+# ---------------------------------------------------------------------------
+# dssdeploy completion
+# ---------------------------------------------------------------------------
+_dssdeploy_zsh() {
+    local prev="${words[$((CURRENT-1))]}"
+
+    if [[ "$prev" == "-c" ]]; then
+        local -a yml_files
+        yml_files=(${(f)"$(ls *.yml *.yaml 2>/dev/null)"})
+        _describe 'compose file' yml_files
+        return
+    fi
+
+    if [[ "${words[$CURRENT]}" == -* ]]; then
+        local -a flags
+        flags=(
+            '-c[Compose file to deploy]:compose file:_files -g "*.yml *.yaml"'
+            '-y[Skip confirmation]'
+            '--yes[Skip confirmation]'
+        )
+        _describe 'flag' flags
+        return
+    fi
+    # First positional = stack name (free text — no completion)
+}
+
+# ---------------------------------------------------------------------------
+# dssrm completion — suggest stacks + flags
+# ---------------------------------------------------------------------------
+_dssrm_zsh() {
+    if [[ "${words[$CURRENT]}" == -* ]]; then
+        local -a flags
+        flags=(
+            '-y[Skip confirmation]'
+            '--yes[Skip confirmation]'
+        )
+        _describe 'flag' flags
+        return
+    fi
+    local -a stacks
+    stacks=(${(f)"$(_get_swarm_stacks)"})
+    _describe 'stack' stacks
+}
+
+# ---------------------------------------------------------------------------
+# dssvc completion — no args
+# ---------------------------------------------------------------------------
+_dssvc_zsh() {
+    :
+}
+
+# ---------------------------------------------------------------------------
+# dssvcps completion — suggest services
+# ---------------------------------------------------------------------------
+_dssvcps_zsh() {
+    local -a services
+    services=(${(f)"$(_get_swarm_services)"})
+    _describe 'service' services
+}
+
+# ---------------------------------------------------------------------------
+# dssvcl completion — suggest services + -n flag
+# ---------------------------------------------------------------------------
+_dssvcl_zsh() {
+    local prev="${words[$((CURRENT-1))]}"
+
+    if [[ "$prev" == "-n" ]]; then
+        local -a lines
+        lines=('50:50 lines' '100:100 lines' '200:200 lines' '300:300 lines' '500:500 lines')
+        _describe 'lines' lines
+        return
+    fi
+
+    if [[ "${words[$CURRENT]}" == -* ]]; then
+        local -a flags
+        flags=(
+            '-n[Number of log lines to tail]:lines:(50 100 200 300 500)'
+        )
+        _describe 'flag' flags
+        return
+    fi
+
+    local -a services
+    services=(${(f)"$(_get_swarm_services)"})
+    _describe 'service' services
+}
+
+# ---------------------------------------------------------------------------
+# dssvcsc completion — suggest <svc>=N + flags
+# ---------------------------------------------------------------------------
+_dssvcsc_zsh() {
+    if [[ "${words[$CURRENT]}" == -* ]]; then
+        local -a flags
+        flags=(
+            '-y[Skip confirmation]'
+            '--yes[Skip confirmation]'
+        )
+        _describe 'flag' flags
+        return
+    fi
+    local -a services
+    services=(${(f)"$(_get_swarm_services)"})
+    _describe 'service' services
+}
+
+# ---------------------------------------------------------------------------
+# dssnodes completion — no args
+# ---------------------------------------------------------------------------
+_dssnodes_zsh() {
+    :
+}
+
+# ---------------------------------------------------------------------------
 # dip completion — completes with container IPs
 # ---------------------------------------------------------------------------
 _dip_zsh() {
@@ -389,3 +517,14 @@ compdef _dcpr_zsh dcpr
 compdef _dip_zsh  dip
 compdef _dcw_zsh  dcw
 compdef _dcrun_zsh dcrun
+
+# Swarm completions
+compdef _dss_zsh      dss
+compdef _dssps_zsh    dssps
+compdef _dssdeploy_zsh dssdeploy
+compdef _dssrm_zsh    dssrm
+compdef _dssvc_zsh    dssvc
+compdef _dssvcps_zsh  dssvcps
+compdef _dssvcl_zsh   dssvcl
+compdef _dssvcsc_zsh  dssvcsc
+compdef _dssnodes_zsh dssnodes

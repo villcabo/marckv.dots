@@ -270,6 +270,98 @@ _dcpr_completion() {
 }
 
 # ---------------------------------------------------------------------------
+# dss completion — no args beyond the command itself
+# ---------------------------------------------------------------------------
+_dss_completion() {
+    :   # no completions — dss takes no arguments
+}
+
+# ---------------------------------------------------------------------------
+# dssps / dssrm completion — suggest stacks
+# ---------------------------------------------------------------------------
+_dssps_completion() {
+    local cur="${COMP_WORDS[COMP_CWORD]}"
+    COMPREPLY=($(compgen -W "$(_get_swarm_stacks)" -- "$cur"))
+}
+
+_dssrm_completion() {
+    local cur="${COMP_WORDS[COMP_CWORD]}"
+    local prev="${COMP_WORDS[COMP_CWORD-1]}"
+    if [[ "$cur" == -* ]]; then
+        COMPREPLY=($(compgen -W "-y --yes" -- "$cur"))
+        return 0
+    fi
+    COMPREPLY=($(compgen -W "$(_get_swarm_stacks)" -- "$cur"))
+}
+
+# ---------------------------------------------------------------------------
+# dssdeploy completion — first arg: stack name (free text); after -c: yml files
+# ---------------------------------------------------------------------------
+_dssdeploy_completion() {
+    local cur="${COMP_WORDS[COMP_CWORD]}"
+    local prev="${COMP_WORDS[COMP_CWORD-1]}"
+
+    if [[ "$prev" == "-c" ]]; then
+        COMPREPLY=($(compgen -W "$(ls *.yml *.yaml 2>/dev/null)" -- "$cur"))
+        return 0
+    fi
+
+    if [[ "$cur" == -* ]]; then
+        COMPREPLY=($(compgen -W "-c -y --yes" -- "$cur"))
+        return 0
+    fi
+    # No completion for stack name (free text) or command args beyond flags
+}
+
+# ---------------------------------------------------------------------------
+# dssvc completion — no args
+# ---------------------------------------------------------------------------
+_dssvc_completion() {
+    :
+}
+
+# ---------------------------------------------------------------------------
+# dssvcps / dssvcl / dssvcsc completion — suggest services
+# ---------------------------------------------------------------------------
+_dssvcps_completion() {
+    local cur="${COMP_WORDS[COMP_CWORD]}"
+    COMPREPLY=($(compgen -W "$(_get_swarm_services)" -- "$cur"))
+}
+
+_dssvcl_completion() {
+    local cur="${COMP_WORDS[COMP_CWORD]}"
+    local prev="${COMP_WORDS[COMP_CWORD-1]}"
+    if [[ "$prev" == "-n" ]]; then
+        COMPREPLY=($(compgen -W "50 100 200 300 500" -- "$cur"))
+        return 0
+    fi
+    if [[ "$cur" == -* ]]; then
+        COMPREPLY=($(compgen -W "-n" -- "$cur"))
+        return 0
+    fi
+    COMPREPLY=($(compgen -W "$(_get_swarm_services)" -- "$cur"))
+}
+
+_dssvcsc_completion() {
+    local cur="${COMP_WORDS[COMP_CWORD]}"
+    if [[ "$cur" == -* ]]; then
+        COMPREPLY=($(compgen -W "-y --yes" -- "$cur"))
+        return 0
+    fi
+    # Suggest <svc>=N pattern by listing services as prefix
+    local svcs
+    svcs=$(_get_swarm_services)
+    COMPREPLY=($(compgen -W "$svcs" -- "$cur"))
+}
+
+# ---------------------------------------------------------------------------
+# dssnodes completion — no args
+# ---------------------------------------------------------------------------
+_dssnodes_completion() {
+    :
+}
+
+# ---------------------------------------------------------------------------
 # Register all completions
 # ---------------------------------------------------------------------------
 complete -F _d_completion    d
@@ -287,3 +379,14 @@ complete -F _dclt_completion          dclt
 complete -F _dcpr_completion          dcpr
 complete -F _dcw_completion           dcw
 complete -F _dcrun_completion         dcrun
+
+# Swarm completions
+complete -F _dss_completion      dss
+complete -F _dssps_completion    dssps
+complete -F _dssdeploy_completion dssdeploy
+complete -F _dssrm_completion    dssrm
+complete -F _dssvc_completion    dssvc
+complete -F _dssvcps_completion  dssvcps
+complete -F _dssvcl_completion   dssvcl
+complete -F _dssvcsc_completion  dssvcsc
+complete -F _dssnodes_completion dssnodes
