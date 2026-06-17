@@ -108,10 +108,10 @@ check_pass() { TOTAL_PASS=$((TOTAL_PASS + 1)); pass "$1"; }
 check_fail() { TOTAL_FAIL=$((TOTAL_FAIL + 1)); fail "$1"; }
 
 # ---------------------------------------------------------------------------
-# Expected symbols (post-triage)
+# Expected symbols (post-triage + Phase 4 modern compose)
 # ---------------------------------------------------------------------------
-# Functions present after triage
-EXPECTED_FUNCTIONS=(d dc dcup dq dcq dstatus dclt dip dstats dprune _dip_impl _dc_parse_args _dc_resolve_file)
+# Functions present after triage + phase 4
+EXPECTED_FUNCTIONS=(d dc dcup dq dcq dstatus dclt dip dstats dprune _dip_impl _dc_parse_args _dc_resolve_file dcw dcrun _get_compose_profiles _dc_build_extra_flags)
 # dcleanup is DROPPED — must NOT appear
 DROPPED_FUNCTIONS=(dcleanup)
 
@@ -136,7 +136,7 @@ rc=\$?
 echo \"SOURCE_EXIT:\$rc\"
 
 # --- Functions that MUST exist ---
-for fn in d dc dcup dq dcq dstatus dclt dip dstats dprune _dip_impl _dc_parse_args _dc_resolve_file; do
+for fn in d dc dcup dq dcq dstatus dclt dip dstats dprune _dip_impl _dc_parse_args _dc_resolve_file dcw dcrun _get_compose_profiles _dc_build_extra_flags; do
     if declare -f \"\$fn\" > /dev/null 2>&1; then echo \"FUNC_OK:\$fn\"; else echo \"FUNC_MISSING:\$fn\"; fi
 done
 
@@ -171,12 +171,13 @@ if type dcpr > /dev/null 2>&1; then echo 'DCPR_DEFAULT:present'; else echo 'DCPR
 source docker-aliases/extra/git-properties.sh
 if type dcpr > /dev/null 2>&1; then echo 'DCPR_OPTIN:present'; else echo 'DCPR_OPTIN:absent'; fi
 
-# --- Stub no-ops ---
-BEFORE=\$(declare -F | wc -l)
-source docker-aliases/compose-modern.sh
-AFTER=\$(declare -F | wc -l)
-echo \"STUB_MODERN:\$BEFORE:\$AFTER\"
+# --- compose-modern.sh adds expected functions ---
+type dcw > /dev/null 2>&1 && echo 'MODERN_DCW:ok' || echo 'MODERN_DCW:missing'
+type dcrun > /dev/null 2>&1 && echo 'MODERN_DCRUN:ok' || echo 'MODERN_DCRUN:missing'
+type _get_compose_profiles > /dev/null 2>&1 && echo 'MODERN_PROFILES_HELPER:ok' || echo 'MODERN_PROFILES_HELPER:missing'
 
+source docker-aliases/swarm.sh
+BEFORE=\$(declare -F | wc -l)
 source docker-aliases/swarm.sh
 AFTER2=\$(declare -F | wc -l)
 echo \"STUB_SWARM:\$BEFORE:\$AFTER2\"
@@ -186,6 +187,27 @@ complete -p d  2>/dev/null | grep -q '_d_completion'  && echo 'COMP_D:ok'  || ec
 complete -p dc 2>/dev/null | grep -q '_dc_completion' && echo 'COMP_DC:ok' || echo 'COMP_DC:missing'
 complete -p dstats 2>/dev/null | grep -q '_dstats_completion' && echo 'COMP_DSTATS:ok' || echo 'COMP_DSTATS:missing'
 complete -p dprune 2>/dev/null | grep -q '_dprune_completion' && echo 'COMP_DPRUNE:ok' || echo 'COMP_DPRUNE:missing'
+
+# ── Phase 4 modern compose completion checks ─────────────────────────────
+complete -p dcw  2>/dev/null | grep -q '_dcw_completion'  && echo 'COMP_DCW:ok'  || echo 'COMP_DCW:missing'
+complete -p dcrun 2>/dev/null | grep -q '_dcrun_completion' && echo 'COMP_DCRUN:ok' || echo 'COMP_DCRUN:missing'
+
+# ── Phase 4 _dc_parse_args -P/-e tests ───────────────────────────────────
+# -P single profile
+_dc_parse_args -P dev some_svc
+if [[ \"\${_dc_profiles[*]}\" == 'dev' && \"\${_dc_services[*]}\" == 'some_svc' ]]; then
+    echo 'PARSE_PROFILE_SINGLE:ok'
+else
+    echo \"PARSE_PROFILE_SINGLE:fail:profiles=\${_dc_profiles[*]}:services=\${_dc_services[*]}\"
+fi
+
+# -P multi profile + -e env file
+_dc_parse_args -P dev,debug -e .env.prod
+if [[ \"\${_dc_profiles[*]}\" == 'dev debug' && \"\${_dc_env_files[*]}\" == '.env.prod' ]]; then
+    echo 'PARSE_PROFILE_MULTI_ENVFILE:ok'
+else
+    echo \"PARSE_PROFILE_MULTI_ENVFILE:fail:profiles=\${_dc_profiles[*]}:envfiles=\${_dc_env_files[*]}\"
+fi
 
 # ── Phase 3 UX tests ─────────────────────────────────────────────────────
 
@@ -235,7 +257,7 @@ rc=\$?
 echo \"SOURCE_EXIT:\$rc\"
 
 # --- Functions that MUST exist ---
-for fn in d dc dcup dq dcq dstatus dclt dip dstats dprune _dip_impl _dc_parse_args _dc_resolve_file; do
+for fn in d dc dcup dq dcq dstatus dclt dip dstats dprune _dip_impl _dc_parse_args _dc_resolve_file dcw dcrun _get_compose_profiles _dc_build_extra_flags; do
     if typeset -f \"\$fn\" > /dev/null 2>&1; then echo \"FUNC_OK:\$fn\"; else echo \"FUNC_MISSING:\$fn\"; fi
 done
 
@@ -270,15 +292,31 @@ type dcpr > /dev/null 2>&1 && echo 'DCPR_DEFAULT:present' || echo 'DCPR_DEFAULT:
 source docker-aliases/extra/git-properties.sh 2>/dev/null
 type dcpr > /dev/null 2>&1 && echo 'DCPR_OPTIN:present' || echo 'DCPR_OPTIN:absent'
 
-# --- Stub no-ops ---
-BEFORE=\$(typeset -f | grep '^[a-z_]' | wc -l)
-source docker-aliases/compose-modern.sh
-AFTER=\$(typeset -f | grep '^[a-z_]' | wc -l)
-echo \"STUB_MODERN:\$BEFORE:\$AFTER\"
+# --- compose-modern.sh adds expected functions ---
+type dcw > /dev/null 2>&1 && echo 'MODERN_DCW:ok' || echo 'MODERN_DCW:missing'
+type dcrun > /dev/null 2>&1 && echo 'MODERN_DCRUN:ok' || echo 'MODERN_DCRUN:missing'
+type _get_compose_profiles > /dev/null 2>&1 && echo 'MODERN_PROFILES_HELPER:ok' || echo 'MODERN_PROFILES_HELPER:missing'
 
+# --- swarm stub still adds no functions ---
+BEFORE=\$(typeset -f | grep '^[a-z_]' | wc -l)
 source docker-aliases/swarm.sh
 AFTER2=\$(typeset -f | grep '^[a-z_]' | wc -l)
 echo \"STUB_SWARM:\$BEFORE:\$AFTER2\"
+
+# ── Phase 4 _dc_parse_args -P/-e tests ───────────────────────────────────
+_dc_parse_args -P dev some_svc
+if [[ \"\${_dc_profiles[*]}\" == 'dev' && \"\${_dc_services[*]}\" == 'some_svc' ]]; then
+    echo 'PARSE_PROFILE_SINGLE:ok'
+else
+    echo \"PARSE_PROFILE_SINGLE:fail:profiles=\${_dc_profiles[*]}:services=\${_dc_services[*]}\"
+fi
+
+_dc_parse_args -P dev,debug -e .env.prod
+if [[ \"\${_dc_profiles[*]}\" == 'dev debug' && \"\${_dc_env_files[*]}\" == '.env.prod' ]]; then
+    echo 'PARSE_PROFILE_MULTI_ENVFILE:ok'
+else
+    echo \"PARSE_PROFILE_MULTI_ENVFILE:fail:profiles=\${_dc_profiles[*]}:envfiles=\${_dc_env_files[*]}\"
+fi
 
 # ── Phase 3 UX tests ─────────────────────────────────────────────────────
 
@@ -348,14 +386,23 @@ parse_and_report() {
             DCPR_OPTIN:present)   check_pass "$tag dcpr available after explicit source" ;;
             DCPR_OPTIN:absent)    check_fail "$tag dcpr NOT available after opt-in source" ;;
 
-            STUB_MODERN:*)
-                IFS=':' read -r _ before after <<< "$line"
-                if [[ "$before" == "$after" ]]; then
-                    check_pass "$tag compose-modern.sh stub: no functions added"
-                else
-                    check_fail "$tag compose-modern.sh stub: added functions (before=$before after=$after)"
-                fi
-                ;;
+            MODERN_DCW:ok)              check_pass "$tag dcw defined (compose-modern.sh)" ;;
+            MODERN_DCW:missing)         check_fail "$tag dcw NOT defined" ;;
+            MODERN_DCRUN:ok)            check_pass "$tag dcrun defined (compose-modern.sh)" ;;
+            MODERN_DCRUN:missing)       check_fail "$tag dcrun NOT defined" ;;
+            MODERN_PROFILES_HELPER:ok)  check_pass "$tag _get_compose_profiles defined" ;;
+            MODERN_PROFILES_HELPER:missing) check_fail "$tag _get_compose_profiles NOT defined" ;;
+
+            COMP_DCW:ok)    check_pass "$tag complete -p dcw registered" ;;
+            COMP_DCW:missing) check_fail "$tag complete -p dcw NOT registered" ;;
+            COMP_DCRUN:ok)  check_pass "$tag complete -p dcrun registered" ;;
+            COMP_DCRUN:missing) check_fail "$tag complete -p dcrun NOT registered" ;;
+
+            PARSE_PROFILE_SINGLE:ok)    check_pass "$tag _dc_parse_args -P dev → profiles=(dev) services=(some_svc)" ;;
+            PARSE_PROFILE_SINGLE:*)     check_fail "$tag _dc_parse_args -P single: $line" ;;
+            PARSE_PROFILE_MULTI_ENVFILE:ok) check_pass "$tag _dc_parse_args -P dev,debug -e .env.prod → profiles=(dev debug) env_files=(.env.prod)" ;;
+            PARSE_PROFILE_MULTI_ENVFILE:*) check_fail "$tag _dc_parse_args multi-profile+env-file: $line" ;;
+
             STUB_SWARM:*)
                 IFS=':' read -r _ before after <<< "$line"
                 if [[ "$before" == "$after" ]]; then
