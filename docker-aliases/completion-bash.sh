@@ -3,6 +3,16 @@
 # Loaded only when BASH_VERSION is detected by the main loader
 
 # ---------------------------------------------------------------------------
+# Fallthrough to docker's official bash completion (if available).
+# This allows unknown subcommands / flags to resolve via docker's own completer.
+# We load it first so our completions (registered below) take precedence for
+# the commands we explicitly handle; docker's completer covers everything else.
+# ---------------------------------------------------------------------------
+if command -v docker >/dev/null 2>&1; then
+    eval "$(docker completion bash 2>/dev/null)" 2>/dev/null || true
+fi
+
+# ---------------------------------------------------------------------------
 # d() completion
 # ---------------------------------------------------------------------------
 _d_completion() {

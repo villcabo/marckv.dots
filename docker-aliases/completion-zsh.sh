@@ -3,6 +3,14 @@
 # Loaded only when ZSH_VERSION is detected by the main loader
 
 # ---------------------------------------------------------------------------
+# Fallthrough to docker's official zsh completion (if available).
+# Loaded first so our compdef calls below override for the commands we handle.
+# ---------------------------------------------------------------------------
+if command -v docker >/dev/null 2>&1; then
+    eval "$(docker completion zsh 2>/dev/null)" 2>/dev/null || true
+fi
+
+# ---------------------------------------------------------------------------
 # d() completion
 # ---------------------------------------------------------------------------
 _d_zsh() {
