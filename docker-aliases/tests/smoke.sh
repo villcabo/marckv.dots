@@ -266,6 +266,28 @@ if [[ \$rc -eq 0 && -z \"\$prompt_out\" ]]; then echo 'AUTO_YES:ok'; else echo \
 for fn in _use_nerd_font _icon _action_color _render_preview; do
     if declare -f \"\$fn\" > /dev/null 2>&1; then echo \"UX_FUNC_OK:\$fn\"; else echo \"UX_FUNC_MISSING:\$fn\"; fi
 done
+
+# ── Phase 7 completion cache tests ───────────────────────────────────────
+# Cache functions defined
+for fn in _cache_get _cache_set; do
+    if declare -f \"\$fn\" > /dev/null 2>&1; then echo \"CACHE_FUNC_OK:\$fn\"; else echo \"CACHE_FUNC_MISSING:\$fn\"; fi
+done
+
+# Functional test: set then get returns same value
+_cache_set 'test-key-bash' 'hello-world'
+got=\$(_cache_get 'test-key-bash' 2>/dev/null)
+if [[ \"\$got\" == 'hello-world' ]]; then echo 'CACHE_ROUNDTRIP:ok'; else echo \"CACHE_ROUNDTRIP:fail:got=\$got\"; fi
+
+# Functional test: still valid immediately (no expiry yet)
+got2=\$(_cache_get 'test-key-bash' 2>/dev/null)
+if [[ \"\$got2\" == 'hello-world' ]]; then echo 'CACHE_STILL_VALID:ok'; else echo \"CACHE_STILL_VALID:fail:got=\$got2\"; fi
+
+# Docker official completion loaded — not a hard failure if docker not present
+if complete -p docker 2>/dev/null | grep -q 'docker'; then
+    echo 'DOCKER_OFFICIAL_COMP:ok'
+else
+    echo 'DOCKER_OFFICIAL_COMP:skip'
+fi
 " 2>/dev/null
 }
 
@@ -396,6 +418,29 @@ if [[ \$rc -eq 0 && -z \"\$prompt_out\" ]]; then echo 'AUTO_YES:ok'; else echo \
 for fn in _use_nerd_font _icon _action_color _render_preview; do
     if typeset -f \"\$fn\" > /dev/null 2>&1; then echo \"UX_FUNC_OK:\$fn\"; else echo \"UX_FUNC_MISSING:\$fn\"; fi
 done
+
+# ── Phase 7 completion cache tests ───────────────────────────────────────
+# Cache functions defined
+for fn in _cache_get _cache_set; do
+    if typeset -f \"\$fn\" > /dev/null 2>&1; then echo \"CACHE_FUNC_OK:\$fn\"; else echo \"CACHE_FUNC_MISSING:\$fn\"; fi
+done
+
+# Functional test: set then get returns same value
+_cache_set 'test-key-zsh' 'hello-world'
+got=\$(_cache_get 'test-key-zsh' 2>/dev/null)
+if [[ \"\$got\" == 'hello-world' ]]; then echo 'CACHE_ROUNDTRIP:ok'; else echo \"CACHE_ROUNDTRIP:fail:got=\$got\"; fi
+
+# Functional test: still valid immediately (no expiry yet)
+got2=\$(_cache_get 'test-key-zsh' 2>/dev/null)
+if [[ \"\$got2\" == 'hello-world' ]]; then echo 'CACHE_STILL_VALID:ok'; else echo \"CACHE_STILL_VALID:fail:got=\$got2\"; fi
+
+# Docker official completion loaded — not a hard failure if docker not present in zsh
+# In zsh we check _docker is defined (docker completion zsh defines _docker)
+if typeset -f _docker > /dev/null 2>&1 || whence _docker > /dev/null 2>&1; then
+    echo 'DOCKER_OFFICIAL_COMP:ok'
+else
+    echo 'DOCKER_OFFICIAL_COMP:skip'
+fi
 " 2>/dev/null
 }
 
@@ -512,6 +557,19 @@ parse_and_report() {
 
             UX_FUNC_OK:*)      check_pass "$tag UX helper ${line#UX_FUNC_OK:} defined" ;;
             UX_FUNC_MISSING:*) check_fail "$tag UX helper MISSING: ${line#UX_FUNC_MISSING:}" ;;
+
+            # Phase 7 completion cache checks
+            CACHE_FUNC_OK:*)      check_pass "$tag cache function ${line#CACHE_FUNC_OK:} defined" ;;
+            CACHE_FUNC_MISSING:*) check_fail "$tag cache function MISSING: ${line#CACHE_FUNC_MISSING:}" ;;
+
+            CACHE_ROUNDTRIP:ok)   check_pass "$tag _cache_set/get round-trip returns correct value" ;;
+            CACHE_ROUNDTRIP:*)    check_fail "$tag _cache_set/get round-trip failed: $line" ;;
+
+            CACHE_STILL_VALID:ok) check_pass "$tag cached value still valid immediately after set" ;;
+            CACHE_STILL_VALID:*)  check_fail "$tag cached value not valid immediately after set: $line" ;;
+
+            DOCKER_OFFICIAL_COMP:ok)   check_pass "$tag docker official completion loaded" ;;
+            DOCKER_OFFICIAL_COMP:skip) warn "$tag docker official completion not available (docker may not be in PATH inside container — skipping)" ;;
         esac
     done <<< "$output"
 }
