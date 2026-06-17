@@ -5,19 +5,23 @@
 # Bash resuelve por orden de source — no romper sin revisar dependencias.
 
 # ---------------------------------------------------------------------------
-# Internal helper: parse -f <file> + other flags + service list from args.
-# Sets variables: _dc_file, _dc_opts, _dc_show_logs, _dc_services[]
+# Internal helper: parse -f <file> + -y/--yes + other flags + service list
+# Sets variables: _dc_files, _dc_opts, _dc_show_logs, _dc_services[], _dc_yes
 # ---------------------------------------------------------------------------
 _dc_parse_args() {
     _dc_files=()
     _dc_opts=""
     _dc_show_logs=false
     _dc_services=()
+    _dc_yes=false
 
     while [[ $# -gt 0 ]]; do
         if [[ "$1" == "-f" && -n "$2" && "$2" != -* ]]; then
             _dc_files+=("$2")
             shift 2
+        elif [[ "$1" == "--yes" || "$1" == "-y" ]]; then
+            _dc_yes=true
+            shift
         elif [[ "$1" == -* ]]; then
             local flags="${1#-}"
             local i=0
@@ -27,6 +31,7 @@ _dc_parse_args() {
                     p) _dc_opts+=" --pull always" ;;
                     b) _dc_opts+=" --build" ;;
                     l) _dc_show_logs=true ;;
+                    y) _dc_yes=true ;;
                     *) _dc_opts+=" -${flags:$i:1}" ;;
                 esac
                 (( i++ ))
@@ -53,7 +58,7 @@ _dc_resolve_file() {
     if [[ ${#_dc_files[@]} -gt 0 ]]; then
         for f in "${_dc_files[@]}"; do
             if [[ ! -f "$f" ]]; then
-                echo -e "${CRE}Compose file ${CB}$f${CR} not found ❌"
+                echo -e "${CRE}Compose file ${CB}$f${CR} not found"
                 return 1
             fi
             _dc_resolved_files+=("$f")
@@ -62,7 +67,7 @@ _dc_resolve_file() {
     else
         local detected
         detected=$(_get_compose_file) || {
-            echo -e "${CRE}No compose file found. Set ${CB}DOCKER_COMPOSE_FILE${CR} or add docker-compose.yml ❌"
+            echo -e "${CRE}No compose file found. Set ${CB}DOCKER_COMPOSE_FILE${CR} or add docker-compose.yml"
             return 1
         }
         _dc_resolved_files+=("$detected")
@@ -81,7 +86,7 @@ dc() {
 
     local compose_file
     compose_file=$(_get_compose_file) || {
-        echo -e "${CRE}No compose file found. Set ${CB}DOCKER_COMPOSE_FILE${CR} or add docker-compose.yml ❌"
+        echo -e "${CRE}No compose file found. Set ${CB}DOCKER_COMPOSE_FILE${CR} or add docker-compose.yml"
         return 1
     }
 
@@ -96,17 +101,22 @@ dc() {
             all_services=($(_get_compose_services))
             [[ ${#_dc_services[@]} -gt 0 ]] && target_services=("${_dc_services[@]}") || target_services=("${all_services[@]}")
 
-            echo -e "${CB}${CYE}DOCKER COMPOSE UP${CR} 🐳"
-            echo -e "${CCY}Action:${CR} Start services"
-            for f in "${_dc_resolved_files[@]}"; do
-                echo -e "${CCY}Compose file:${CR} ${CB}$f${CR}"
-            done
-            [[ -n "$_dc_opts" ]] && echo -e "${CCY}Options:${CR}${CB}$_dc_opts${CR}"
-            echo -e "${CCY}Affected services:${CR} ${CB}${CGR}${target_services[*]}${CR}"
-            [[ "$_dc_show_logs" == true ]] && echo -e "${CCY}After up:${CR} ${CB}Show logs${CR}"
-            echo ""
+            local files_str="${_dc_resolved_files[*]}"
+            local svc_str="${target_services[*]}"
+            local flags_str
+            flags_str=$(echo "$_dc_opts" | xargs)   # trim leading space
 
-            _confirm_operation "Continue with operation?" || { echo -e "${CB}${CYE}Cancelled${CR} ⚠️"; return 1; }
+            _render_preview "compose up" "$files_str" "$svc_str" "$flags_str"
+
+            # Skip confirmation if -y flag or DOCKER_ALIASES_AUTO_YES
+            local skip_confirm=false
+            [[ "$_dc_yes" == true ]] && skip_confirm=true
+
+            if [[ "$skip_confirm" == false ]]; then
+                local acol
+                acol=$(_action_color "up")
+                _confirm_operation "Continue?" "$acol" || { echo -e "${CB}${CYE}Cancelled${CR}"; return 1; }
+            fi
 
             local cmd="docker compose${_dc_file_flags} up -d${_dc_opts}"
             [[ ${#_dc_services[@]} -gt 0 ]] && cmd+=" ${_dc_services[*]}"
@@ -158,16 +168,19 @@ dc() {
             all_services=($(_get_compose_services))
             [[ ${#_dc_services[@]} -gt 0 ]] && target_services=("${_dc_services[@]}") || target_services=("${all_services[@]}")
 
-            echo -e "${CB}${CRE}DOCKER COMPOSE DOWN${CR} 🛑"
-            echo -e "${CCY}Action:${CR} Stop and remove services"
-            for f in "${_dc_resolved_files[@]}"; do
-                echo -e "${CCY}Compose file:${CR} ${CB}$f${CR}"
-            done
-            [[ -n "$_dc_opts" ]] && echo -e "${CCY}Options:${CR}${CB}$_dc_opts${CR}"
-            echo -e "${CCY}Affected services:${CR} ${CB}${CGR}${target_services[*]}${CR}"
-            echo ""
+            local files_str="${_dc_resolved_files[*]}"
+            local svc_str="${target_services[*]}"
 
-            _confirm_operation "Continue with operation?" || { echo -e "${CB}${CYE}Cancelled${CR} ⚠️"; return 1; }
+            _render_preview "compose down" "$files_str" "$svc_str" ""
+
+            local skip_confirm=false
+            [[ "$_dc_yes" == true ]] && skip_confirm=true
+
+            if [[ "$skip_confirm" == false ]]; then
+                local acol
+                acol=$(_action_color "down")
+                _confirm_operation "Continue?" "$acol" || { echo -e "${CB}${CYE}Cancelled${CR}"; return 1; }
+            fi
 
             local cmd="docker compose${_dc_file_flags} down${_dc_opts}"
             [[ ${#_dc_services[@]} -gt 0 ]] && cmd+=" ${_dc_services[*]}"
@@ -190,16 +203,21 @@ dc() {
             all_services=($(_get_compose_services))
             [[ ${#_dc_services[@]} -gt 0 ]] && target_services=("${_dc_services[@]}") || target_services=("${all_services[@]}")
 
-            echo -e "${CB}${CCY}DOCKER COMPOSE BUILD${CR} 🔨"
-            echo -e "${CCY}Action:${CR} Build services"
-            for f in "${_dc_resolved_files[@]}"; do
-                echo -e "${CCY}Compose file:${CR} ${CB}$f${CR}"
-            done
-            [[ -n "$_dc_opts" ]] && echo -e "${CCY}Options:${CR}${CB}$_dc_opts${CR}"
-            echo -e "${CCY}Affected services:${CR} ${CB}${CGR}${target_services[*]}${CR}"
-            echo ""
+            local files_str="${_dc_resolved_files[*]}"
+            local svc_str="${target_services[*]}"
+            local flags_str
+            flags_str=$(echo "$_dc_opts" | xargs)
 
-            _confirm_operation "Continue with operation?" || { echo -e "${CB}${CYE}Cancelled${CR} ⚠️"; return 1; }
+            _render_preview "compose build" "$files_str" "$svc_str" "$flags_str"
+
+            local skip_confirm=false
+            [[ "$_dc_yes" == true ]] && skip_confirm=true
+
+            if [[ "$skip_confirm" == false ]]; then
+                local acol
+                acol=$(_action_color "build")
+                _confirm_operation "Continue?" "$acol" || { echo -e "${CB}${CYE}Cancelled${CR}"; return 1; }
+            fi
 
             local cmd="docker compose${_dc_file_flags} build${_dc_opts}"
             [[ ${#_dc_services[@]} -gt 0 ]] && cmd+=" ${_dc_services[*]}"
@@ -256,6 +274,7 @@ dcup() {
             echo -e "  ${CYE}-b${CR}                   Build images before starting"
             echo -e "  ${CYE}-r${CR}                   Force recreate containers"
             echo -e "  ${CYE}-l${CR}                   Follow logs after up"
+            echo -e "  ${CYE}-y${CR}, ${CYE}--yes${CR}           Skip confirmation prompt"
             echo -e "  ${CYE}-f${CR} ${CMA}<file>${CR}             Use a specific compose file (repeatable)"
 
             echo -e "\n${CCY}EXAMPLES${CR}"
@@ -268,6 +287,7 @@ dcup() {
             echo -e "  ${CGR}dcup -rb api${CR}                           Recreate + build for 'api' service"
             echo -e "  ${CGR}dcup -f prod.yml -r${CR}                    Custom compose file + recreate"
             echo -e "  ${CGR}dcup -f app.yml -f app.override.yml${CR}    Multiple compose files"
+            echo -e "  ${CGR}dcup -y${CR}                                Skip confirmation"
             ;;
         *)
             dc up "$@"
@@ -295,11 +315,11 @@ dq() {
     local container
     container=$(docker ps --format "{{.Names}}" | grep -i "$1" | head -1)
     if [[ -n "$container" ]]; then
-        echo -e "${CGR}Executing in: ${CB}$container${CR} 🚀"
+        echo -e "${CGR}Executing in: ${CB}$container${CR}"
         shift
         docker exec -it "$container" "$@"
     else
-        echo -e "${CRE}No container found matching: ${CB}$1${CR} ❌"
+        echo -e "${CRE}No container found matching: ${CB}$1${CR}"
         return 1
     fi
 }
@@ -312,17 +332,17 @@ dcq() {
     fi
     local compose_file
     compose_file=$(_get_compose_file) || {
-        echo -e "${CRE}No compose file found ❌"
+        echo -e "${CRE}No compose file found${CR}"
         return 1
     }
     local service
     service=$(docker compose -f "$compose_file" ps --services | grep -i "$1" | head -1)
     if [[ -n "$service" ]]; then
-        echo -e "${CGR}Executing in service: ${CB}$service${CR} 🚀"
+        echo -e "${CGR}Executing in service: ${CB}$service${CR}"
         shift
         docker compose -f "$compose_file" exec "$service" "$@"
     else
-        echo -e "${CRE}No service found matching: ${CB}$1${CR} ❌"
+        echo -e "${CRE}No service found matching: ${CB}$1${CR}"
         return 1
     fi
 }
@@ -356,7 +376,7 @@ dclt() {
 
     local compose_file
     compose_file=$(_get_compose_file) || {
-        echo -e "${CRE}No compose file found ❌"
+        echo -e "${CRE}No compose file found${CR}"
         return 1
     }
 
@@ -366,7 +386,7 @@ dclt() {
             case "$1" in
                 --regex) regex_mode=true ;;
                 --wait)  ask_confirm=true ;;
-                *) echo "❌ Unknown option: $1" >&2; return 1 ;;
+                *) echo "Unknown option: $1" >&2; return 1 ;;
             esac
         elif [[ "$1" == "-n" ]]; then
             shift
@@ -378,7 +398,7 @@ dclt() {
                 case "${flags:$i:1}" in
                     r) regex_mode=true ;;
                     w) ask_confirm=true ;;
-                    *) echo "❌ Unknown option: -${flags:$i:1}" >&2; return 1 ;;
+                    *) echo "Unknown option: -${flags:$i:1}" >&2; return 1 ;;
                 esac
                 (( i++ ))
             done
@@ -391,7 +411,7 @@ dclt() {
     local services matched_services unique_services
     services=($(_get_compose_services))
     if [[ ${#services[@]} -eq 0 ]]; then
-        echo -e "${CRE}No compose services found ❌"
+        echo -e "${CRE}No compose services found${CR}"
         return 1
     fi
 
@@ -429,11 +449,11 @@ dclt() {
     done
 
     if [[ ${#unique_services[@]} -eq 0 ]]; then
-        echo -e "${CRE}No services matched: ${CB}'${patterns[*]}'${CR} ❌"
+        echo -e "${CRE}No services matched: ${CB}'${patterns[*]}'${CR}"
         return 1
     fi
 
-    echo -e "${CGR}Services: ${CB}${unique_services[*]}${CR} 📋"
+    echo -e "${CGR}Services: ${CB}${unique_services[*]}${CR}"
     if [[ "$ask_confirm" == true ]]; then
         _confirm_operation "Show logs for these services?" || return 0
     fi

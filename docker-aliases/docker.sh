@@ -58,18 +58,52 @@ dstats() {
 #
 # Usage:
 #   dprune              docker system prune -f (safe)
-#   dprune --all        docker system prune -af
+#   dprune --all        docker system prune -af (preview + confirm)
 #   dprune --images     docker image prune -f
 #   dprune --volumes    docker volume prune -f
 #   dprune --networks   docker network prune -f
+#   dprune -y           skip confirmation for --all
 # ---------------------------------------------------------------------------
 dprune() {
-    case "$1" in
-        --all)      docker system prune -af ;;
-        --images)   docker image prune -f ;;
-        --volumes)  docker volume prune -f ;;
-        --networks) docker network prune -f ;;
-        *)          docker system prune -f ;;
+    local skip_yes=false
+    local scope=""
+
+    # Parse args
+    local remaining_args=()
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -y|--yes) skip_yes=true ;;
+            --all|--images|--volumes|--networks) scope="$1" ;;
+            *) remaining_args+=("$1") ;;
+        esac
+        shift
+    done
+
+    case "$scope" in
+        --all)
+            _render_preview "prune" "" "" "--all (removes all unused containers, images, networks, volumes)"
+            if [[ "$skip_yes" == false ]]; then
+                local acol
+                acol=$(_action_color "prune")
+                _confirm_operation "Continue?" "$acol" || { echo -e "${CB}${CYE}Cancelled${CR}"; return 1; }
+            fi
+            docker system prune -af "${remaining_args[@]}"
+            ;;
+        --images)
+            echo -e "  $(_icon flags) Pruning unused images..."
+            docker image prune -f "${remaining_args[@]}"
+            ;;
+        --volumes)
+            echo -e "  $(_icon flags) Pruning unused volumes..."
+            docker volume prune -f "${remaining_args[@]}"
+            ;;
+        --networks)
+            echo -e "  $(_icon flags) Pruning unused networks..."
+            docker network prune -f "${remaining_args[@]}"
+            ;;
+        *)
+            docker system prune -f "${remaining_args[@]}"
+            ;;
     esac
 }
 
