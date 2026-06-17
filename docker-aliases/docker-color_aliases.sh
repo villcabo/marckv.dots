@@ -13,13 +13,16 @@
 #   dq <pattern>      Quick exec in first matching container
 #   dcq <pattern>     Quick exec in first matching service
 #   dclt [opts]       Follow logs for services matching a pattern
-#   dcpr <service>    Show git.properties from container
+#   dip [ip|pattern]  Find containers by IP, or list all with IPs
 #   dstatus           Quick status overview
 #   dcleanup          Full system cleanup
 #   dhelp / dchelp    Show help
 #
 # CONFIGURATION:
 #   DOCKER_COMPOSE_FILE — override default compose file path
+#
+# OPT-IN (no cargado por defecto):
+#   dcpr <service>    Show git.properties — source extra/git-properties.sh
 #
 # ==============================================================
 
@@ -38,8 +41,9 @@ fi
 # Load modules
 source "$_DOCKER_ALIASES_DIR/_init.sh"
 source "$_DOCKER_ALIASES_DIR/docker.sh"
-source "$_DOCKER_ALIASES_DIR/compose.sh"
-source "$_DOCKER_ALIASES_DIR/advanced.sh"
+source "$_DOCKER_ALIASES_DIR/compose-core.sh"
+source "$_DOCKER_ALIASES_DIR/compose-modern.sh"
+source "$_DOCKER_ALIASES_DIR/swarm.sh"
 source "$_DOCKER_ALIASES_DIR/help.sh"
 
 # Load shell-appropriate completions
