@@ -265,15 +265,16 @@ rc=\$?
 if [[ \$rc -eq 0 ]]; then echo "DSTATS_ONCE_OK"; else echo "DSTATS_ONCE_FAIL:\$rc"; fi
 
 # ── COMPOSE LIFECYCLE ────────────────────────────────────────────────────────
-# NOTE: Use DOCKER_COMPOSE_FILE env var to point dc/dcup/dcdown at the test
-# compose file. Using -f flag with dcup/dcdown triggers a known bug: dc()
-# calls _get_compose_file() before parsing subcommand args, so it fails when
-# no compose file exists in cwd. The env var bypasses this.
+# Use -f flag directly to exercise the bug fix in dc() / dcup: previously
+# dc() called _get_compose_file() before parsing args, which caused an early
+# bail when no compose file existed in cwd even though -f was supplied.
+# Also export DOCKER_COMPOSE_FILE so subsequent dc subcommands (ps, logs…)
+# that don't go through _dc_parse_args can still find the file.
 
 export DOCKER_COMPOSE_FILE=/tmp/fn-test/compose.yml
 
-# dcup — start the web service (via DOCKER_COMPOSE_FILE env var)
-DOCKER_ALIASES_AUTO_YES=1 dcup -y 2>&1 | tail -5
+# dcup — start the web service via -f flag (tests the early-bail fix)
+DOCKER_ALIASES_AUTO_YES=1 dcup -f /tmp/fn-test/compose.yml -y 2>&1 | tail -5
 # Re-check by looking if web container is up (use docker ps directly to avoid compose ps blank-line quirk)
 if docker ps --format '{{.Names}}' 2>/dev/null | grep -q "marckv-fn-test-web"; then
     echo "DCUP_WEB_OK"
@@ -388,15 +389,12 @@ else
 fi
 
 # dcrun -P full --rm cache redis-cli --version
-# NOTE: In zsh, dcrun uses "read -ra" (bash-only) to parse -P profiles.
-# This is a known bug: zsh requires "read -rA" instead of "read -ra".
-# We detect the failure and skip rather than fail, so the suite remains clean.
+# Previously this skipped in zsh due to "read -ra" being bash-only.
+# Fixed: dcrun now uses a portable comma-split loop (works in both bash+zsh).
 out=$(dcrun -f /tmp/fn-test/compose.yml -P full --rm cache redis-cli --version 2>&1)
 rc=$?
 if [[ $rc -eq 0 && "$out" == *redis* ]]; then
     echo "DCRUN_REDIS_OK"
-elif [[ "$out" == *"bad option: -a"* || "$out" == *"unknown flag: --rm"* ]]; then
-    echo "DCRUN_REDIS_SKIP_BUG:zsh_read_ra_incompatible"
 else
     echo "DCRUN_REDIS_FAIL:rc=$rc:out=$out"
 fi
@@ -580,7 +578,6 @@ parse_and_report() {
             DCRUN_WEB_OK)         check_pass "$tag dcrun --rm web echo hello → output contains 'hello'" ;;
             DCRUN_WEB_FAIL:*)     check_fail "$tag dcrun web → failed (${line#DCRUN_WEB_FAIL:})" ;;
             DCRUN_REDIS_OK)       check_pass "$tag dcrun -P full --rm cache redis-cli --version → contains 'redis'" ;;
-            DCRUN_REDIS_SKIP_BUG:*) check_skip "$tag dcrun -P full (zsh) → KNOWN BUG: read -ra not supported in zsh (needs read -rA in compose-modern.sh:104)" ;;
             DCRUN_REDIS_FAIL:*)   check_fail "$tag dcrun redis → failed (${line#DCRUN_REDIS_FAIL:})" ;;
             DCUP_ENVFILE_OK)      check_pass "$tag dcup -e env-file → web still running after env-file up" ;;
             DCUP_ENVFILE_FAIL)    check_fail "$tag dcup -e env-file → web NOT running after env-file up" ;;

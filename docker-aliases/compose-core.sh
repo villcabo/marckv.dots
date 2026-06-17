@@ -126,11 +126,25 @@ dc() {
         -h|--help|help|h|"") _compose_help; return 0 ;;
     esac
 
-    local compose_file
-    compose_file=$(_get_compose_file) || {
-        echo -e "${CRE}No compose file found. Set ${CB}DOCKER_COMPOSE_FILE${CR} or add docker-compose.yml"
-        return 1
-    }
+    # If -f/--file is in the args, skip the early compose-file check.
+    # Subcommands that route through _dc_parse_args (up/down/build/watch) will
+    # resolve the file themselves via _dc_resolve_file.
+    # NOTE: Simple subcommands (ps, logs, exec, start, stop, restart, pull…)
+    # still require a discoverable compose file in cwd when -f is not used —
+    # that's a known limitation; -f support for those is out of scope here.
+    local _has_f_flag=0
+    for _arg in "$@"; do
+        [[ "$_arg" == "-f" || "$_arg" == "--file" ]] && _has_f_flag=1 && break
+    done
+    unset _arg
+
+    local compose_file=""
+    if (( _has_f_flag == 0 )); then
+        compose_file=$(_get_compose_file) || {
+            echo -e "${CRE}No compose file found. Set ${CB}DOCKER_COMPOSE_FILE${CR} or add docker-compose.yml"
+            return 1
+        }
+    fi
 
     case "$1" in
         # ── up ──────────────────────────────────────────────────────────────
