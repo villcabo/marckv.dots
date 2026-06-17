@@ -101,9 +101,16 @@ dcrun() {
                 ;;
             -P)
                 [[ -z "$2" ]] && { echo -e "${CRE}dcrun: -P requires a profile argument${CR}"; return 1; }
-                IFS=',' read -ra _ptmp <<< "$2"
-                for _p in "${_ptmp[@]}"; do _run_profiles+=("$_p"); done
-                unset _ptmp _p
+                # Portable comma-split — bash and zsh both handle this correctly.
+                # (IFS=',' read -ra is bash-only; zsh requires read -rA)
+                local _pstr="$2" _pitem
+                while [[ -n "$_pstr" ]]; do
+                    _pitem="${_pstr%%,*}"
+                    [[ -n "$_pitem" ]] && _run_profiles+=("$_pitem")
+                    [[ "$_pstr" == *,* ]] || break
+                    _pstr="${_pstr#*,}"
+                done
+                unset _pstr _pitem
                 shift 2
                 ;;
             -e)
