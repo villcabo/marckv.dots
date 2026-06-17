@@ -56,6 +56,9 @@ _docker_help() {
     echo -e "\n${CCY}CONFIGURATION${CR}"
     echo -e "  ${CYE}DOCKER_ALIASES_NERD_FONT=0${CR}   Force ASCII icons (default: Nerd Font)"
     echo -e "  ${CYE}DOCKER_ALIASES_AUTO_YES=1${CR}    Skip all confirmation prompts"
+
+    echo -e "\n${CCY}SEE ALSO${CR}"
+    echo -e "  Run ${CGR}dsshelp${CR} for Docker Swarm commands (${CYE}dss*${CR} namespace)."
 }
 
 _compose_help() {
@@ -170,6 +173,53 @@ _modern_compose_help() {
     echo -e "  After ${CYE}-e${CR}, TAB suggests ${CMA}.env*${CR} files in the current directory."
 }
 
+_swarm_help() {
+    echo -e "${CB}${CCY}Docker Swarm Helper${CR}  ${CI}(dss* namespace)${CR}\n"
+
+    echo -e "${CCY}STACKS${CR}"
+    echo -e "  ${CGR}dss${CR}                          List all stacks (docker stack ls)"
+    echo -e "  ${CGR}dssps${CR} ${CMA}<stack>${CR}               Tasks of a stack (docker stack ps)"
+    echo -e "  ${CGR}dssdeploy${CR} ${CMA}<stack>${CR}           Deploy stack (auto-detect compose file)"
+    echo -e "  ${CGR}dssdeploy${CR} ${CMA}<stack>${CR} ${CYE}-c${CR} ${CMA}<file>${CR}   Deploy using specific compose file"
+    echo -e "  ${CGR}dssdeploy${CR} ${CMA}<stack>${CR} ${CYE}-y${CR}          Deploy without confirmation"
+    echo -e "  ${CGR}dssrm${CR} ${CMA}<stack>${CR}               Remove stack (preview + confirm)"
+    echo -e "  ${CGR}dssrm${CR} ${CMA}<stack>${CR} ${CYE}-y${CR}             Remove without confirmation"
+
+    echo -e "\n${CCY}SERVICES${CR}"
+    echo -e "  ${CGR}dssvc${CR}                         List all services (docker service ls)"
+    echo -e "  ${CGR}dssvcps${CR} ${CMA}<svc>${CR}               Tasks of a service (docker service ps)"
+    echo -e "  ${CGR}dssvcl${CR} ${CMA}<svc>${CR}                Follow service logs (tail 100)"
+    echo -e "  ${CGR}dssvcl${CR} ${CMA}<svc>${CR} ${CYE}-n${CR} ${CMA}<N>${CR}          Follow last N log lines"
+    echo -e "  ${CGR}dssvcsc${CR} ${CMA}<svc>=<N>${CR}           Scale service (preview + confirm)"
+    echo -e "  ${CGR}dssvcsc${CR} ${CMA}<svc>=<N>${CR} ${CYE}-y${CR}         Scale without confirmation"
+
+    echo -e "\n${CCY}NODES${CR}"
+    echo -e "  ${CGR}dssnodes${CR}                      List swarm nodes (docker node ls)"
+
+    echo -e "\n${CCY}OVERVIEW${CR}"
+    echo -e "  ${CGR}dsstatus${CR}                      Stacks + services + nodes overview"
+
+    echo -e "\n${CCY}EXAMPLES${CR}"
+    echo -e "  ${CGR}dssdeploy myapp${CR}               Deploy 'myapp' stack (auto-detects compose file)"
+    echo -e "  ${CGR}dssdeploy myapp -c prod.yml${CR}   Deploy using prod.yml"
+    echo -e "  ${CGR}dssrm myapp${CR}                   Remove 'myapp' stack (with confirm)"
+    echo -e "  ${CGR}dssvcl myapp_api${CR}              Follow logs for service 'myapp_api'"
+    echo -e "  ${CGR}dssvcl myapp_api -n 300${CR}       Follow last 300 lines"
+    echo -e "  ${CGR}dssvcsc myapp_api=3${CR}           Scale 'myapp_api' to 3 replicas"
+    echo -e "  ${CGR}dsstatus${CR}                      Quick swarm overview"
+
+    echo -e "\n${CCY}FLAGS${CR}"
+    echo -e "  ${CYE}-c${CR} ${CMA}<file>${CR}   Compose file for dssdeploy (default: auto-detect)"
+    echo -e "  ${CYE}-n${CR} ${CMA}<N>${CR}     Tail lines for dssvcl (default: \$DOCKER_ALIASES_LOG_LINES or 100)"
+    echo -e "  ${CYE}-y${CR}         Skip confirmation for dssdeploy / dssrm / dssvcsc"
+
+    echo -e "\n${CCY}NOTES${CR}"
+    echo -e "  Destructive commands (${CYE}dssrm${CR}, ${CYE}dssvcsc${CR}) show a preview + require confirmation."
+    echo -e "  Set ${CYE}DOCKER_ALIASES_AUTO_YES=1${CR} to skip all confirmations globally."
+    echo -e "  All list commands pipe through ${CYE}docker-color-output${CR} when available."
+}
+
 alias dhelp='_docker_help'
 alias dchelp='_compose_help'
 alias dmhelp='_modern_compose_help'
+alias dsshelp='_swarm_help'
