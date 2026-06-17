@@ -224,6 +224,23 @@ else
     echo \"PARSE_PROFILE_MULTI_ENVFILE:fail:profiles=\${_dc_profiles[*]}:envfiles=\${_dc_env_files[*]}\"
 fi
 
+# ── Phase 6 bake flag parsing ─────────────────────────────────────────────
+# --bake flag sets _dc_bake=true
+_dc_parse_args --bake some_target
+if [[ \"\$_dc_bake\" == 'true' && \"\${_dc_services[*]}\" == 'some_target' ]]; then
+    echo 'PARSE_BAKE_FLAG:ok'
+else
+    echo \"PARSE_BAKE_FLAG:fail:bake=\$_dc_bake:services=\${_dc_services[*]}\"
+fi
+
+# without --bake, _dc_bake must be false
+_dc_parse_args some_target
+if [[ \"\$_dc_bake\" == 'false' ]]; then
+    echo 'PARSE_BAKE_DEFAULT:ok'
+else
+    echo \"PARSE_BAKE_DEFAULT:fail:bake=\$_dc_bake\"
+fi
+
 # ── Phase 3 UX tests ─────────────────────────────────────────────────────
 
 # --- _icon: known keys return non-empty (Nerd Font mode) ---
@@ -337,6 +354,23 @@ else
     echo \"PARSE_PROFILE_MULTI_ENVFILE:fail:profiles=\${_dc_profiles[*]}:envfiles=\${_dc_env_files[*]}\"
 fi
 
+# ── Phase 6 bake flag parsing ─────────────────────────────────────────────
+# --bake flag sets _dc_bake=true
+_dc_parse_args --bake some_target
+if [[ \"\$_dc_bake\" == 'true' && \"\${_dc_services[*]}\" == 'some_target' ]]; then
+    echo 'PARSE_BAKE_FLAG:ok'
+else
+    echo \"PARSE_BAKE_FLAG:fail:bake=\$_dc_bake:services=\${_dc_services[*]}\"
+fi
+
+# without --bake, _dc_bake must be false
+_dc_parse_args some_target
+if [[ \"\$_dc_bake\" == 'false' ]]; then
+    echo 'PARSE_BAKE_DEFAULT:ok'
+else
+    echo \"PARSE_BAKE_DEFAULT:fail:bake=\$_dc_bake\"
+fi
+
 # ── Phase 3 UX tests ─────────────────────────────────────────────────────
 
 # --- _icon: known keys return non-empty (Nerd Font mode) ---
@@ -421,6 +455,12 @@ parse_and_report() {
             PARSE_PROFILE_SINGLE:*)     check_fail "$tag _dc_parse_args -P single: $line" ;;
             PARSE_PROFILE_MULTI_ENVFILE:ok) check_pass "$tag _dc_parse_args -P dev,debug -e .env.prod → profiles=(dev debug) env_files=(.env.prod)" ;;
             PARSE_PROFILE_MULTI_ENVFILE:*) check_fail "$tag _dc_parse_args multi-profile+env-file: $line" ;;
+
+            # Phase 6 bake flag checks
+            PARSE_BAKE_FLAG:ok)     check_pass "$tag _dc_parse_args --bake some_target → _dc_bake=true services=(some_target)" ;;
+            PARSE_BAKE_FLAG:*)      check_fail "$tag _dc_parse_args --bake: $line" ;;
+            PARSE_BAKE_DEFAULT:ok)  check_pass "$tag _dc_parse_args without --bake → _dc_bake=false (default)" ;;
+            PARSE_BAKE_DEFAULT:*)   check_fail "$tag _dc_parse_args bake default: $line" ;;
 
             # Phase 5 swarm function/alias checks
             SWARM_FUNC_OK:*)      check_pass "$tag swarm function ${line#SWARM_FUNC_OK:}" ;;
