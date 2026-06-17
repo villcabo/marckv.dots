@@ -108,10 +108,10 @@ check_pass() { TOTAL_PASS=$((TOTAL_PASS + 1)); pass "$1"; }
 check_fail() { TOTAL_FAIL=$((TOTAL_FAIL + 1)); fail "$1"; }
 
 # ---------------------------------------------------------------------------
-# Expected symbols (post-triage + Phase 4 modern compose)
+# Expected symbols (post-triage + Phase 4 modern compose + Phase 5 swarm)
 # ---------------------------------------------------------------------------
-# Functions present after triage + phase 4
-EXPECTED_FUNCTIONS=(d dc dcup dq dcq dstatus dclt dip dstats dprune _dip_impl _dc_parse_args _dc_resolve_file dcw dcrun _get_compose_profiles _dc_build_extra_flags)
+# Functions present after triage + phase 4 + phase 5
+EXPECTED_FUNCTIONS=(d dc dcup dq dcq dstatus dclt dip dstats dprune _dip_impl _dc_parse_args _dc_resolve_file dcw dcrun _get_compose_profiles _dc_build_extra_flags dss dssps dssdeploy dssrm dssvc dssvcps dssvcl dssvcsc dssnodes dsstatus _get_swarm_stacks _get_swarm_services _get_swarm_nodes)
 # dcleanup is DROPPED — must NOT appear
 DROPPED_FUNCTIONS=(dcleanup)
 
@@ -176,11 +176,15 @@ type dcw > /dev/null 2>&1 && echo 'MODERN_DCW:ok' || echo 'MODERN_DCW:missing'
 type dcrun > /dev/null 2>&1 && echo 'MODERN_DCRUN:ok' || echo 'MODERN_DCRUN:missing'
 type _get_compose_profiles > /dev/null 2>&1 && echo 'MODERN_PROFILES_HELPER:ok' || echo 'MODERN_PROFILES_HELPER:missing'
 
-source docker-aliases/swarm.sh
-BEFORE=\$(declare -F | wc -l)
-source docker-aliases/swarm.sh
-AFTER2=\$(declare -F | wc -l)
-echo \"STUB_SWARM:\$BEFORE:\$AFTER2\"
+# ── Phase 5 Swarm — existence only (no live swarm required) ──────────────
+# NOTE: We cannot test against a real swarm here — that would require
+# 'docker swarm init', which is too heavy for a smoke container.
+# We verify only function/alias existence and completion registration.
+for fn in dss dssps dssdeploy dssrm dssvc dssvcps dssvcl dssvcsc dssnodes dsstatus _get_swarm_stacks _get_swarm_services _get_swarm_nodes; do
+    if declare -f \"\$fn\" > /dev/null 2>&1; then echo \"SWARM_FUNC_OK:\$fn\"; else echo \"SWARM_FUNC_MISSING:\$fn\"; fi
+done
+# dsshelp alias
+alias dsshelp > /dev/null 2>&1 && echo 'SWARM_ALIAS_OK:dsshelp' || echo 'SWARM_ALIAS_MISSING:dsshelp'
 
 # --- Completions ---
 complete -p d  2>/dev/null | grep -q '_d_completion'  && echo 'COMP_D:ok'  || echo 'COMP_D:missing'
@@ -191,6 +195,17 @@ complete -p dprune 2>/dev/null | grep -q '_dprune_completion' && echo 'COMP_DPRU
 # ── Phase 4 modern compose completion checks ─────────────────────────────
 complete -p dcw  2>/dev/null | grep -q '_dcw_completion'  && echo 'COMP_DCW:ok'  || echo 'COMP_DCW:missing'
 complete -p dcrun 2>/dev/null | grep -q '_dcrun_completion' && echo 'COMP_DCRUN:ok' || echo 'COMP_DCRUN:missing'
+
+# ── Phase 5 swarm completion checks ──────────────────────────────────────
+complete -p dss      2>/dev/null | grep -q '_dss_completion'      && echo 'COMP_DSS:ok'      || echo 'COMP_DSS:missing'
+complete -p dssps    2>/dev/null | grep -q '_dssps_completion'    && echo 'COMP_DSSPS:ok'    || echo 'COMP_DSSPS:missing'
+complete -p dssdeploy 2>/dev/null | grep -q '_dssdeploy_completion' && echo 'COMP_DSSDEPLOY:ok' || echo 'COMP_DSSDEPLOY:missing'
+complete -p dssrm    2>/dev/null | grep -q '_dssrm_completion'    && echo 'COMP_DSSRM:ok'    || echo 'COMP_DSSRM:missing'
+complete -p dssvc    2>/dev/null | grep -q '_dssvc_completion'    && echo 'COMP_DSSVC:ok'    || echo 'COMP_DSSVC:missing'
+complete -p dssvcps  2>/dev/null | grep -q '_dssvcps_completion'  && echo 'COMP_DSSVCPS:ok'  || echo 'COMP_DSSVCPS:missing'
+complete -p dssvcl   2>/dev/null | grep -q '_dssvcl_completion'   && echo 'COMP_DSSVCL:ok'   || echo 'COMP_DSSVCL:missing'
+complete -p dssvcsc  2>/dev/null | grep -q '_dssvcsc_completion'  && echo 'COMP_DSSVCSC:ok'  || echo 'COMP_DSSVCSC:missing'
+complete -p dssnodes 2>/dev/null | grep -q '_dssnodes_completion' && echo 'COMP_DSSNODES:ok' || echo 'COMP_DSSNODES:missing'
 
 # ── Phase 4 _dc_parse_args -P/-e tests ───────────────────────────────────
 # -P single profile
@@ -297,11 +312,15 @@ type dcw > /dev/null 2>&1 && echo 'MODERN_DCW:ok' || echo 'MODERN_DCW:missing'
 type dcrun > /dev/null 2>&1 && echo 'MODERN_DCRUN:ok' || echo 'MODERN_DCRUN:missing'
 type _get_compose_profiles > /dev/null 2>&1 && echo 'MODERN_PROFILES_HELPER:ok' || echo 'MODERN_PROFILES_HELPER:missing'
 
-# --- swarm stub still adds no functions ---
-BEFORE=\$(typeset -f | grep '^[a-z_]' | wc -l)
-source docker-aliases/swarm.sh
-AFTER2=\$(typeset -f | grep '^[a-z_]' | wc -l)
-echo \"STUB_SWARM:\$BEFORE:\$AFTER2\"
+# ── Phase 5 Swarm — existence only (no live swarm required) ──────────────
+# NOTE: We cannot test against a real swarm here — that would require
+# 'docker swarm init', which is too heavy for a smoke container.
+# We verify only function/alias existence (no live Docker calls).
+for fn in dss dssps dssdeploy dssrm dssvc dssvcps dssvcl dssvcsc dssnodes dsstatus _get_swarm_stacks _get_swarm_services _get_swarm_nodes; do
+    if typeset -f \"\$fn\" > /dev/null 2>&1; then echo \"SWARM_FUNC_OK:\$fn\"; else echo \"SWARM_FUNC_MISSING:\$fn\"; fi
+done
+# dsshelp alias
+alias dsshelp > /dev/null 2>&1 && echo 'SWARM_ALIAS_OK:dsshelp' || echo 'SWARM_ALIAS_MISSING:dsshelp'
 
 # ── Phase 4 _dc_parse_args -P/-e tests ───────────────────────────────────
 _dc_parse_args -P dev some_svc
@@ -403,14 +422,31 @@ parse_and_report() {
             PARSE_PROFILE_MULTI_ENVFILE:ok) check_pass "$tag _dc_parse_args -P dev,debug -e .env.prod → profiles=(dev debug) env_files=(.env.prod)" ;;
             PARSE_PROFILE_MULTI_ENVFILE:*) check_fail "$tag _dc_parse_args multi-profile+env-file: $line" ;;
 
-            STUB_SWARM:*)
-                IFS=':' read -r _ before after <<< "$line"
-                if [[ "$before" == "$after" ]]; then
-                    check_pass "$tag swarm.sh stub: no functions added"
-                else
-                    check_fail "$tag swarm.sh stub: added functions (before=$before after=$after)"
-                fi
-                ;;
+            # Phase 5 swarm function/alias checks
+            SWARM_FUNC_OK:*)      check_pass "$tag swarm function ${line#SWARM_FUNC_OK:}" ;;
+            SWARM_FUNC_MISSING:*) check_fail "$tag swarm function MISSING: ${line#SWARM_FUNC_MISSING:}" ;;
+            SWARM_ALIAS_OK:*)     check_pass "$tag swarm alias ${line#SWARM_ALIAS_OK:}" ;;
+            SWARM_ALIAS_MISSING:*) check_fail "$tag swarm alias MISSING: ${line#SWARM_ALIAS_MISSING:}" ;;
+
+            # Phase 5 swarm completion checks (bash only)
+            COMP_DSS:ok)        check_pass "$tag complete -p dss registered" ;;
+            COMP_DSS:missing)   check_fail "$tag complete -p dss NOT registered" ;;
+            COMP_DSSPS:ok)      check_pass "$tag complete -p dssps registered" ;;
+            COMP_DSSPS:missing) check_fail "$tag complete -p dssps NOT registered" ;;
+            COMP_DSSDEPLOY:ok)      check_pass "$tag complete -p dssdeploy registered" ;;
+            COMP_DSSDEPLOY:missing) check_fail "$tag complete -p dssdeploy NOT registered" ;;
+            COMP_DSSRM:ok)      check_pass "$tag complete -p dssrm registered" ;;
+            COMP_DSSRM:missing) check_fail "$tag complete -p dssrm NOT registered" ;;
+            COMP_DSSVC:ok)      check_pass "$tag complete -p dssvc registered" ;;
+            COMP_DSSVC:missing) check_fail "$tag complete -p dssvc NOT registered" ;;
+            COMP_DSSVCPS:ok)      check_pass "$tag complete -p dssvcps registered" ;;
+            COMP_DSSVCPS:missing) check_fail "$tag complete -p dssvcps NOT registered" ;;
+            COMP_DSSVCL:ok)      check_pass "$tag complete -p dssvcl registered" ;;
+            COMP_DSSVCL:missing) check_fail "$tag complete -p dssvcl NOT registered" ;;
+            COMP_DSSVCSC:ok)      check_pass "$tag complete -p dssvcsc registered" ;;
+            COMP_DSSVCSC:missing) check_fail "$tag complete -p dssvcsc NOT registered" ;;
+            COMP_DSSNODES:ok)      check_pass "$tag complete -p dssnodes registered" ;;
+            COMP_DSSNODES:missing) check_fail "$tag complete -p dssnodes NOT registered" ;;
 
             COMP_D:ok)          check_pass "$tag complete -p d registered" ;;
             COMP_D:missing)     check_fail "$tag complete -p d NOT registered" ;;
