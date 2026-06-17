@@ -207,3 +207,19 @@ _get_compose_profiles() {
     compose_file=$(_get_compose_file) || return 1
     docker compose -f "$compose_file" config --profiles 2>/dev/null | sort -u
 }
+
+# ---------------------------------------------------------------------------
+# Swarm completion helpers
+# Return empty (graceful) when not in a swarm — completions degrade silently.
+# ---------------------------------------------------------------------------
+_get_swarm_stacks() {
+    docker stack ls --format '{{.Name}}' 2>/dev/null
+}
+
+_get_swarm_services() {
+    docker service ls --format '{{.Name}}' 2>/dev/null
+}
+
+_get_swarm_nodes() {
+    docker node ls --format '{{.Hostname}}' 2>/dev/null
+}
