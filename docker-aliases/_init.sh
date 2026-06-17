@@ -6,7 +6,8 @@
 #   DOCKER_ALIASES_NERD_FONT  Set to 0 to force ASCII icons (default: 1 = use Nerd Font)
 #   DOCKER_ALIASES_AUTO_YES   Set to 1 to skip all confirmation prompts (default: 0)
 #   DOCKER_ALIASES_LOG_LINES  Default tail line count for dclt (default: 100)
-#   DOCKER_ALIASES_CACHE_TTL  Completion cache TTL in seconds (default: 5)
+#   DOCKER_ALIASES_CACHE_TTL  Completion cache TTL in seconds (default: 5).
+#                             Set to 0 to disable caching (every TTL check fails immediately).
 
 # Color variables
 CR="\033[0m"        # COLOR_RESET
@@ -188,24 +189,103 @@ _get_compose_file() {
 }
 
 # ---------------------------------------------------------------------------
+# Per-shell completion cache — avoids re-running slow docker commands on every TAB
+#
+# Storage strategy:
+#   - bash 4+ / zsh: associative array _DA_CACHE keyed by "namespace:cwd"
+#     value format: "result|epoch_when_cached"
+#   - Fallback (when declare -gA fails): temp files under /tmp/da-cache-$USER/
+#
+# TTL: DOCKER_ALIASES_CACHE_TTL seconds (default 5). Set to 0 to disable.
+# Cache is implicitly per-directory because PWD is part of every key.
+# ---------------------------------------------------------------------------
+
+: "${DOCKER_ALIASES_CACHE_TTL:=5}"
+
+# Try to declare a global associative array; fall back to files if unsupported.
+declare -gA _DA_CACHE 2>/dev/null || _DA_CACHE_FALLBACK=1
+
+_cache_get() {
+    local key="$1"
+    if [[ -z "${_DA_CACHE_FALLBACK:-}" ]]; then
+        local entry="${_DA_CACHE[$key]:-}"
+        [[ -z "$entry" ]] && return 1
+        local ts="${entry##*|}"
+        local val="${entry%|*}"
+        local now
+        now=$(date +%s)
+        (( now - ts > DOCKER_ALIASES_CACHE_TTL )) && return 1
+        printf '%s' "$val"
+    else
+        local safe_key="${key//\//_}"
+        local file="/tmp/da-cache-${USER}/${safe_key}"
+        [[ ! -f "$file" ]] && return 1
+        local mtime
+        mtime=$(stat -c %Y "$file" 2>/dev/null || stat -f %m "$file" 2>/dev/null)
+        local now
+        now=$(date +%s)
+        (( now - mtime > DOCKER_ALIASES_CACHE_TTL )) && return 1
+        cat "$file"
+    fi
+    return 0
+}
+
+_cache_set() {
+    local key="$1" val="$2"
+    if [[ -z "${_DA_CACHE_FALLBACK:-}" ]]; then
+        _DA_CACHE[$key]="${val}|$(date +%s)"
+    else
+        local dir="/tmp/da-cache-${USER}"
+        mkdir -p "$dir" 2>/dev/null
+        local safe_key="${key//\//_}"
+        printf '%s' "$val" > "$dir/${safe_key}"
+    fi
+}
+
+# ---------------------------------------------------------------------------
 # Completion helpers — shared between bash and zsh completion modules
 # ---------------------------------------------------------------------------
 _get_docker_containers() {
-    docker ps --format "{{.Names}}" 2>/dev/null
+    local key="docker-containers:${PWD}"
+    local cached
+    if cached=$(_cache_get "$key"); then
+        printf '%s\n' "$cached"
+        return 0
+    fi
+    local result
+    result=$(docker ps --format "{{.Names}}" 2>/dev/null)
+    _cache_set "$key" "$result"
+    printf '%s' "$result"
 }
 
 _get_compose_services() {
     local compose_file
-    compose_file=$(_get_compose_file)
-    if [[ $? -eq 0 ]]; then
-        docker compose -f "$compose_file" config --services 2>/dev/null
+    compose_file=$(_get_compose_file) || return 1
+    local key="compose-services:${PWD}:${compose_file}"
+    local cached
+    if cached=$(_cache_get "$key"); then
+        printf '%s\n' "$cached"
+        return 0
     fi
+    local result
+    result=$(docker compose -f "$compose_file" config --services 2>/dev/null)
+    _cache_set "$key" "$result"
+    printf '%s' "$result"
 }
 
 _get_compose_profiles() {
     local compose_file
     compose_file=$(_get_compose_file) || return 1
-    docker compose -f "$compose_file" config --profiles 2>/dev/null | sort -u
+    local key="compose-profiles:${PWD}:${compose_file}"
+    local cached
+    if cached=$(_cache_get "$key"); then
+        printf '%s\n' "$cached"
+        return 0
+    fi
+    local result
+    result=$(docker compose -f "$compose_file" config --profiles 2>/dev/null | sort -u)
+    _cache_set "$key" "$result"
+    printf '%s' "$result"
 }
 
 # ---------------------------------------------------------------------------
@@ -213,13 +293,40 @@ _get_compose_profiles() {
 # Return empty (graceful) when not in a swarm — completions degrade silently.
 # ---------------------------------------------------------------------------
 _get_swarm_stacks() {
-    docker stack ls --format '{{.Name}}' 2>/dev/null
+    local key="swarm-stacks:${PWD}"
+    local cached
+    if cached=$(_cache_get "$key"); then
+        printf '%s\n' "$cached"
+        return 0
+    fi
+    local result
+    result=$(docker stack ls --format '{{.Name}}' 2>/dev/null)
+    _cache_set "$key" "$result"
+    printf '%s' "$result"
 }
 
 _get_swarm_services() {
-    docker service ls --format '{{.Name}}' 2>/dev/null
+    local key="swarm-services:${PWD}"
+    local cached
+    if cached=$(_cache_get "$key"); then
+        printf '%s\n' "$cached"
+        return 0
+    fi
+    local result
+    result=$(docker service ls --format '{{.Name}}' 2>/dev/null)
+    _cache_set "$key" "$result"
+    printf '%s' "$result"
 }
 
 _get_swarm_nodes() {
-    docker node ls --format '{{.Hostname}}' 2>/dev/null
+    local key="swarm-nodes:${PWD}"
+    local cached
+    if cached=$(_cache_get "$key"); then
+        printf '%s\n' "$cached"
+        return 0
+    fi
+    local result
+    result=$(docker node ls --format '{{.Hostname}}' 2>/dev/null)
+    _cache_set "$key" "$result"
+    printf '%s' "$result"
 }
