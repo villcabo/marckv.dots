@@ -2,7 +2,7 @@
 # Docker Swarm shortcuts — dss* namespace
 #
 # Commands:
-#   dss                  docker stack ls (colored)
+#   dss                  docker stack ls
 #   dssps <stack>        docker stack ps <stack>
 #   dssdeploy <stack>    docker stack deploy (auto-detect compose file)
 #   dssrm <stack>        docker stack rm (destructive — preview + confirm)
@@ -18,21 +18,10 @@
 #   DOCKER_ALIASES_AUTO_YES   skip confirmations when set to 1
 
 # ---------------------------------------------------------------------------
-# _color_pipe — pipe through docker-color-output if available
-# ---------------------------------------------------------------------------
-_color_pipe() {
-    if command -v docker-color-output >/dev/null 2>&1; then
-        docker-color-output
-    else
-        cat
-    fi
-}
-
-# ---------------------------------------------------------------------------
 # dss — docker stack ls
 # ---------------------------------------------------------------------------
 dss() {
-    docker stack ls "$@" | _color_pipe
+    docker stack ls "$@"
 }
 
 # ---------------------------------------------------------------------------
@@ -43,7 +32,7 @@ dssps() {
         echo -e "${CRE}Usage: dssps <stack>${CR}"
         return 1
     fi
-    docker stack ps "$@" | _color_pipe
+    docker stack ps "$@"
 }
 
 # ---------------------------------------------------------------------------
@@ -142,7 +131,7 @@ dssrm() {
 # dssvc — docker service ls
 # ---------------------------------------------------------------------------
 dssvc() {
-    docker service ls "$@" | _color_pipe
+    docker service ls "$@"
 }
 
 # ---------------------------------------------------------------------------
@@ -153,7 +142,7 @@ dssvcps() {
         echo -e "${CRE}Usage: dssvcps <service>${CR}"
         return 1
     fi
-    docker service ps "$@" | _color_pipe
+    docker service ps "$@"
 }
 
 # ---------------------------------------------------------------------------
@@ -234,7 +223,7 @@ dssvcsc() {
 # dssnodes — docker node ls
 # ---------------------------------------------------------------------------
 dssnodes() {
-    docker node ls "$@" | _color_pipe
+    docker node ls "$@"
 }
 
 # ---------------------------------------------------------------------------
