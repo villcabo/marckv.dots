@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 # Docker Compose shortcuts — dc(), dcup(), smart functions, and compose aliases
+#
+# Orden: helpers (_prefijo) primero, luego consumidores.
+# Bash resuelve por orden de source — no romper sin revisar dependencias.
 
 # ---------------------------------------------------------------------------
 # Internal helper: parse -f <file> + other flags + service list from args.
@@ -368,4 +371,100 @@ dcleanup() {
     docker system prune -f
     docker network prune -f
     echo -e "${CGR}${CB}Cleanup completed${CR} ✅"
+}
+
+# ---------------------------------------------------------------------------
+# dclt — Follow logs for services matching one or more patterns
+#
+# Usage: dclt [options] [pattern...]
+#   -r, --regex   Match patterns as regex (default: literal)
+#   -w, --wait    Ask for confirmation before showing logs
+# ---------------------------------------------------------------------------
+dclt() {
+    local regex_mode=false
+    local ask_confirm=false
+    local patterns=()
+
+    local compose_file
+    compose_file=$(_get_compose_file) || {
+        echo -e "${CRE}No compose file found ❌"
+        return 1
+    }
+
+    # Parse flags and patterns
+    while [[ $# -gt 0 ]]; do
+        if [[ "$1" == --* ]]; then
+            case "$1" in
+                --regex) regex_mode=true ;;
+                --wait)  ask_confirm=true ;;
+                *) echo "❌ Unknown option: $1" >&2; return 1 ;;
+            esac
+        elif [[ "$1" == -* && "$1" != "-" ]]; then
+            local flags="${1#-}"
+            local i=0
+            while (( i < ${#flags} )); do
+                case "${flags:$i:1}" in
+                    r) regex_mode=true ;;
+                    w) ask_confirm=true ;;
+                    *) echo "❌ Unknown option: -${flags:$i:1}" >&2; return 1 ;;
+                esac
+                (( i++ ))
+            done
+        else
+            patterns+=("$1")
+        fi
+        shift
+    done
+
+    local services matched_services unique_services
+    services=($(_get_compose_services))
+    if [[ ${#services[@]} -eq 0 ]]; then
+        echo -e "${CRE}No compose services found ❌"
+        return 1
+    fi
+
+    # Match services against patterns
+    matched_services=()
+    if [[ ${#patterns[@]} -gt 0 ]]; then
+        if [[ "$regex_mode" == true ]]; then
+            for svc in "${services[@]}"; do
+                for pat in "${patterns[@]}"; do
+                    if [[ "$svc" =~ $pat ]]; then
+                        matched_services+=("$svc")
+                        break
+                    fi
+                done
+            done
+        else
+            for pat in "${patterns[@]}"; do
+                for svc in "${services[@]}"; do
+                    [[ "$svc" == "$pat" ]] && matched_services+=("$svc")
+                done
+            done
+        fi
+    else
+        matched_services=("${services[@]}")
+    fi
+
+    # Deduplicate (bash/zsh compatible)
+    unique_services=()
+    for svc in "${matched_services[@]}"; do
+        local found=false
+        for usvc in "${unique_services[@]}"; do
+            [[ "$svc" == "$usvc" ]] && found=true && break
+        done
+        [[ "$found" == false ]] && unique_services+=("$svc")
+    done
+
+    if [[ ${#unique_services[@]} -eq 0 ]]; then
+        echo -e "${CRE}No services matched: ${CB}'${patterns[*]}'${CR} ❌"
+        return 1
+    fi
+
+    echo -e "${CGR}Services: ${CB}${unique_services[*]}${CR} 📋"
+    if [[ "$ask_confirm" == true ]]; then
+        _confirm_operation "Show logs for these services?" || return 0
+    fi
+
+    docker compose -f "$compose_file" logs --tail 100 -f "${unique_services[@]}"
 }
