@@ -10,12 +10,13 @@
 #   d [command]       Docker shortcuts (ps, logs, exec, etc.)
 #   dc [command]      Docker Compose shortcuts (up, down, logs, etc.)
 #   dcup [opts]       Docker Compose up (mirrors: dc up)
+#   dstats [--once]   Live or snapshot docker stats
+#   dprune [--flag]   Unified prune (--all|--images|--volumes|--networks)
 #   dq <pattern>      Quick exec in first matching container
 #   dcq <pattern>     Quick exec in first matching service
 #   dclt [opts]       Follow logs for services matching a pattern
 #   dip [ip|pattern]  Find containers by IP, or list all with IPs
 #   dstatus           Quick status overview
-#   dcleanup          Full system cleanup
 #   dhelp / dchelp    Show help
 #
 # CONFIGURATION:

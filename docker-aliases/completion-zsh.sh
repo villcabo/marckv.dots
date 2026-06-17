@@ -15,9 +15,7 @@ _d_zsh() {
         'psp:List containers with ports'
         'images:List images'
         'i:List images'
-        'stats:Live resource stats'
-        's:Live resource stats'
-        's1:Stats (single snapshot)'
+        'stats:Live resource stats (delegates to dstats)'
         'logs:Follow container logs'
         'l:Follow container logs'
         'l100:Follow last 100 log lines'
@@ -30,15 +28,7 @@ _d_zsh() {
         'stop:Stop container'
         'restart:Restart container'
         'rm:Remove container'
-        'rmi:Remove image'
-        'kill:Kill container'
-        'inspect:Inspect container'
-        'top:Show container processes'
-        'prune:Clean system (safe)'
-        'prunea:Clean all (aggressive)'
-        'pruneima:Prune images'
-        'prunevol:Prune volumes'
-        'prunenet:Prune networks'
+        'prune:Clean system (delegates to dprune)'
         'help:Show help'
         'h:Show help'
         '-h:Show help'
@@ -53,7 +43,7 @@ _d_zsh() {
     else
         local cmd="${words[2]}"
         case "$cmd" in
-            x|sh|bash|logs|l|l100|l300|l500|start|stop|restart|rm|inspect|top|kill)
+            x|sh|bash|logs|l|l100|l300|l500|start|stop|restart|rm)
                 _describe 'container' containers
                 ;;
         esac
@@ -68,20 +58,12 @@ _dc_zsh() {
     subcmds=(
         'up:Start services'
         'u:Start services'
-        'ul:Start services and follow logs'
         'ps:List services'
         'p:List services'
-        'ps1:List services (compact)'
-        'p1:List services (compact)'
-        'psp:List services with ports'
         'stats:Live resource stats'
         's:Live resource stats'
-        's1:Stats (single snapshot)'
         'logs:Follow logs'
         'l:Follow logs'
-        'l100:Follow last 100 lines'
-        'l300:Follow last 300 lines'
-        'l500:Follow last 500 lines'
         'x:Execute in service'
         'sh:Open sh in service'
         'bash:Open bash in service'
@@ -93,7 +75,6 @@ _dc_zsh() {
         'build:Build services'
         'b:Build services'
         'pull:Pull images'
-        'default:Manage default compose file'
         'info:Show compose configuration'
         'help:Show help'
         'h:Show help'
@@ -116,6 +97,12 @@ _dc_zsh() {
         '-r[Force recreate containers]'
     )
 
+    local -a ps_flags
+    ps_flags=(
+        '-c[Compact format]'
+        '-p[Show ports]'
+    )
+
     local cmd="${words[2]}"
     local prev="${words[$((CURRENT-1))]}"
 
@@ -133,8 +120,11 @@ _dc_zsh() {
     # Flag completion
     if [[ "${words[$CURRENT]}" == -* ]]; then
         case "$cmd" in
-            up|u|ul|down|d|build|b)
+            up|u|down|d|build|b)
                 _describe 'flag' up_flags
+                ;;
+            ps|p)
+                _describe 'flag' ps_flags
                 ;;
         esac
         return
@@ -142,16 +132,8 @@ _dc_zsh() {
 
     # Service or file completion
     case "$cmd" in
-        x|sh|bash|logs|l|l100|l300|l500|start|stop|restart|up|u|ul|down|d|build|b)
+        x|sh|bash|logs|l|start|stop|restart|up|u|down|d|build|b)
             _describe 'service' services
-            ;;
-        default)
-            if (( CURRENT == 3 )); then
-                local -a opts
-                opts=('remove:Remove default setting' 'rm:Remove default setting')
-                _describe 'option' opts
-                _describe 'file' yml_files
-            fi
             ;;
     esac
 }
@@ -188,6 +170,31 @@ _dcup_zsh() {
 }
 
 # ---------------------------------------------------------------------------
+# dstats completion
+# ---------------------------------------------------------------------------
+_dstats_zsh() {
+    local -a flags
+    flags=(
+        '--once[Single snapshot (no-stream)]'
+    )
+    _describe 'option' flags
+}
+
+# ---------------------------------------------------------------------------
+# dprune completion
+# ---------------------------------------------------------------------------
+_dprune_zsh() {
+    local -a flags
+    flags=(
+        '--all[docker system prune -af]'
+        '--images[docker image prune -f]'
+        '--volumes[docker volume prune -f]'
+        '--networks[docker network prune -f]'
+    )
+    _describe 'option' flags
+}
+
+# ---------------------------------------------------------------------------
 # dq completion
 # ---------------------------------------------------------------------------
 _dq_zsh() {
@@ -212,6 +219,7 @@ _dclt_zsh() {
     local -a services flags
     services=(${(f)"$(_get_compose_services)"})
     flags=(
+        '-n[Number of log lines to tail]:lines:(50 100 200 300 500)'
         '-r[Match patterns as regex]'
         '--regex[Match patterns as regex]'
         '-w[Ask for confirmation before showing logs]'
@@ -226,7 +234,7 @@ _dclt_zsh() {
 }
 
 # ---------------------------------------------------------------------------
-# dcpr completion
+# dcpr completion (extra/ opt-in)
 # ---------------------------------------------------------------------------
 _dcpr_zsh() {
     local -a services flags
@@ -267,9 +275,13 @@ _dip_zsh() {
 compdef _d_zsh    d
 compdef _dc_zsh   dc
 compdef _dcup_zsh dcup
+
+compdef _dstats_zsh dstats
+compdef _dprune_zsh dprune
+
 compdef _dq_zsh   dq
 compdef _dcq_zsh  dcq dcdown dcl dcx dcs
-compdef _dc_zsh   dcps dcps1
+compdef _dc_zsh   dcps
 compdef _dq_zsh   dl dx
 compdef _dclt_zsh dclt
 compdef _dcpr_zsh dcpr
