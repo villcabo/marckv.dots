@@ -123,6 +123,13 @@ _compose_help() {
     echo -e "  ${CGR}dcq data psql${CR}              psql in first service matching 'data'"
     echo -e "  ${CGR}dclt -n 300 api${CR}            Follow last 300 log lines for 'api'"
 
+    echo -e "\n${CCY}MODERN COMPOSE (v2-native)${CR}"
+    echo -e "  ${CGR}dcw${CR} [opts] [svc...]   Compose watch (file-sync dev loop)"
+    echo -e "  ${CGR}dcrun${CR} [opts] ${CMA}<svc> <cmd>${CR}  One-shot run --rm"
+    echo -e "  ${CYE}-P${CR} ${CMA}<profile>${CR}          Activate compose profile (works on up/down/build/dcw/dcrun)"
+    echo -e "  ${CYE}-e${CR} ${CMA}<file>${CR}             Env-file override (repeatable)"
+    echo -e "  ${CI}Run ${CYE}dmhelp${CR}${CI} for full modern compose reference${CR}"
+
     echo -e "\n${CCY}CONFIGURATION${CR}"
     echo -e "  ${CYE}DOCKER_COMPOSE_FILE=file.yml${CR}     Override compose file"
     echo -e "  ${CYE}DOCKER_ALIASES_NERD_FONT=0${CR}      Force ASCII icons (default: Nerd Font)"
@@ -130,5 +137,39 @@ _compose_help() {
     echo -e "  ${CYE}DOCKER_ALIASES_LOG_LINES=200${CR}    Default tail lines for dclt (default: 100)"
 }
 
+_modern_compose_help() {
+    echo -e "${CB}${CCY}Modern Compose Commands${CR}  ${CI}(compose v2-native)${CR}\n"
+
+    echo -e "${CCY}WATCH${CR}"
+    echo -e "  ${CGR}dcw${CR}                          Watch all services (sync on file change)"
+    echo -e "  ${CGR}dcw api${CR}                      Watch only 'api' service"
+    echo -e "  ${CGR}dcw -f dev.yml${CR}               Custom compose file"
+    echo -e "  ${CGR}dcw -P dev api${CR}               Dev profile, watch 'api'"
+    echo -e "  ${CGR}dcw -y${CR}                       Skip confirmation"
+
+    echo -e "\n${CCY}ONE-SHOT RUN${CR}"
+    echo -e "  ${CGR}dcrun api bash${CR}                Ephemeral bash in 'api' (removed after exit)"
+    echo -e "  ${CGR}dcrun -P dev migrate npm run migrate${CR}  Migrations in dev profile"
+    echo -e "  ${CGR}dcrun -e .env.test api pytest${CR} Run pytest with test env-file"
+    echo -e "  ${CGR}dcrun --no-rm api bash${CR}        Keep container after exit"
+
+    echo -e "\n${CCY}PROFILE FLAG${CR}  ${CI}(-P, applies to dcup / dcdown / dc build / dcw / dcrun)${CR}"
+    echo -e "  ${CYE}-P${CR} ${CMA}<profile>${CR}              Activate a compose profile"
+    echo -e "  ${CYE}-P${CR} ${CMA}dev,debug${CR}              Multiple profiles (comma-separated)"
+    echo -e "  ${CGR}dcup -P dev${CR}                  Equivalent to: docker compose --profile dev up -d"
+    echo -e "  ${CGR}dcup -P dev,debug api worker${CR}  Profile + specific services"
+
+    echo -e "\n${CCY}ENV-FILE FLAG${CR}  ${CI}(-e, applies to dcup / dcdown / dc build / dcrun)${CR}"
+    echo -e "  ${CYE}-e${CR} ${CMA}<file>${CR}               Env-file override (repeatable)"
+    echo -e "  ${CGR}dcup -e .env.prod${CR}             Equivalent to: docker compose up --env-file .env.prod"
+    echo -e "  ${CGR}dcup -e .env.prod -e .env.local${CR}  Stack multiple env-files"
+    echo -e "  ${CGR}dcrun -e .env.test api pytest${CR} One-shot run with test env-file"
+
+    echo -e "\n${CCY}COMPLETION HINTS${CR}"
+    echo -e "  After ${CYE}-P${CR}, TAB suggests profiles from the active compose file."
+    echo -e "  After ${CYE}-e${CR}, TAB suggests ${CMA}.env*${CR} files in the current directory."
+}
+
 alias dhelp='_docker_help'
 alias dchelp='_compose_help'
+alias dmhelp='_modern_compose_help'
