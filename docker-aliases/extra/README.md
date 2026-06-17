@@ -13,7 +13,9 @@ No se carga por defecto porque es de nicho y agrega tiempo de source innecesario
 Agrega la siguiente línea en `~/.bashrc` o `~/.zshrc`, **después** del loader principal:
 
 ```bash
-source ~/.marckv.dots/docker-aliases/extra/git-properties.sh
+# Ejemplo en ~/.bashrc o ~/.zshrc:
+source ~/.marckv.dots/docker-aliases/docker-color_aliases.sh  # loader principal
+source ~/.marckv.dots/docker-aliases/extra/git-properties.sh  # opt-in dcpr
 ```
 
 ### Uso
