@@ -140,12 +140,15 @@ dclt() {
     # --- resolve and validate inputs ---------------------------------------
     local file
     if [[ ${#files[@]} -eq 0 ]]; then
-        local detected
-        detected=$(_get_compose_file) || {
+        local resolved resolved_item
+        resolved=$(_resolve_compose_files) || {
             _err dclt "no compose file found — add docker-compose.yml or set DOCKER_COMPOSE_FILE"
             return 1
         }
-        files+=("$detected")
+        # May be two lines: the base file and its override sibling.
+        while IFS= read -r resolved_item; do
+            [[ -n "$resolved_item" ]] && files+=("$resolved_item")
+        done <<< "$resolved"
     else
         for file in "${files[@]}"; do
             [[ -f "$file" ]] || { _err dclt "compose file not found: $file"; return 1; }
