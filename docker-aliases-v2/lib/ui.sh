@@ -209,6 +209,199 @@ _confirm_operation() {
 }
 
 # ---------------------------------------------------------------------------
+# Port compaction
+#
+# `docker ps` renders ports at their most verbose, and it is what pushes the
+# row past the width of a terminal:
+#
+#   8080/tcp, 8443/tcp, 0.0.0.0:9080->9080/tcp, 9000/tcp, 0.0.0.0:9443->9443/tcp
+#
+# Three kinds of noise live in there:
+#
+#   1. The same mapping listed once per address family — 0.0.0.0:3001->3000/tcp
+#      and [::]:3001->3000/tcp are one port, printed twice.
+#   2. Ports that are merely EXPOSEd, never published. 5432/tcp with no arrow
+#      cannot be reached from the host at all, so it does not answer the
+#      question you are asking when you run ps.
+#   3. host->container pairs that are identical. 9080->9080 is just 9080.
+#
+# Stripping those turns the line above into "9080 9443" — 76 characters to 9.
+# ---------------------------------------------------------------------------
+
+# _compact_ports <ports string> [show_exposed]
+_compact_ports() {
+    local raw="$1"
+    local show_exposed="${2:-false}"
+
+    [[ -z "$raw" ]] && return 0
+
+    local out="" entry hostpart container proto cport hport hip label
+
+    while IFS= read -r entry || [[ -n "$entry" ]]; do
+        entry="${entry# }"
+        [[ -z "$entry" ]] && continue
+
+        if [[ "$entry" != *"->"* ]]; then
+            # Exposed only. Marked with ~ when asked for, so it never reads as
+            # something you can connect to.
+            [[ "$show_exposed" != true ]] && continue
+            cport="${entry%%/*}"
+            proto="${entry##*/}"
+            label="~${cport}"
+            [[ "$proto" != "tcp" ]] && label="${label}/${proto}"
+        else
+            hostpart="${entry%%->*}"
+            container="${entry#*->}"
+            proto="${container##*/}"
+            cport="${container%%/*}"
+            hport="${hostpart##*:}"
+            hip="${hostpart%:*}"
+
+            label="$hport"
+            [[ "$hport" != "$cport" ]] && label="${hport}→${cport}"
+            [[ "$proto" != "tcp" ]] && label="${label}/${proto}"
+            # A localhost binding is NOT reachable from elsewhere, which is
+            # worth seeing rather than inferring.
+            case "$hip" in
+                127.0.0.1|localhost) label="lo:${label}" ;;
+            esac
+        fi
+
+        # Deduplicate on the rendered label. This collapses the v4/v6 pair
+        # without assuming v4 is present — a port published only on IPv6 still
+        # shows up exactly once.
+        case " $out " in
+            *" $label "*) continue ;;
+        esac
+        out+="${out:+ }${label}"
+    done <<< "$(printf '%s\n' "$raw" | tr ',' '\n')"
+
+    printf '%s' "$out"
+}
+
+# ---------------------------------------------------------------------------
+# Table helpers
+#
+# Padding is computed on the PLAIN text and the color is wrapped around the
+# result. Doing it the other way round makes printf count the escape sequences
+# as if they were characters, and every column drifts.
+# ---------------------------------------------------------------------------
+
+# _ellipsize <text> <max> → text, shortened from the middle if it must be
+#
+# Middle rather than end, because container names are usually
+# <project>-<service>-<n> and both ends carry meaning — cutting the tail throws
+# away exactly the part that distinguishes one container from its siblings.
+#
+# Shortening is deliberately VISIBLE. Stripping the redundant project prefix
+# would read better, but it would produce a name that looks real and is not —
+# paste it into `docker exec` and it fails. An ellipsis cannot be mistaken for
+# a name.
+_ellipsize() {
+    local text="$1" max="$2"
+    local len=${#1}
+
+    (( len <= max )) && { printf '%s' "$text"; return 0; }
+    (( max < 5 )) && { printf '%s' "${text:0:$max}"; return 0; }
+
+    local head=$(( (max - 1) / 2 ))
+    local tail=$(( max - 1 - head ))
+    printf '%s…%s' "${text:0:$head}" "${text:$(( len - tail ))}"
+}
+
+# _pad_to <text> <width> → text followed by spaces up to width
+_pad_to() {
+    local text="$1" width="$2"
+    local len=${#1}
+    printf '%s' "$text"
+    while (( len < width )); do
+        printf ' '
+        len=$(( len + 1 ))
+    done
+}
+
+# _status_color <status text> → the color that status deserves
+#
+# Health is read out of the status string rather than left buried in it: a
+# container that is up but unhealthy looks exactly like a healthy one otherwise.
+_status_color() {
+    case "$1" in
+        *"(unhealthy)"*) printf '%s' "$CRE" ;;
+        *"(starting)"*)  printf '%s' "$CYE" ;;
+        *"(healthy)"*)   printf '%s' "$CGR" ;;
+        Up*|up*|running*) printf '%s' "$CGR" ;;
+        Restarting*|restarting*|Paused*|paused*) printf '%s' "$CYE" ;;
+        *) printf '%s' "$CRE" ;;
+    esac
+}
+
+# ---------------------------------------------------------------------------
+# Container table
+#
+# _render_container_table <title> <shown> <total> <filter> \
+#                         <head1> <head2> <head3> <head4> <rows>
+#
+# `rows` is newline-separated, each line four TAB-separated fields. Rows travel
+# as text rather than as arrays because passing arrays by name needs indirect
+# expansion, and that is spelled ${!v[@]} in bash and ${(P)v} in zsh — one of
+# the few things with no portable form.
+#
+# Widths are measured in a first pass so the last row lines up with the first.
+# ---------------------------------------------------------------------------
+
+_render_container_table() {
+    local title="$1" shown="$2" total="$3" filter="$4"
+    local h1="$5" h2="$6" h3="$7" h4="$8"
+    local rows="$9"
+
+    # Caps, so one pathological name cannot stretch the table past the screen —
+    # which is the very thing compacting the ports was meant to fix. Columns
+    # still shrink below these when the content is short.
+    local cap1=32 cap2=22 cap3=22
+
+    local c1 c2 c3 c4
+    local w1=${#h1} w2=${#h2} w3=${#h3}
+
+    if [[ -n "$rows" ]]; then
+        while IFS=$'\t' read -r c1 c2 c3 c4 || [[ -n "$c1" ]]; do
+            [[ -z "$c1" ]] && continue
+            (( ${#c1} > w1 )) && w1=${#c1}
+            (( ${#c2} > w2 )) && w2=${#c2}
+            (( ${#c3} > w3 )) && w3=${#c3}
+        done <<< "$rows"
+        (( w1 > cap1 )) && w1=$cap1
+        (( w2 > cap2 )) && w2=$cap2
+        (( w3 > cap3 )) && w3=$cap3
+    fi
+
+    # Scope line instead of a preview block: for a command whose whole output is
+    # a table, a preview would just say everything twice.
+    printf "  %s ${CBL}${CB}%s${CR}  ${CDIM}·${CR}  ${CDIM}%s of %s${CR}" \
+        "$(_icon docker)" "$title" "$shown" "$total"
+    [[ -n "$filter" ]] && printf "  ${CDIM}·${CR}  ${CDIM}filter:${CR} ${CMA}%s${CR}" "$filter"
+    printf "\n"
+
+    printf "  ${CDIM}%s  %s  %s  %s${CR}\n" \
+        "$(_pad_to "$h1" "$w1")" "$(_pad_to "$h2" "$w2")" \
+        "$(_pad_to "$h3" "$w3")" "$h4"
+
+    if [[ -z "$rows" ]]; then
+        printf "  ${CDIM}(nothing to show)${CR}\n"
+        return 0
+    fi
+
+    local scolor
+    while IFS=$'\t' read -r c1 c2 c3 c4 || [[ -n "$c1" ]]; do
+        [[ -z "$c1" ]] && continue
+        scolor=$(_status_color "$c3")
+        printf "  ${CWH}%s${CR}  ${CDIM}%s${CR}  ${scolor}%s${CR}  ${CGR}%s${CR}\n" \
+            "$(_pad_to "$(_ellipsize "$c1" "$w1")" "$w1")" \
+            "$(_pad_to "$(_ellipsize "$c2" "$w2")" "$w2")" \
+            "$(_pad_to "$(_ellipsize "$c3" "$w3")" "$w3")" "$c4"
+    done <<< "$rows"
+}
+
+# ---------------------------------------------------------------------------
 # Typed confirmation
 #
 # For operations that destroy data, "yes" is the wrong prompt — not because it
