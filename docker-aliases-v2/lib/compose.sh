@@ -131,6 +131,97 @@ _get_compose_profiles() {
     docker compose "${args[@]}" config --profiles 2>/dev/null
 }
 
+# _get_compose_project [file...] → the resolved project name
+#
+# Read from `config` rather than guessed: compose resolves it from `name:`, then
+# COMPOSE_PROJECT_NAME, then the directory. Only `config` knows the answer.
+#
+# Parsed in pure shell because jq is not installed on a minimal server, and this
+# runs on Debian/Ubuntu boxes with nothing extra.
+_get_compose_project() {
+    local files=("$@")
+    if [[ ${#files[@]} -eq 0 ]]; then
+        local detected
+        detected=$(_get_compose_file) || return 1
+        files=("$detected")
+    fi
+
+    local args=() file
+    for file in "${files[@]}"; do
+        args+=(-f "$file")
+    done
+
+    local line value
+    while IFS= read -r line; do
+        # Only a top-level `name:` — a nested one is some service's key.
+        case "$line" in
+            name:*)
+                value="${line#name:}"
+                while [[ "$value" == " "* ]]; do value="${value# }"; done
+                value="${value%\"}"; value="${value#\"}"
+                value="${value%\'}"; value="${value#\'}"
+                if [[ -n "$value" ]]; then
+                    printf '%s\n' "$value"
+                    return 0
+                fi
+                ;;
+        esac
+    done <<< "$(docker compose "${args[@]}" config 2>/dev/null)"
+
+    return 1
+}
+
+# _get_compose_volumes [file...] → one NAMED volume per line
+#
+# These are exactly what `docker compose down -v` destroys.
+_get_compose_volumes() {
+    local files=("$@")
+    if [[ ${#files[@]} -eq 0 ]]; then
+        local detected
+        detected=$(_get_compose_file) || return 1
+        files=("$detected")
+    fi
+
+    local args=() file
+    for file in "${files[@]}"; do
+        args+=(-f "$file")
+    done
+
+    local result
+    result=$(docker compose "${args[@]}" config --volumes 2>/dev/null | LC_ALL=C sort) || return 1
+    [[ -z "$result" ]] && return 1
+    printf '%s\n' "$result"
+}
+
+# _get_running_services [file...] → one RUNNING service per line
+#
+# Unlike every other lookup here, this one needs a live daemon. It returns
+# non-zero when it cannot ask, which callers must treat as "unknown" rather
+# than "nothing is running" — those two mean very different things right
+# before a destructive command.
+_get_running_services() {
+    local files=("$@")
+    if [[ ${#files[@]} -eq 0 ]]; then
+        local detected
+        detected=$(_get_compose_file) || return 1
+        files=("$detected")
+    fi
+
+    local args=() file
+    for file in "${files[@]}"; do
+        args+=(-f "$file")
+    done
+
+    # Not piped straight into sort: a pipeline reports the LAST command's
+    # status, so `docker | sort` would return 0 even when docker failed, making
+    # "cannot reach the daemon" indistinguishable from "nothing is running".
+    local result
+    result=$(docker compose "${args[@]}" ps --filter status=running --services 2>/dev/null) || return 1
+
+    [[ -z "$result" ]] && return 0      # daemon answered: nothing is running
+    printf '%s\n' "$result" | LC_ALL=C sort
+}
+
 # ---------------------------------------------------------------------------
 # Portable helpers
 # ---------------------------------------------------------------------------
