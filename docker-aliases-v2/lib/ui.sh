@@ -50,6 +50,8 @@ _icon() {
             services) printf '' ;;   # nf-fa-server
             flags)    printf '' ;;   # nf-fa-cog
             cmd)      printf '' ;;   # nf-fa-terminal
+            volumes)  printf '' ;;   # nf-fa-trash
+            warn)     printf '' ;;   # nf-fa-exclamation_triangle
             confirm)  printf '' ;;   # nf-fa-question_circle
             check)    printf '' ;;
             cross)    printf '' ;;
@@ -64,6 +66,8 @@ _icon() {
             services) printf '[svc]' ;;
             flags)    printf '[flags]' ;;
             cmd)      printf '$' ;;
+            volumes)  printf '[vol]' ;;
+            warn)     printf '[!]' ;;
             confirm)  printf '[?]' ;;
             check)    printf 'OK' ;;
             cross)    printf 'X' ;;
@@ -131,6 +135,10 @@ _hr() {
 #   $5  command to run    PRE-COLORED string — the caller owns its colors,
 #                         because only the caller knows which token is a file,
 #                         a flag or a service.
+#   $6  volumes           space-separated named volumes about to be DESTROYED
+#                         (may be empty). Rendered in red — this is the only
+#                         irreversible thing any of these commands can do, so
+#                         it gets its own line and its own color.
 #
 # The command line is not a reconstruction: callers build one command, execute
 # that exact command, and pass a colored rendering of it here. What you read is
@@ -147,6 +155,7 @@ _render_preview() {
     local services="${3:-}"
     local flags="${4:-}"
     local command_display="${5:-}"
+    local volumes="${6:-}"
 
     local action_color
     action_color=$(_action_color "${action##* }")   # "up" from "compose up"
@@ -165,6 +174,8 @@ _render_preview() {
         fi
 
         [[ -n "$services" ]] && printf "  %s ${CMA}%s${CR}\n" "$(_icon services)" "$services"
+        [[ -n "$volumes" ]]  && printf "  %s ${CRE}${CB}%s${CR}  ${CRE}← deleted, cannot be undone${CR}\n" \
+                                      "$(_icon volumes)" "$volumes"
         [[ -n "$flags" ]]    && printf "  %s ${CYE}%s${CR}\n" "$(_icon flags)" "$flags"
         [[ -n "$command_display" ]] && printf "  %s %b${CR}\n" "$(_icon cmd)" "$command_display"
 
@@ -193,6 +204,45 @@ _confirm_operation() {
     local response
     read -r response
     [[ "$response" == "yes" || "$response" == "YES" || "$response" == "Yes" ]]
+}
+
+# ---------------------------------------------------------------------------
+# Typed confirmation
+#
+# For operations that destroy data, "yes" is the wrong prompt — not because it
+# is too short, but because it is the SAME answer every other prompt takes. Type
+# it often enough and you stop reading the question.
+#
+# Demanding a different, situation-specific token (the project name) breaks that
+# reflex: you cannot answer without looking at what you are about to destroy.
+# ---------------------------------------------------------------------------
+
+# _confirm_typed <expected> <warning message> [color]
+_confirm_typed() {
+    local expected="$1"
+    local message="$2"
+    local color="${3:-$CRE}"
+
+    # TEST/CI ONLY escape, same as _confirm_operation.
+    if [[ "${DOCKER_ALIASES_AUTO_YES:-0}" == "1" ]]; then
+        return 0
+    fi
+
+    printf "  %s ${color}${CB}%s${CR}\n" "$(_icon warn)" "$message" >&2
+    printf "  %s ${color}${CB}[%s]${CR}${CDIM}:${CR} " "$(_icon confirm)" "$expected" >&2
+
+    local response
+    read -r response
+    [[ "$response" == "$expected" ]]
+}
+
+# ---------------------------------------------------------------------------
+# Notices
+# ---------------------------------------------------------------------------
+
+# _note <message> — a neutral heads-up that is not an error
+_note() {
+    printf "  %s ${CDIM}%s${CR}\n" "$(_icon warn)" "$1" >&2
 }
 
 # ---------------------------------------------------------------------------
