@@ -138,6 +138,39 @@ dcup_argv() {
     " 2>&1 | strip_ansi | grep '^ARGV:'
 }
 
+# dclt never confirms, and the shim turns `logs` into argv instead of a
+# blocking stream — so these return immediately.
+
+# dclt_argv <dir> <args...> → STDOUT only, which must stay pipe-clean
+dclt_argv() {
+    local dir="$1"; shift
+    "$CURRENT_SHELL" -c "
+        cd '$dir' || exit 99
+        source '$INIT'
+        dclt $*
+    " 2>/dev/null | strip_ansi
+}
+
+# dclt_err <dir> <args...> → STDERR only, where the preview belongs
+dclt_err() {
+    local dir="$1"; shift
+    "$CURRENT_SHELL" -c "
+        cd '$dir' || exit 99
+        source '$INIT'
+        dclt $*
+    " 2>&1 >/dev/null | strip_ansi
+}
+
+dclt_rc() {
+    local dir="$1"; shift
+    "$CURRENT_SHELL" -c "
+        cd '$dir' || exit 99
+        source '$INIT'
+        dclt $*
+    " >/dev/null 2>&1
+    printf '%s' "$?"
+}
+
 # ---------------------------------------------------------------------------
 # Checks
 # ---------------------------------------------------------------------------
@@ -242,8 +275,98 @@ run_suite() {
     out=$(in_shell "$F/profiles" '_get_compose_profiles')
     assert_has "profiles are discovered" "debug"  "$out"
 
+    run_dclt_checks "$F"
+
     section "$CURRENT_SHELL — completion"
     run_completion_checks "$F"
+}
+
+# ---------------------------------------------------------------------------
+# dclt
+# ---------------------------------------------------------------------------
+
+run_dclt_checks() {
+    local F="$1" out
+
+    section "$CURRENT_SHELL — dclt help"
+    out=$(in_shell "$F/basic" 'dclt --help')
+    assert_has "help shows USAGE"                "USAGE"                "$out"
+    assert_has "help documents the bare number"  "dclt 500 api"         "$out"
+    assert_has "help says patterns are regex"    "regular expressions"  "$out"
+
+    section "$CURRENT_SHELL — dclt matching"
+    assert_has "no pattern follows every service" \
+        "[api] [db] [worker]" "$(dclt_argv "$F/basic")"
+    assert_has "a plain word matches as a regex" \
+        "[--follow] [api]" "$(dclt_argv "$F/basic" api)"
+    out=$(dclt_argv "$F/basic" "'api|db'")
+    assert_has "alternation matches the first"  "[api]" "$out"
+    assert_has "alternation matches the second" "[db]"  "$out"
+    assert_lacks "alternation excludes the rest" "[worker]" "$out"
+    assert_has "an anchored pattern matches exactly one" \
+        "[--follow] [api]" "$(dclt_argv "$F/basic" "'^api\$'")"
+    # Services are iterated on the outside, so overlapping patterns cannot
+    # produce the same service twice.
+    out=$(dclt_argv "$F/basic" api "'ap'")
+    assert_eq "overlapping patterns do not duplicate a service" \
+        "1" "$(printf '%s' "$out" | grep -o '\[api\]' | wc -l | tr -d ' ')"
+
+    section "$CURRENT_SHELL — dclt line count"
+    assert_has "default tail is 100" \
+        "[--tail] [100]" "$(dclt_argv "$F/basic")"
+    assert_has "a bare number sets the tail" \
+        "[--tail] [500]" "$(dclt_argv "$F/basic" 500 api)"
+    assert_has "-n sets the tail too" \
+        "[--tail] [500]" "$(dclt_argv "$F/basic" -n 500 api)"
+    assert_has "-n all passes 'all' through" \
+        "[--tail] [all]" "$(dclt_argv "$F/basic" -n all)"
+
+    section "$CURRENT_SHELL — dclt flags"
+    assert_has "follow is the default" \
+        "[--follow]" "$(dclt_argv "$F/basic" api)"
+    assert_lacks "-o drops --follow" \
+        "[--follow]" "$(dclt_argv "$F/basic" -o api)"
+    out=$(dclt_argv "$F/basic" -ot api)
+    assert_has "-ot still applies timestamps"  "[--timestamps]" "$out"
+    assert_lacks "-ot still suppresses follow" "[--follow]"     "$out"
+    assert_has "-s emits --since" \
+        "[--since] [10m]" "$(dclt_argv "$F/basic" -s 10m)"
+    out=$(dclt_argv "$F/envfile" -e .env.prod)
+    case "$out" in
+        *"[--env-file] [.env.prod]"*"[logs]"*) pass "--env-file precedes logs" ;;
+        *) fail "--env-file precedes logs" "--env-file before [logs]" "$out" ;;
+    esac
+    assert_has "-f selects the compose file" \
+        "[-f] [base.yml]" "$(dclt_argv "$F/multifile" -f base.yml)"
+
+    section "$CURRENT_SHELL — dclt output streams"
+    # The whole point of -o is piping. A preview on stdout would poison it.
+    out=$(dclt_argv "$F/basic" -o api)
+    assert_lacks "stdout carries no preview"      "compose logs" "$out"
+    assert_has  "stdout carries the log output"   "ARGV:"        "$out"
+    out=$(dclt_err "$F/basic" -o api)
+    assert_has  "stderr carries the preview"      "compose logs" "$out"
+    assert_has  "preview shows the real command"  "docker compose" "$out"
+
+    section "$CURRENT_SHELL — dclt errors"
+    assert_eq "no match exits 1"        "1" "$(dclt_rc "$F/basic" zzz)"
+    assert_eq "bad line count exits 1"  "1" "$(dclt_rc "$F/basic" -n abc)"
+    assert_eq "-n without value exits 1" "1" "$(dclt_rc "$F/basic" -n)"
+    assert_eq "unknown flag exits 1"    "1" "$(dclt_rc "$F/basic" -Z)"
+    out=$(dclt_err "$F/basic" zzz)
+    assert_has "no match lists what exists" "available:" "$out"
+    assert_has "no match names the services" "worker"    "$out"
+
+    section "$CURRENT_SHELL — dclt is read-only"
+    # dclt must never prompt: it changes nothing. If it ever grows a
+    # confirmation, this catches it — with no stdin, a prompt would hang or
+    # fail rather than sail through.
+    out=$("$CURRENT_SHELL" -c "
+        cd '$F/basic' || exit 99
+        source '$INIT'
+        dclt api </dev/null" 2>/dev/null | strip_ansi)
+    assert_has "runs with no stdin and no prompt" "ARGV:"   "$out"
+    assert_lacks "never asks for confirmation"    "[yes/N]" "$out"
 }
 
 # ---------------------------------------------------------------------------
@@ -292,6 +415,36 @@ run_completion_checks() {
             _dcup_complete_bash
             printf '%s\n' \"\${COMPREPLY[@]}\"" 2>&1)
         assert_has "bash: -P completes profiles" "debug" "$out"
+
+        out=$(cd "$F/basic" && bash -c "
+            source '$INIT'
+            COMP_WORDS=(dclt ''); COMP_CWORD=1
+            _dclt_complete_bash
+            printf '%s\n' \"\${COMPREPLY[@]}\"" 2>&1)
+        assert_has "bash: dclt completes services" "worker" "$out"
+
+        out=$(cd "$F/basic" && bash -c "
+            source '$INIT'
+            COMP_WORDS=(dclt '-'); COMP_CWORD=1
+            _dclt_complete_bash
+            printf '%s\n' \"\${COMPREPLY[@]}\"" 2>&1)
+        assert_has "bash: dclt offers -o" "-o" "$out"
+        assert_has "bash: dclt offers -s" "-s" "$out"
+
+        out=$(cd "$F/basic" && bash -c "
+            source '$INIT'
+            COMP_WORDS=(dclt -n ''); COMP_CWORD=2
+            _dclt_complete_bash
+            printf '%s\n' \"\${COMPREPLY[@]}\"" 2>&1)
+        assert_has "bash: dclt -n suggests counts" "500" "$out"
+        assert_has "bash: dclt -n suggests all"    "all" "$out"
+
+        out=$(cd "$F/basic" && bash -c "
+            source '$INIT'
+            COMP_WORDS=(dclt -s ''); COMP_CWORD=2
+            _dclt_complete_bash
+            printf '%s\n' \"\${COMPREPLY[@]}\"" 2>&1)
+        assert_has "bash: dclt -s suggests durations" "10m" "$out"
         return
     fi
 
@@ -334,6 +487,36 @@ run_completion_checks() {
         words=(dcup -f ''); CURRENT=3
         _dcup_complete_zsh" 2>&1)
     assert_has "zsh: -f delegates to _files" "__files__" "$out"
+
+    out=$(cd "$F/basic" && zsh -c "
+        source '$INIT'
+        $stub
+        words=(dclt ''); CURRENT=2
+        _dclt_complete_zsh" 2>&1)
+    assert_has "zsh: dclt completes services" "worker" "$out"
+
+    out=$(cd "$F/basic" && zsh -c "
+        source '$INIT'
+        $stub
+        words=(dclt '-'); CURRENT=2
+        _dclt_complete_zsh" 2>&1)
+    assert_has "zsh: dclt offers -o" "-o" "$out"
+    assert_has "zsh: dclt offers -s" "-s" "$out"
+
+    out=$(cd "$F/basic" && zsh -c "
+        source '$INIT'
+        $stub
+        words=(dclt -n ''); CURRENT=3
+        _dclt_complete_zsh" 2>&1)
+    assert_has "zsh: dclt -n suggests counts" "500" "$out"
+    assert_has "zsh: dclt -n suggests all"    "all" "$out"
+
+    out=$(cd "$F/basic" && zsh -c "
+        source '$INIT'
+        $stub
+        words=(dclt -s ''); CURRENT=3
+        _dclt_complete_zsh" 2>&1)
+    assert_has "zsh: dclt -s suggests durations" "10m" "$out"
 }
 
 # ---------------------------------------------------------------------------

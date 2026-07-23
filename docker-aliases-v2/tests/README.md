@@ -100,7 +100,19 @@ inside a container act on the host's real containers.
 
 ## What is covered
 
-98 checks per shell, per distro:
+176 checks per shell, per distro.
+
+`dclt`:
+
+- Patterns treated as regex: plain word, alternation, anchored
+- Overlapping patterns never duplicate a service
+- Line count via bare number, `-n N`, and `-n all`
+- `--follow` by default, dropped by `-o`; `-t`, `-s` mapping
+- **stdout stays pipe-clean while the preview goes to stderr**
+- Never prompts — verified by running it with no stdin at all
+- Errors list the services that *were* available
+
+`dcup`:
 
 - `--help` output, including that no `-y` escape is advertised
 - Preview: action, files, resolved services, flags, and the command line
