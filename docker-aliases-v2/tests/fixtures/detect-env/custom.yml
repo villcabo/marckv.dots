@@ -1,0 +1,13 @@
+# Reached only through DOCKER_COMPOSE_FILE in .env — never by filename guessing.
+name: dav2-fixture-detect
+
+networks:
+  appnet:
+    driver: bridge
+
+services:
+  detected:
+    image: alpine:latest
+    command: ["sleep", "infinity"]
+    restart: unless-stopped
+    networks: [appnet]

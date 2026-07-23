@@ -1,0 +1,17 @@
+# Exercises repeated -f: base plus override, merged by compose.
+name: dav2-fixture-multifile
+
+networks:
+  appnet:
+    driver: bridge
+
+services:
+  api:
+    image: nginx:alpine
+    restart: unless-stopped
+    networks: [appnet]
+
+  worker:
+    image: redis:alpine
+    restart: unless-stopped
+    networks: [appnet]

@@ -1,0 +1,95 @@
+name: docker-aliases-v2-tests
+
+networks:
+  dav2-net:
+    driver: bridge
+
+# Every distro shares this. Only the base image differs, which is the whole
+# point of the matrix.
+#
+# No docker socket is mounted on purpose: `docker compose config` parses YAML
+# without a daemon, and that is all the preview path needs. Mounting the host
+# socket would let a test inside a container start real containers on the host.
+# If you ever need that, add it per service — deliberately, not by default.
+x-distro: &distro
+  working_dir: /repo/docker-aliases-v2
+  command: ["sleep", "infinity"]
+  restart: unless-stopped
+  networks: [dav2-net]
+  volumes:
+    - ../..:/repo:ro
+
+services:
+  # ── Debian ────────────────────────────────────────────────────────────────
+
+  debian11:
+    image: ${DA_TEST_NS:-local}/docker-aliases-test:debian11
+    build:
+      context: .
+      args:
+        BASE_IMAGE: debian:11
+    container_name: dav2-debian11
+    hostname: debian11
+    <<: *distro
+
+  debian12:
+    image: ${DA_TEST_NS:-local}/docker-aliases-test:debian12
+    build:
+      context: .
+      args:
+        BASE_IMAGE: debian:12
+    container_name: dav2-debian12
+    hostname: debian12
+    <<: *distro
+
+  debian13:
+    image: ${DA_TEST_NS:-local}/docker-aliases-test:debian13
+    build:
+      context: .
+      args:
+        BASE_IMAGE: debian:13
+    container_name: dav2-debian13
+    hostname: debian13
+    <<: *distro
+
+  # ── Ubuntu ────────────────────────────────────────────────────────────────
+
+  ubuntu20:
+    image: ${DA_TEST_NS:-local}/docker-aliases-test:ubuntu20
+    build:
+      context: .
+      args:
+        BASE_IMAGE: ubuntu:20.04
+    container_name: dav2-ubuntu20
+    hostname: ubuntu20
+    <<: *distro
+
+  ubuntu22:
+    image: ${DA_TEST_NS:-local}/docker-aliases-test:ubuntu22
+    build:
+      context: .
+      args:
+        BASE_IMAGE: ubuntu:22.04
+    container_name: dav2-ubuntu22
+    hostname: ubuntu22
+    <<: *distro
+
+  ubuntu24:
+    image: ${DA_TEST_NS:-local}/docker-aliases-test:ubuntu24
+    build:
+      context: .
+      args:
+        BASE_IMAGE: ubuntu:24.04
+    container_name: dav2-ubuntu24
+    hostname: ubuntu24
+    <<: *distro
+
+  ubuntu26:
+    image: ${DA_TEST_NS:-local}/docker-aliases-test:ubuntu26
+    build:
+      context: .
+      args:
+        BASE_IMAGE: ubuntu:26.04
+    container_name: dav2-ubuntu26
+    hostname: ubuntu26
+    <<: *distro

@@ -1,0 +1,24 @@
+# Plainest possible case: three services, no profiles, no interpolation.
+name: dav2-fixture-basic
+
+networks:
+  appnet:
+    driver: bridge
+
+services:
+  api:
+    image: nginx:alpine
+    restart: unless-stopped
+    networks: [appnet]
+
+  worker:
+    image: redis:alpine
+    restart: unless-stopped
+    networks: [appnet]
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    networks: [appnet]
+    environment:
+      POSTGRES_PASSWORD: fixture

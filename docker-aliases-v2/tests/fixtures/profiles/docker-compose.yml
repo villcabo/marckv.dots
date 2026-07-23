@@ -1,0 +1,33 @@
+# Exercises -P: 'api' always runs, the rest are gated behind profiles.
+name: dav2-fixture-profiles
+
+networks:
+  appnet:
+    driver: bridge
+
+services:
+  api:
+    image: nginx:alpine
+    restart: unless-stopped
+    networks: [appnet]
+
+  debugger:
+    image: alpine:latest
+    profiles: ["debug"]
+    command: ["sleep", "infinity"]
+    restart: unless-stopped
+    networks: [appnet]
+
+  seeder:
+    image: alpine:latest
+    profiles: ["dev"]
+    command: ["sleep", "infinity"]
+    restart: unless-stopped
+    networks: [appnet]
+
+  metrics:
+    image: alpine:latest
+    profiles: ["dev", "full"]
+    command: ["sleep", "infinity"]
+    restart: unless-stopped
+    networks: [appnet]
