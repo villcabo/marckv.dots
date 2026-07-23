@@ -826,9 +826,14 @@ run_ps_checks() {
     out=$(ps_out "$F/basic" dps)
     assert_has "header names the scope"      "docker ps"    "$out"
     assert_has "header counts the rows"      "4 of 4"       "$out"
-    assert_has "the id column is there"      "ID"           "$out"
+    assert_has "the header follows docker ps" "CONTAINER ID  IMAGE  " "$out"
+    assert_has "and ends with NAMES, as docker does" "NAMES" "$out"
     assert_has "the id is shown in full"     "a1b2c3d4e5f6" "$out"
     assert_has "the image is shown"          "nginx:alpine" "$out"
+    # The tag is the point of the column: a cut one cannot tell you which build.
+    assert_has "long images are NOT truncated" \
+        "quay.io/example/very-long-image-name:1.2.3" "$out"
+    assert_lacks "nothing in the row is ellipsized" "…" "$out"
     assert_has "ports arrive compacted"      "9080"         "$out"
     assert_lacks "no raw docker port syntax" "0.0.0.0:"     "$out"
     assert_lacks "no /tcp noise"             "/tcp"         "$out"
@@ -846,6 +851,7 @@ run_ps_checks() {
     assert_has "service comes first"        "SERVICE"    "$out"
     assert_has "the id is shown"            "a1b2c3d4e5f6" "$out"
     assert_has "the image is shown"         "postgres:18-alpine" "$out"
+    assert_has "service is the last column"  "SERVICE" "$out"
     assert_has "the localhost mark survives" "lo:8080→80" "$out"
     assert_has "udp survives"                "53/udp"     "$out"
     out=$(ps_out "$F/basic" dcps db)
@@ -861,8 +867,12 @@ run_ps_checks() {
     assert_eq "months become mo"         "2mo" "$(dur '2 months ago')"
     assert_eq "docker's 'About an hour'" "1h"  "$(dur 'About an hour ago')"
     assert_eq "docker's 'About a minute'" "1m" "$(dur 'About a minute ago')"
-    assert_eq "up plus health"           "Up 5h ✓" "$(st 'Up 5 hours (healthy)')"
-    assert_eq "unhealthy is marked"      "Up 2m ✗" "$(st 'Up 2 minutes (unhealthy)')"
+    # In ASCII mode the three health states stay distinguishable on purpose:
+    # whoever lost the Nerd Font may have lost colour too, and with one glyph
+    # for all three it is the colour that carries the meaning.
+    assert_eq "healthy is marked"        "Up 5h +" "$(st 'Up 5 hours (healthy)')"
+    assert_eq "unhealthy reads different" "Up 2m !" "$(st 'Up 2 minutes (unhealthy)')"
+    assert_eq "starting reads different" "Up 3s ~" "$(st 'Up 3 seconds (starting)')"
     # The exit code is the whole point of the line: 137 is an OOM kill.
     assert_eq "an exit code survives"    "Exit 137 · 3m" "$(st 'Exited (137) 3 minutes ago')"
     assert_eq "a clean exit survives"    "Exit 0 · 2d"   "$(st 'Exited (0) 2 days ago')"
