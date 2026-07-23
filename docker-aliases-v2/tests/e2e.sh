@@ -800,6 +800,28 @@ ps_out() {
 run_ps_checks() {
     local F="$1" out
 
+    section "$CURRENT_SHELL — nerd font icons"
+    # The whole suite runs with DOCKER_ALIASES_NERD_FONT=0, so for a long time
+    # nothing here ever executed the Nerd Font branch — and it shipped with
+    # every glyph replaced by an empty string. A blank icon looks exactly like
+    # a working one that the terminal cannot draw, so nobody noticed.
+    local icon bytes
+    for icon in docker file services flags cmd dir volumes warn confirm health; do
+        bytes=$("$CURRENT_SHELL" -c "
+            DOCKER_ALIASES_NERD_FONT=1
+            export DOCKER_ALIASES_NERD_FONT
+            source '$INIT'
+            _icon $icon" 2>/dev/null | wc -c | tr -d ' ')
+        assert_eq "icon '$icon' emits a glyph" "3" "$bytes"
+    done
+    # And it must be a real glyph, not the '*' every unknown name falls back to.
+    out=$("$CURRENT_SHELL" -c "
+        DOCKER_ALIASES_NERD_FONT=1
+        export DOCKER_ALIASES_NERD_FONT
+        source '$INIT'
+        _icon health" 2>/dev/null)
+    assert_lacks "health is not the unknown-icon fallback" "*" "$out"
+
     section "$CURRENT_SHELL — port compaction"
     # The whole reason dps1 / dpsp existed: this string is 76 characters wide.
     assert_eq "unpublished ports are dropped, published kept" \
