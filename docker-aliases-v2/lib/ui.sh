@@ -50,6 +50,7 @@ _icon() {
             services) printf '' ;;   # nf-fa-server
             flags)    printf '' ;;   # nf-fa-cog
             cmd)      printf '' ;;   # nf-fa-terminal
+            dir)      printf '' ;;   # nf-fa-folder
             volumes)  printf '' ;;   # nf-fa-trash
             warn)     printf '' ;;   # nf-fa-exclamation_triangle
             confirm)  printf '' ;;   # nf-fa-question_circle
@@ -66,6 +67,7 @@ _icon() {
             services) printf '[svc]' ;;
             flags)    printf '[flags]' ;;
             cmd)      printf '$' ;;
+            dir)      printf '[dir]' ;;
             volumes)  printf '[vol]' ;;
             warn)     printf '[!]' ;;
             confirm)  printf '[?]' ;;
