@@ -68,6 +68,45 @@ _DAV2_SVC_KEY=""
 _DAV2_SVC_VAL=""
 _DAV2_SVC_TS=0
 
+# _resolve_compose_files → one compose file per line
+#
+# The base file, plus its override sibling when there is one.
+#
+# This exists because of a trap worth stating plainly: `docker compose` merges
+# docker-compose.override.yml automatically, but ONLY when no -f is passed. The
+# moment you pass `-f docker-compose.yml`, the override is silently dropped —
+# and since every command here passes -f so the preview can name the file, the
+# override has to be added back explicitly or it disappears.
+#
+# The sibling is only added for the two standard base names. A file chosen by
+# hand (prod.yml, or DOCKER_COMPOSE_FILE pointing somewhere specific) is taken
+# at its word, exactly as docker would.
+_resolve_compose_files() {
+    local base
+    base=$(_get_compose_file) || return 1
+    printf '%s\n' "$base"
+
+    local dir="${base%/*}"
+    [[ "$dir" == "$base" ]] && dir="."
+    local stem="${base##*/}"
+    local candidate=""
+
+    case "$stem" in
+        docker-compose.yml)  candidate="$dir/docker-compose.override.yml" ;;
+        docker-compose.yaml) candidate="$dir/docker-compose.override.yaml" ;;
+        compose.yml)         candidate="$dir/compose.override.yml" ;;
+        compose.yaml)        candidate="$dir/compose.override.yaml" ;;
+    esac
+
+    if [[ -n "$candidate" && -f "$candidate" ]]; then
+        # Keep it relative when the base was relative, so the preview stays
+        # readable instead of printing an absolute path out of nowhere.
+        printf '%s\n' "${candidate#./}"
+    fi
+
+    return 0
+}
+
 # _get_compose_services [file...] → one service name per line
 #
 # Takes every compose file, not just the first: with layered files the merged
@@ -236,4 +275,36 @@ _split_commas() {
     done
     [[ -n "$rest" ]] && printf '%s\n' "$rest"
     return 0
+}
+
+# ---------------------------------------------------------------------------
+# Container lookups
+#
+# These reach across the whole host, not just the project in the current
+# directory — the point of dcd is jumping to a project you are NOT standing in.
+# ---------------------------------------------------------------------------
+
+# _list_containers → one container name per line, running AND stopped
+#
+# Stopped ones are included on purpose: `docker inspect` reads them fine, and a
+# project you want to jump to is quite often one that is currently down.
+_list_containers() {
+    local result
+    result=$(docker ps -a --format '{{.Names}}' 2>/dev/null) || return 1
+    [[ -z "$result" ]] && return 1
+    printf '%s\n' "$result" | LC_ALL=C sort
+}
+
+# _container_compose_info <name>... → five lines PER container, in this order:
+#   status, project, service, working_dir, config_files
+#
+# Takes every name in one call. docker inspect accepts a list and emits the
+# format once per container, in order, so N containers cost one round trip
+# instead of N.
+_container_compose_info() {
+    docker inspect "$@" --format '{{.State.Status}}
+{{index .Config.Labels "com.docker.compose.project"}}
+{{index .Config.Labels "com.docker.compose.service"}}
+{{index .Config.Labels "com.docker.compose.project.working_dir"}}
+{{index .Config.Labels "com.docker.compose.project.config_files"}}' 2>/dev/null
 }
