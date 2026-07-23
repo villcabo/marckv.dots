@@ -1,0 +1,25 @@
+# Two services share a prefix on purpose: 'api' matches both, which is exactly
+# the case dcx must refuse to guess at.
+name: dav2-fixture-multimatch
+
+networks:
+  appnet:
+    driver: bridge
+
+services:
+  api:
+    image: nginx:alpine
+    restart: unless-stopped
+    networks: [appnet]
+
+  api-worker:
+    image: redis:alpine
+    restart: unless-stopped
+    networks: [appnet]
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    networks: [appnet]
+    environment:
+      POSTGRES_PASSWORD: fixture

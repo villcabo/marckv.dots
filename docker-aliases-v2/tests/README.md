@@ -87,6 +87,7 @@ stay on this machine. **Docker Hub repositories are public by default.**
 | `detect-env/` | `DOCKER_COMPOSE_FILE=` inside `.env` pointing at `custom.yml` |
 | `spaces/` | A compose file literally named `my stack.yml` |
 | `volumes/` | Two named volumes — what `dcdown -v` destroys |
+| `multimatch/` | `api` and `api-worker` share a prefix — what `dcx` must refuse to guess |
 
 ## How the suite stays safe
 
@@ -105,7 +106,16 @@ inside a container act on the host's real containers.
 
 ## What is covered
 
-240 checks per shell, per distro.
+296 checks per shell, per distro.
+
+`dcx`:
+
+- Shell probe: `sh` fallback **and** the bash branch, both driven by the shim
+- An explicit command skips the probe
+- `dcx api ls -la` keeps `-la` for `ls` — the parse stops at the pattern
+- An ambiguous pattern lists the matches and exits 1 instead of picking one
+- `--no-tty` added when there is no terminal; `-u` / `-w` mapping
+- Completion switches from services to commands once the pattern is given
 
 `dcdown`:
 
@@ -147,6 +157,10 @@ inside a container act on the host's real containers.
 **Real `docker compose up`.** By design — the shim blocks it. Actually starting
 containers does not vary by distro or shell, so the matrix would add risk
 without adding signal.
+
+**Interactive TTY behavior.** The suite always runs without a terminal, so it
+can assert that `dcx` adds `--no-tty` when there is none — but that a real
+terminal gets a real TTY stays a manual check.
 
 **Interactive zsh TAB.** bash completion is tested for real: the suite sets
 `COMP_WORDS` / `COMP_CWORD` and reads `COMPREPLY`, exactly as bash does.

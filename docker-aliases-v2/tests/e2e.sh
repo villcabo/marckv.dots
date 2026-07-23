@@ -50,6 +50,14 @@ cat > "${WORK}/bin/docker" <<SHIM
 #   config → parses YAML, needs no daemon, so it answers for real.
 #   ps     → needs a daemon. There is none here, so it fails, which is exactly
 #            the "cannot reach the daemon" path dcdown has to handle.
+#
+# dcx probes the container for bash before opening a shell. There is no real
+# container here, so the answer is driven by DAV2_FAKE_BASH — which lets the
+# suite exercise BOTH the bash branch and the sh fallback.
+case "\$*" in
+    *"command -v bash"*)
+        [ "\${DAV2_FAKE_BASH:-0}" = "1" ] && exit 0 || exit 1 ;;
+esac
 for a in "\$@"; do
     case "\$a" in
         config|ps) exec "${REAL_DOCKER}" "\$@" ;;
@@ -329,9 +337,109 @@ run_suite() {
 
     run_dclt_checks "$F"
     run_dcdown_checks "$F"
+    run_dcx_checks "$F"
 
     section "$CURRENT_SHELL — completion"
     run_completion_checks "$F"
+}
+
+# ---------------------------------------------------------------------------
+# dcx
+# ---------------------------------------------------------------------------
+
+# dcx_argv <dir> <args...> → argv only
+dcx_argv() {
+    local dir="$1"; shift
+    "$CURRENT_SHELL" -c "
+        cd '$dir' || exit 99
+        source '$INIT'
+        dcx $*
+    " 2>/dev/null | strip_ansi | grep '^ARGV:'
+}
+
+# dcx_argv_bash <dir> <args...> → same, pretending the image ships bash
+dcx_argv_bash() {
+    local dir="$1"; shift
+    "$CURRENT_SHELL" -c "
+        cd '$dir' || exit 99
+        export DAV2_FAKE_BASH=1
+        source '$INIT'
+        dcx $*
+    " 2>/dev/null | strip_ansi | grep '^ARGV:'
+}
+
+dcx_err() {
+    local dir="$1"; shift
+    "$CURRENT_SHELL" -c "
+        cd '$dir' || exit 99
+        source '$INIT'
+        dcx $*
+    " 2>&1 >/dev/null | strip_ansi
+}
+
+dcx_rc() {
+    local dir="$1"; shift
+    "$CURRENT_SHELL" -c "
+        cd '$dir' || exit 99
+        source '$INIT'
+        dcx $*
+    " >/dev/null 2>&1
+    printf '%s' "$?"
+}
+
+run_dcx_checks() {
+    local F="$1" out
+
+    section "$CURRENT_SHELL — dcx help"
+    out=$(in_shell "$F/multimatch" 'dcx --help')
+    assert_has "help shows USAGE"                  "USAGE"          "$out"
+    assert_has "help explains the shell fallback"  "falling back"   "$out"
+    assert_has "help warns flags precede pattern"  "BEFORE"         "$out"
+
+    section "$CURRENT_SHELL — dcx shell selection"
+    # The daily tax this command exists to remove: alpine has no bash.
+    assert_has "no bash in the image falls back to sh" \
+        "[api] [sh]" "$(dcx_argv "$F/multimatch" "'^api\$'")"
+    assert_has "bash is used when the image has it" \
+        "[api] [bash]" "$(dcx_argv_bash "$F/multimatch" "'^api\$'")"
+    assert_lacks "an explicit command skips the probe entirely" \
+        "[sh]" "$(dcx_argv "$F/multimatch" "'^api\$'" ls)"
+
+    section "$CURRENT_SHELL — dcx argument handling"
+    # The parse must stop at the pattern, or -la is read as a dcx flag.
+    out=$(dcx_argv "$F/multimatch" "'^api\$'" ls -la /app)
+    assert_has "the command survives intact"        "[ls] [-la] [/app]" "$out"
+    assert_lacks "its flags are not eaten by dcx"   "unknown flag"      "$out"
+    assert_has "-u becomes --user" \
+        "[--user] [root]" "$(dcx_argv "$F/multimatch" -u root "'^api\$'")"
+    assert_has "-w becomes --workdir" \
+        "[--workdir] [/app]" "$(dcx_argv "$F/multimatch" -w /app "'^api\$'" npm test)"
+    # Non-interactive by definition here, so the TTY must be dropped.
+    assert_has "no TTY is requested when there is no terminal" \
+        "[--no-tty]" "$(dcx_argv "$F/multimatch" "'^api\$'")"
+
+    section "$CURRENT_SHELL — dcx refuses to guess"
+    out=$(dcx_err "$F/multimatch" api)
+    assert_has "says how many matched"        "matched 2 services" "$out"
+    assert_has "lists the ambiguous services" "api-worker"         "$out"
+    assert_has "suggests an anchored pattern" "^api"               "$out"
+    assert_eq  "an ambiguous pattern exits 1" "1" "$(dcx_rc "$F/multimatch" api)"
+    assert_has "an anchored pattern resolves it" \
+        "[api] [sh]" "$(dcx_argv "$F/multimatch" "'^api\$'")"
+
+    section "$CURRENT_SHELL — dcx errors"
+    assert_eq "no match exits 1"          "1" "$(dcx_rc "$F/multimatch" zzz)"
+    assert_eq "a missing pattern exits 1" "1" "$(dcx_rc "$F/multimatch")"
+    assert_eq "unknown flag exits 1"      "1" "$(dcx_rc "$F/multimatch" -Z api)"
+    assert_eq "-u without value exits 1"  "1" "$(dcx_rc "$F/multimatch" -u)"
+    out=$(dcx_err "$F/multimatch")
+    assert_has "explains that a pattern is required" "pattern is required" "$out"
+
+    section "$CURRENT_SHELL — dcx preview"
+    out=$(dcx_err "$F/multimatch" "'^api\$'")
+    assert_has "preview names the action"   "compose exec" "$out"
+    assert_has "preview names the service"  "api"          "$out"
+    assert_lacks "it never asks to confirm" "[yes/N]"      "$out"
 }
 
 # ---------------------------------------------------------------------------
@@ -589,6 +697,28 @@ run_completion_checks() {
             printf '%s\n' \"\${COMPREPLY[@]}\"" 2>&1)
         assert_has "bash: dcdown offers -v" "-v" "$out"
         assert_has "bash: dcdown offers -O" "-O" "$out"
+
+        out=$(cd "$F/multimatch" && bash -c "
+            source '$INIT'
+            COMP_WORDS=(dcx ''); COMP_CWORD=1
+            _dcx_complete_bash
+            printf '%s\n' \"\${COMPREPLY[@]}\"" 2>&1)
+        assert_has "bash: dcx completes services first" "api-worker" "$out"
+
+        out=$(cd "$F/multimatch" && bash -c "
+            source '$INIT'
+            COMP_WORDS=(dcx api ''); COMP_CWORD=2
+            _dcx_complete_bash
+            printf '%s\n' \"\${COMPREPLY[@]}\"" 2>&1)
+        assert_has "bash: after the pattern it offers commands" "bash" "$out"
+        assert_lacks "after the pattern it stops offering services" "api-worker" "$out"
+
+        out=$(cd "$F/multimatch" && bash -c "
+            source '$INIT'
+            COMP_WORDS=(dcx -u ''); COMP_CWORD=2
+            _dcx_complete_bash
+            printf '%s\n' \"\${COMPREPLY[@]}\"" 2>&1)
+        assert_has "bash: -u suggests root" "root" "$out"
         return
     fi
 
@@ -676,6 +806,28 @@ run_completion_checks() {
         _dcdown_complete_zsh" 2>&1)
     assert_has "zsh: dcdown offers -v" "-v" "$out"
     assert_has "zsh: dcdown offers -O" "-O" "$out"
+
+    out=$(cd "$F/multimatch" && zsh -c "
+        source '$INIT'
+        $stub
+        words=(dcx ''); CURRENT=2
+        _dcx_complete_zsh" 2>&1)
+    assert_has "zsh: dcx completes services first" "api-worker" "$out"
+
+    out=$(cd "$F/multimatch" && zsh -c "
+        source '$INIT'
+        $stub
+        words=(dcx api ''); CURRENT=3
+        _dcx_complete_zsh" 2>&1)
+    assert_has "zsh: after the pattern it offers commands" "bash" "$out"
+    assert_lacks "after the pattern it stops offering services" "api-worker" "$out"
+
+    out=$(cd "$F/multimatch" && zsh -c "
+        source '$INIT'
+        $stub
+        words=(dcx -u ''); CURRENT=3
+        _dcx_complete_zsh" 2>&1)
+    assert_has "zsh: -u suggests root" "root" "$out"
 }
 
 # ---------------------------------------------------------------------------
