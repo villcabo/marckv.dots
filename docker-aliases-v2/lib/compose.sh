@@ -96,8 +96,12 @@ _get_compose_services() {
         args+=(-f "$file")
     done
 
+    # Sorted because `config --services` does NOT guarantee an order — the same
+    # file can come back as "api db worker" or "worker api db" on consecutive
+    # runs. Docker does not care about the order we pass services in, but a
+    # preview that reshuffles itself every run is one you stop trusting.
     local result
-    result=$(docker compose "${args[@]}" config --services 2>/dev/null) || return 1
+    result=$(docker compose "${args[@]}" config --services 2>/dev/null | LC_ALL=C sort) || return 1
     [[ -z "$result" ]] && return 1
 
     _DAV2_SVC_KEY="$key"
