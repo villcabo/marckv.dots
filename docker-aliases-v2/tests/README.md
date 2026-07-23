@@ -102,6 +102,10 @@ queries through to the real binary and captures everything else as
   containers, so `dcd`'s grouping is testable without a host full of projects.
 - The bash probe `dcx` makes is answered from `DAV2_FAKE_BASH`, so both the
   bash branch and the sh fallback get exercised.
+- `dps` and `dcps` get rows carrying deliberately messy real-world port
+  strings, so compaction is exercised through the command and not only in
+  isolation. `inspect` is matched BEFORE any format-based rule, since `dcd`
+  asks inspect for the compose project label and would otherwise be hijacked.
 
 So the suite asserts against the **exact argv** `dcup` would hand to docker,
 while being physically unable to start, stop or delete a container. That is
@@ -110,7 +114,15 @@ inside a container act on the host's real containers.
 
 ## What is covered
 
-370 checks per shell, per distro.
+430 checks per shell, per distro.
+
+`dps` / `dcps`:
+
+- Port compaction unit-tested directly: v4/v6 collapse, identical pairs, the
+  localhost mark, udp, exposed-only hidden then revealed with `-x`, and a port
+  published on IPv6 ONLY still surviving the dedupe
+- Rendered tables carry no `0.0.0.0:` or `/tcp` noise at all
+- Filters, counts, health colouring, and the empty case
 
 `dcd`:
 

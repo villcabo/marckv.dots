@@ -68,10 +68,13 @@ esac
 #   fx-api, fx-db  → one project, one directory   (several matches, NOT ambiguous)
 #   other-api      → a second project             (a pattern spanning both IS)
 #   plain-box      → no compose labels at all
-case "\$* " in
-    *"ps -a "*|*"--format {{.Names}}"*)
-        printf 'fx-api\nfx-db\nother-api\nplain-box\n'; exit 0 ;;
-esac
+#
+# dps and dcps ask for their own formats. Answered with rows that carry the
+# messy real-world port strings, so compaction is exercised through the command
+# and not only in isolation. Checked BEFORE the plain {{.Names}} case, which
+# would otherwise swallow dps's format too.
+# inspect is settled FIRST: dcd asks for the compose project LABEL, so a
+# format-based match below would hijack it.
 if [ "\$1" = "inspect" ]; then
     shift
     for c in "\$@"; do
@@ -86,6 +89,24 @@ if [ "\$1" = "inspect" ]; then
     done
     exit 0
 fi
+
+case "\$*" in
+    *"com.docker.compose.project"*)
+        printf 'fx-api\tfixture-proj\tUp 2 hours\t0.0.0.0:9080->9080/tcp, [::]:9080->9080/tcp\n'
+        printf 'fx-db\tfixture-proj\tUp 2 hours (healthy)\t5432/tcp\n'
+        printf 'other-api\tother-proj\tUp 1 hour\t0.0.0.0:3001->3000/tcp, [::]:3001->3000/tcp\n'
+        printf 'plain-box\t\tExited (0) 3 minutes ago\t\n'
+        exit 0 ;;
+    *"{{.Service}}"*)
+        printf 'api\tfx-api\tUp 2 hours\t127.0.0.1:8080->80/tcp\n'
+        printf 'db\tfx-db\tUp 2 hours (unhealthy)\t5432/tcp\n'
+        printf 'dns\tfx-dns\tUp 2 hours\t0.0.0.0:53->53/udp\n'
+        exit 0 ;;
+esac
+case "\$* " in
+    *"ps -a "*|*"--format {{.Names}}"*)
+        printf 'fx-api\nfx-db\nother-api\nplain-box\n'; exit 0 ;;
+esac
 for a in "\$@"; do
     case "\$a" in
         config|ps) exec "${REAL_DOCKER}" "\$@" ;;
@@ -386,6 +407,7 @@ run_suite() {
     run_dcdown_checks "$F"
     run_dcx_checks "$F"
     run_dcd_checks "$F"
+    run_ps_checks "$F"
 
     section "$CURRENT_SHELL — completion"
     run_completion_checks "$F"
@@ -752,6 +774,88 @@ run_dcd_checks() {
     out=$(dcd_err plain-box)
     assert_has "a non-compose container is explained" "docker compose" "$out"
     assert_eq  "and exits 1"              "1" "$(dcd_rc plain-box)"
+}
+
+# ---------------------------------------------------------------------------
+# dps / dcps
+# ---------------------------------------------------------------------------
+
+# ports <raw> [show_exposed] → the compacted rendering
+ports() {
+    "$CURRENT_SHELL" -c "
+        source '$INIT'
+        _compact_ports '$1' '${2:-false}'
+    " 2>/dev/null
+}
+
+ps_out() {
+    local dir="$1"; shift
+    "$CURRENT_SHELL" -c "
+        cd '$dir' || exit 99
+        source '$INIT'
+        $*
+    " 2>&1 | strip_ansi
+}
+
+run_ps_checks() {
+    local F="$1" out
+
+    section "$CURRENT_SHELL — port compaction"
+    # The whole reason dps1 / dpsp existed: this string is 76 characters wide.
+    assert_eq "unpublished ports are dropped, published kept" \
+        "9080 9443" \
+        "$(ports '8080/tcp, 8443/tcp, 0.0.0.0:9080->9080/tcp, 9000/tcp, 0.0.0.0:9443->9443/tcp')"
+    assert_eq "the v4/v6 pair collapses to one" \
+        "3001→3000" "$(ports '0.0.0.0:3001->3000/tcp, [::]:3001->3000/tcp')"
+    assert_eq "an identical host and container port shows once" \
+        "5432" "$(ports '0.0.0.0:5432->5432/tcp')"
+    assert_eq "a localhost binding is marked" \
+        "lo:8080→80" "$(ports '127.0.0.1:8080->80/tcp')"
+    assert_eq "a non-tcp protocol is kept" \
+        "53/udp" "$(ports '0.0.0.0:53->53/udp')"
+    assert_eq "exposed-only yields nothing by default" \
+        "" "$(ports '5432/tcp, 8080/tcp')"
+    assert_eq "and is marked with ~ when asked for" \
+        "~5432 ~8080" "$(ports '5432/tcp, 8080/tcp' true)"
+    # A port published on IPv6 only must not vanish with the dedupe.
+    assert_eq "an IPv6-only publish still appears" \
+        "3001→3000" "$(ports '[::]:3001->3000/tcp')"
+    assert_eq "empty in, empty out" "" "$(ports '')"
+
+    section "$CURRENT_SHELL — dps"
+    out=$(ps_out "$F/basic" dps)
+    assert_has "header names the scope"      "docker ps"    "$out"
+    assert_has "header counts the rows"      "4 of 4"       "$out"
+    assert_has "columns are labelled"        "PROJECT"      "$out"
+    assert_has "the project is shown"        "fixture-proj" "$out"
+    assert_has "ports arrive compacted"      "9080"         "$out"
+    assert_lacks "no raw docker port syntax" "0.0.0.0:"     "$out"
+    assert_lacks "no /tcp noise"             "/tcp"         "$out"
+    assert_has "a container with none shows a dash" "—"     "$out"
+    out=$(ps_out "$F/basic" dps -x)
+    assert_has "-x reveals the exposed ones" "~5432" "$out"
+    out=$(ps_out "$F/basic" dps fx)
+    assert_has "a pattern filters"           "2 of 4"    "$out"
+    assert_has "and says what it filtered on" "filter:"  "$out"
+    assert_lacks "excluding the rest"        "other-api" "$out"
+
+    section "$CURRENT_SHELL — dcps"
+    out=$(ps_out "$F/basic" dcps)
+    assert_has "header names the scope"     "compose ps" "$out"
+    assert_has "service comes first"        "SERVICE"    "$out"
+    assert_has "the localhost mark survives" "lo:8080→80" "$out"
+    assert_has "udp survives"                "53/udp"     "$out"
+    out=$(ps_out "$F/basic" dcps db)
+    assert_has "a pattern filters services" "1 of 3" "$out"
+
+    section "$CURRENT_SHELL — ps errors"
+    assert_eq "dps rejects an unknown flag"  "1" \
+        "$("$CURRENT_SHELL" -c "cd '$F/basic'; source '$INIT'; dps -Z" >/dev/null 2>&1; printf '%s' "$?")"
+    assert_eq "dcps rejects an unknown flag" "1" \
+        "$("$CURRENT_SHELL" -c "cd '$F/basic'; source '$INIT'; dcps -Z" >/dev/null 2>&1; printf '%s' "$?")"
+    out=$(ps_out "$F/basic" dps zzzz)
+    assert_has "no match still renders a table" "0 of 4"    "$out"
+    assert_has "and says so plainly"    "nothing to show"   "$out"
 }
 
 # ---------------------------------------------------------------------------
