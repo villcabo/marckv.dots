@@ -36,6 +36,10 @@ trap 'rm -rf "$WORK"' EXIT
 cp -r "${TESTS_DIR}/fixtures" "${WORK}/fixtures"
 mkdir -p "${WORK}/bin"
 
+# Destinations the shimmed containers claim to live in, so dcd has somewhere
+# real to cd into.
+mkdir -p "${WORK}/fake-project" "${WORK}/other-project"
+
 REAL_DOCKER="$(command -v docker || true)"
 if [[ -z "$REAL_DOCKER" ]]; then
     printf '%sdocker CLI not found in PATH — cannot run%s\n' "$C_BAD" "$C_OFF" >&2
@@ -58,6 +62,30 @@ case "\$*" in
     *"command -v bash"*)
         [ "\${DAV2_FAKE_BASH:-0}" = "1" ] && exit 0 || exit 1 ;;
 esac
+#
+# dcd reaches for the host's containers, which do not exist in here. The shim
+# invents a small, fixed world so the grouping logic is testable:
+#   fx-api, fx-db  → one project, one directory   (several matches, NOT ambiguous)
+#   other-api      → a second project             (a pattern spanning both IS)
+#   plain-box      → no compose labels at all
+case "\$* " in
+    *"ps -a "*|*"--format {{.Names}}"*)
+        printf 'fx-api\nfx-db\nother-api\nplain-box\n'; exit 0 ;;
+esac
+if [ "\$1" = "inspect" ]; then
+    shift
+    for c in "\$@"; do
+        case "\$c" in --format|*"{{"*) continue ;; esac
+        case "\$c" in
+            fx-api)    printf 'running\nfixture-proj\napi\n${WORK}/fake-project\n${WORK}/fake-project/docker-compose.yml,${WORK}/fake-project/docker-compose.override.yml\n' ;;
+            fx-db)     printf 'exited\nfixture-proj\ndb\n${WORK}/fake-project\n${WORK}/fake-project/docker-compose.yml,${WORK}/fake-project/docker-compose.override.yml\n' ;;
+            other-api) printf 'running\nother-proj\napi\n${WORK}/other-project\n${WORK}/other-project/docker-compose.yml\n' ;;
+            plain-box) printf 'running\n\n\n\n\n' ;;
+            *) exit 1 ;;
+        esac
+    done
+    exit 0
+fi
 for a in "\$@"; do
     case "\$a" in
         config|ps) exec "${REAL_DOCKER}" "\$@" ;;
@@ -335,9 +363,29 @@ run_suite() {
     out=$(in_shell "$F/profiles" '_get_compose_profiles')
     assert_has "profiles are discovered" "debug"  "$out"
 
+    section "$CURRENT_SHELL — override auto-detection"
+    # `docker compose` merges docker-compose.override.yml on its own, but ONLY
+    # when no -f is passed. Every command here passes -f so the preview can name
+    # the file, which silently dropped the override until this was fixed.
+    out=$(dcup_argv "$F/override")
+    assert_has "dcup takes the base file"     "[-f] [docker-compose.yml]"          "$out"
+    assert_has "dcup adds the override"       "[-f] [docker-compose.override.yml]" "$out"
+    out=$(dclt_argv "$F/override" -o)
+    assert_has "dclt adds the override too"   "[-f] [docker-compose.override.yml]" "$out"
+    out=$(dcdown_argv "$F/override")
+    assert_has "dcdown adds the override too" "[-f] [docker-compose.override.yml]" "$out"
+    # The service that only exists in the override is the real proof.
+    out=$(dcup_out "$F/override")
+    assert_has "the override-only service is visible" "sidecar" "$out"
+    # An explicitly chosen file is taken at its word, exactly as docker does.
+    out=$(dcup_argv "$F/multifile" -f base.yml)
+    assert_lacks "an explicit -f gets no sibling guessed for it" \
+        "docker-compose.override.yml" "$out"
+
     run_dclt_checks "$F"
     run_dcdown_checks "$F"
     run_dcx_checks "$F"
+    run_dcd_checks "$F"
 
     section "$CURRENT_SHELL — completion"
     run_completion_checks "$F"
@@ -607,6 +655,106 @@ run_dclt_checks() {
 }
 
 # ---------------------------------------------------------------------------
+# dcd
+# ---------------------------------------------------------------------------
+
+# dcd_out <args...> → stdout only (the path, in -p mode)
+dcd_out() {
+    "$CURRENT_SHELL" -c "
+        cd '$WORK' || exit 99
+        source '$INIT'
+        dcd $*
+    " 2>/dev/null
+}
+
+# dcd_err <args...> → stderr only (the details block)
+dcd_err() {
+    "$CURRENT_SHELL" -c "
+        cd '$WORK' || exit 99
+        source '$INIT'
+        dcd $*
+    " 2>&1 >/dev/null | strip_ansi
+}
+
+# dcd_pwd <args...> → where the shell ended up
+dcd_pwd() {
+    "$CURRENT_SHELL" -c "
+        cd '$WORK' || exit 99
+        source '$INIT'
+        dcd $* >/dev/null 2>&1
+        pwd
+    " 2>/dev/null
+}
+
+dcd_rc() {
+    "$CURRENT_SHELL" -c "
+        cd '$WORK' || exit 99
+        source '$INIT'
+        dcd $*
+    " >/dev/null 2>&1
+    printf '%s' "$?"
+}
+
+run_dcd_checks() {
+    local out
+
+    section "$CURRENT_SHELL — dcd help"
+    out=$("$CURRENT_SHELL" -c "source '$INIT'; dcd --help" 2>&1 | strip_ansi)
+    assert_has "help shows USAGE"                "USAGE"          "$out"
+    assert_has "help documents -p for scripting" "scripting"      "$out"
+    assert_has "help states env vars are hidden" "never shown"    "$out"
+
+    section "$CURRENT_SHELL — dcd jumping"
+    # Several containers of ONE project is the normal case, not an ambiguity.
+    assert_eq "many containers, one project, still jumps" \
+        "${WORK}/fake-project" "$(dcd_pwd fx)"
+    assert_eq "-p prints the path on stdout" \
+        "${WORK}/fake-project" "$(dcd_out -p fx)"
+    assert_eq "-p leaves the shell where it was" \
+        "${WORK}" "$(dcd_pwd -p fx)"
+    assert_eq "-i does not move either" \
+        "${WORK}" "$(dcd_pwd -i fx)"
+    assert_eq "an anchored pattern still works" \
+        "${WORK}/fake-project" "$(dcd_pwd "'^fx-api\$'")"
+
+    section "$CURRENT_SHELL — dcd details"
+    out=$(dcd_err -i fx)
+    assert_has "names the project"              "fixture-proj"  "$out"
+    assert_has "counts what is running"         "1/2 running"   "$out"
+    assert_has "lists the services"             "db"            "$out"
+    assert_has "shows the compose file"         "docker-compose.yml"          "$out"
+    assert_has "shows the override too"         "docker-compose.override.yml" "$out"
+    assert_has "shows the directory"            "fake-project"  "$out"
+    # Compose files are stored absolute; showing them relative to the project
+    # keeps the block readable.
+    assert_lacks "paths are not repeated in full" \
+        "${WORK}/fake-project/docker-compose.yml" "$out"
+
+    section "$CURRENT_SHELL — dcd privacy"
+    # docker inspect hands over environment variables freely. dcd must not.
+    out=$(dcd_err -i fx)
+    assert_lacks "no environment section" "Env"      "$out"
+    assert_lacks "no variable assignments" "PASSWORD" "$out"
+
+    section "$CURRENT_SHELL — dcd refuses to guess"
+    out=$(dcd_err api)
+    assert_has "says how many projects it spans" "spans 2 projects" "$out"
+    assert_has "names the first project"         "fixture-proj"     "$out"
+    assert_has "names the second project"        "other-proj"       "$out"
+    assert_eq  "spanning two projects exits 1"   "1" "$(dcd_rc api)"
+    assert_eq  "and does not move the shell"     "${WORK}" "$(dcd_pwd api)"
+
+    section "$CURRENT_SHELL — dcd errors"
+    assert_eq "no match exits 1"          "1" "$(dcd_rc zzz)"
+    assert_eq "a missing pattern exits 1" "1" "$(dcd_rc)"
+    assert_eq "unknown flag exits 1"      "1" "$(dcd_rc -Z fx)"
+    assert_eq "two patterns exit 1"       "1" "$(dcd_rc fx other)"
+    out=$(dcd_err plain-box)
+    assert_has "a non-compose container is explained" "docker compose" "$out"
+    assert_eq  "and exits 1"              "1" "$(dcd_rc plain-box)"
+}
+
+# ---------------------------------------------------------------------------
 # Completion
 #
 # bash: the real completion function is invoked exactly as bash would invoke
@@ -719,6 +867,21 @@ run_completion_checks() {
             _dcx_complete_bash
             printf '%s\n' \"\${COMPREPLY[@]}\"" 2>&1)
         assert_has "bash: -u suggests root" "root" "$out"
+
+        out=$(cd "$WORK" && bash -c "
+            source '$INIT'
+            COMP_WORDS=(dcd ''); COMP_CWORD=1
+            _dcd_complete_bash
+            printf '%s\n' \"\${COMPREPLY[@]}\"" 2>&1)
+        assert_has "bash: dcd completes containers host-wide" "other-api" "$out"
+
+        out=$(cd "$WORK" && bash -c "
+            source '$INIT'
+            COMP_WORDS=(dcd '-'); COMP_CWORD=1
+            _dcd_complete_bash
+            printf '%s\n' \"\${COMPREPLY[@]}\"" 2>&1)
+        assert_has "bash: dcd offers -p" "-p" "$out"
+        assert_has "bash: dcd offers -i" "-i" "$out"
         return
     fi
 
@@ -828,6 +991,21 @@ run_completion_checks() {
         words=(dcx -u ''); CURRENT=3
         _dcx_complete_zsh" 2>&1)
     assert_has "zsh: -u suggests root" "root" "$out"
+
+    out=$(cd "$WORK" && zsh -c "
+        source '$INIT'
+        $stub
+        words=(dcd ''); CURRENT=2
+        _dcd_complete_zsh" 2>&1)
+    assert_has "zsh: dcd completes containers host-wide" "other-api" "$out"
+
+    out=$(cd "$WORK" && zsh -c "
+        source '$INIT'
+        $stub
+        words=(dcd '-'); CURRENT=2
+        _dcd_complete_zsh" 2>&1)
+    assert_has "zsh: dcd offers -p" "-p" "$out"
+    assert_has "zsh: dcd offers -i" "-i" "$out"
 }
 
 # ---------------------------------------------------------------------------

@@ -98,6 +98,10 @@ queries through to the real binary and captures everything else as
 - `config` parses YAML and needs no daemon, so it answers for real.
 - `ps` does need one. There is none here, so it fails — which is exactly the
   "cannot reach the daemon" path `dcdown` has to handle.
+- `ps -a` and `inspect` are answered from a small invented world of four
+  containers, so `dcd`'s grouping is testable without a host full of projects.
+- The bash probe `dcx` makes is answered from `DAV2_FAKE_BASH`, so both the
+  bash branch and the sh fallback get exercised.
 
 So the suite asserts against the **exact argv** `dcup` would hand to docker,
 while being physically unable to start, stop or delete a container. That is
@@ -106,7 +110,17 @@ inside a container act on the host's real containers.
 
 ## What is covered
 
-296 checks per shell, per distro.
+370 checks per shell, per distro.
+
+`dcd`:
+
+- Several containers of one project still jump — the destination is what can be
+  ambiguous, not the container
+- A pattern spanning two projects lists both and exits 1
+- `-p` prints the path and leaves the shell put; `-i` shows details and stays
+- The details block never contains environment variables
+- Stopped containers are searched too
+- A container with no compose labels is explained, not silently skipped
 
 `dcx`:
 

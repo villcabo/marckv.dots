@@ -1,0 +1,13 @@
+# Base file. Docker Compose merges docker-compose.override.yml automatically —
+# but only when no -f is passed, which is why the commands must add it back.
+name: dav2-fixture-override
+
+networks:
+  appnet:
+    driver: bridge
+
+services:
+  api:
+    image: nginx:alpine
+    restart: unless-stopped
+    networks: [appnet]
