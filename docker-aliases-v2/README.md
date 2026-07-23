@@ -49,19 +49,24 @@ docker-aliases-v2/
 │   ├── dclt.sh
 │   ├── dcdown.sh
 │   ├── dcx.sh
-│   └── dcd.sh
+│   ├── dcd.sh
+│   ├── dps.sh
+│   └── dcps.sh
 ├── completions/         one pair per command
 │   ├── dcup.bash / dcup.zsh
 │   ├── dclt.bash / dclt.zsh
 │   ├── dcdown.bash / dcdown.zsh
 │   ├── dcx.bash / dcx.zsh
-│   └── dcd.bash / dcd.zsh
+│   ├── dcd.bash / dcd.zsh
+│   ├── dps.bash / dps.zsh
+│   └── dcps.bash / dcps.zsh
 ├── docs/                one page per command
 │   ├── dcup.md
 │   ├── dclt.md
 │   ├── dcdown.md
 │   ├── dcx.md
-│   └── dcd.md
+│   ├── dcd.md
+│   └── dps.md          (dcps.md links here)
 └── tests/               e2e across 7 distros and both shells
 ```
 
@@ -78,6 +83,8 @@ the running shell, so it never needs editing.
 | `dcdown` | Stop and remove services | [docs/dcdown.md](docs/dcdown.md) |
 | `dcx` | Run a command or open a shell in a service | [docs/dcx.md](docs/dcx.md) |
 | `dcd` | Jump to a container's compose project directory | [docs/dcd.md](docs/dcd.md) |
+| `dps` | List containers on this host | [docs/dps.md](docs/dps.md) |
+| `dcps` | List this project's services | [docs/dps.md](docs/dps.md) |
 
 ## Testing
 
@@ -88,7 +95,7 @@ docker compose build && docker compose up -d
 docker compose exec ubuntu24 zsh      # poke around by hand
 ```
 
-370 checks per shell across 7 distros — Debian 11/12/13 and Ubuntu
+430 checks per shell across 7 distros — Debian 11/12/13 and Ubuntu
 20.04/22.04/24.04/26.04, covering bash 5.0→5.3 and zsh 5.8→5.9. The suite is
 hermetic: `docker` is shimmed, so it asserts on the exact argv each command
 would run while being unable to touch a real container.
@@ -128,6 +135,16 @@ too cheap.
 
 **No `-y` flag.** `DOCKER_ALIASES_AUTO_YES=1` exists for tests and CI only. An
 env var is much harder to fire by accident than a mistyped flag.
+
+**Variants are a smell.** v1 had `dps`, `dps1` and `dpsp` — three commands
+because the ports column overflowed the row. Nobody wanted three views; they
+wanted one that fit. When a command sprouts variants, fix what made them
+necessary and the variants delete themselves.
+
+**Shorten visibly, never invisibly.** When a value must be cut to fit, the cut
+is shown (`cross-border-st…support-1`). Silently dropping a redundant prefix
+would read better and would produce a name that looks real, is not, and fails
+when pasted into `docker exec`.
 
 **Secrets are never printed.** `docker inspect` hands over environment
 variables freely, and in a real project those are database passwords and API
