@@ -47,15 +47,18 @@ docker-aliases-v2/
 ├── commands/            one file per command
 │   ├── dcup.sh
 │   ├── dclt.sh
-│   └── dcdown.sh
+│   ├── dcdown.sh
+│   └── dcx.sh
 ├── completions/         one pair per command
 │   ├── dcup.bash / dcup.zsh
 │   ├── dclt.bash / dclt.zsh
-│   └── dcdown.bash / dcdown.zsh
+│   ├── dcdown.bash / dcdown.zsh
+│   └── dcx.bash / dcx.zsh
 ├── docs/                one page per command
 │   ├── dcup.md
 │   ├── dclt.md
-│   └── dcdown.md
+│   ├── dcdown.md
+│   └── dcx.md
 └── tests/               e2e across 7 distros and both shells
 ```
 
@@ -70,6 +73,7 @@ the running shell, so it never needs editing.
 | `dcup` | Bring compose services up | [docs/dcup.md](docs/dcup.md) |
 | `dclt` | Tail logs for services matched by regex | [docs/dclt.md](docs/dclt.md) |
 | `dcdown` | Stop and remove services | [docs/dcdown.md](docs/dcdown.md) |
+| `dcx` | Run a command or open a shell in a service | [docs/dcx.md](docs/dcx.md) |
 
 ## Testing
 
@@ -80,7 +84,7 @@ docker compose build && docker compose up -d
 docker compose exec ubuntu24 zsh      # poke around by hand
 ```
 
-240 checks per shell across 7 distros — Debian 11/12/13 and Ubuntu
+296 checks per shell across 7 distros — Debian 11/12/13 and Ubuntu
 20.04/22.04/24.04/26.04, covering bash 5.0→5.3 and zsh 5.8→5.9. The suite is
 hermetic: `docker` is shimmed, so it asserts on the exact argv each command
 would run while being unable to touch a real container.
@@ -120,6 +124,10 @@ too cheap.
 
 **No `-y` flag.** `DOCKER_ALIASES_AUTO_YES=1` exists for tests and CI only. An
 env var is much harder to fire by accident than a mistyped flag.
+
+**Guessing is not a feature.** When a pattern is ambiguous and the command can
+only act on one thing, `dcx` lists the matches and stops. Silently taking the
+first is how you end up typing into the wrong container — and not noticing.
 
 **Flags mean the same thing everywhere.** `-f` is the compose file in every
 command — never "follow". `-e` is the env file, `-P` the profile. A letter is
