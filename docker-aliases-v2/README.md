@@ -95,7 +95,7 @@ docker compose build && docker compose up -d
 docker compose exec ubuntu24 zsh      # poke around by hand
 ```
 
-474 checks per shell across 7 distros — Debian 11/12/13 and Ubuntu
+496 checks per shell across 7 distros — Debian 11/12/13 and Ubuntu
 20.04/22.04/24.04/26.04, covering bash 5.0→5.3 and zsh 5.8→5.9. The suite is
 hermetic: `docker` is shimmed, so it asserts on the exact argv each command
 would run while being unable to touch a real container.
@@ -163,6 +163,11 @@ command — never "follow". `-e` is the env file, `-P` the profile. A letter is
 never reused for a second meaning: `-o` is *once* in `dclt`, so `dcdown` spells
 orphans `-O`, and anything that would collide is long-form only.
 
+**A test that cannot fail is not a test.** The suite runs with
+`DOCKER_ALIASES_NERD_FONT=0`, so for a long time it never executed the Nerd Font
+branch at all — and that branch shipped completely broken behind a wall of green
+checks. Whenever a mode exists, something has to exercise it.
+
 **bash and zsh, equally.** Every command is verified in both. The traps that
 already bit us, kept here so they don't bite twice:
 
@@ -180,6 +185,10 @@ already bit us, kept here so they don't bite twice:
   character. Quote the literal part — `${s%%" ("*}`.
 - Indirect array expansion has no portable form: `${!v[@]}` in bash, `${(P)v}`
   in zsh. Pass rows as delimited text instead of arrays by name.
+- Nerd Font glyphs live in the Private Use Area and do **not** survive every
+  editor or transfer — write them as `\uXXXX` escapes, never as literal
+  characters. This file once shipped with every glyph silently emptied, and a
+  blank icon is indistinguishable from one the terminal cannot draw.
 
 ## Environment variables
 

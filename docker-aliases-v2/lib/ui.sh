@@ -40,23 +40,32 @@ _use_nerd_font() {
 }
 
 # _icon <name> → glyph on stdout
+#
+# Codepoints are written as \u escapes, never as literal glyphs. Nerd Font
+# icons live in the Unicode Private Use Area, and PUA characters do not survive
+# every editor, transfer or encoding step — the first version of this file
+# reached disk with every glyph silently replaced by an empty string, so every
+# icon rendered as a blank space and nobody could tell the difference between
+# "no icon" and "icon that failed". An escape sequence is plain ASCII and
+# cannot be lost that way.
 _icon() {
     if _use_nerd_font; then
         case "$1" in
-            docker)   printf '' ;;   # nf-linux-docker
-            file)     printf '' ;;   # nf-fa-file_text
-            env)      printf '' ;;   # nf-fa-sliders
-            profile)  printf '' ;;   # nf-fa-tag
-            services) printf '' ;;   # nf-fa-server
-            flags)    printf '' ;;   # nf-fa-cog
-            cmd)      printf '' ;;   # nf-fa-terminal
-            dir)      printf '' ;;   # nf-fa-folder
-            health|health_bad|health_wait) printf '' ;;   # nf-fa-heartbeat
-            volumes)  printf '' ;;   # nf-fa-trash
-            warn)     printf '' ;;   # nf-fa-exclamation_triangle
-            confirm)  printf '' ;;   # nf-fa-question_circle
-            check)    printf '' ;;
-            cross)    printf '' ;;
+            docker)   printf '' ;;   # nf-linux-docker
+            file)     printf '' ;;   # nf-fa-file_text
+            env)      printf '' ;;   # nf-fa-sliders
+            profile)  printf '' ;;   # nf-fa-tag
+            services) printf '' ;;   # nf-fa-server
+            flags)    printf '' ;;   # nf-fa-cog
+            cmd)      printf '' ;;   # nf-fa-terminal
+            dir)      printf '' ;;   # nf-fa-folder
+            volumes)  printf '' ;;   # nf-fa-trash
+            warn)     printf '' ;;   # nf-fa-exclamation_triangle
+            confirm)  printf '' ;;   # nf-fa-question_circle
+            check)    printf '' ;;   # nf-fa-check
+            cross)    printf '' ;;   # nf-fa-times
+            health|health_bad|health_wait)
+                      printf '' ;;   # nf-fa-heartbeat
             *)        printf '*' ;;
         esac
     else
@@ -69,14 +78,14 @@ _icon() {
             flags)    printf '[flags]' ;;
             cmd)      printf '$' ;;
             dir)      printf '[dir]' ;;
-            health)      printf '+' ;;
-            health_bad)  printf '!' ;;
-            health_wait) printf '~' ;;
             volumes)  printf '[vol]' ;;
             warn)     printf '[!]' ;;
             confirm)  printf '[?]' ;;
             check)    printf 'OK' ;;
             cross)    printf 'X' ;;
+            health)      printf '+' ;;
+            health_bad)  printf '!' ;;
+            health_wait) printf '~' ;;
             *)        printf '*' ;;
         esac
     fi
