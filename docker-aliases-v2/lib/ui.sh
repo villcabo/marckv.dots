@@ -135,6 +135,10 @@ _hr() {
 # The command line is not a reconstruction: callers build one command, execute
 # that exact command, and pass a colored rendering of it here. What you read is
 # what runs.
+#
+# Everything here goes to stderr. The preview is UI, not data — a command whose
+# output you pipe (`dclt -o api | grep error`) must not have its preview land
+# in the pipe.
 # ---------------------------------------------------------------------------
 
 _render_preview() {
@@ -147,23 +151,25 @@ _render_preview() {
     local action_color
     action_color=$(_action_color "${action##* }")   # "up" from "compose up"
 
-    printf "  %s ${action_color}${CB}%s${CR}\n" "$(_icon docker)" "$action"
+    {
+        printf "  %s ${action_color}${CB}%s${CR}\n" "$(_icon docker)" "$action"
 
-    # Read line by line instead of relying on word splitting: zsh does not
-    # split unquoted parameters the way bash does, and this also survives
-    # paths containing spaces.
-    if [[ -n "$files" ]]; then
-        local f
-        while IFS= read -r f; do
-            [[ -n "$f" ]] && printf "  %s ${CWH}%s${CR}\n" "$(_icon file)" "$f"
-        done <<< "$files"
-    fi
+        # Read line by line instead of relying on word splitting: zsh does not
+        # split unquoted parameters the way bash does, and this also survives
+        # paths containing spaces.
+        if [[ -n "$files" ]]; then
+            local f
+            while IFS= read -r f; do
+                [[ -n "$f" ]] && printf "  %s ${CWH}%s${CR}\n" "$(_icon file)" "$f"
+            done <<< "$files"
+        fi
 
-    [[ -n "$services" ]] && printf "  %s ${CMA}%s${CR}\n" "$(_icon services)" "$services"
-    [[ -n "$flags" ]]    && printf "  %s ${CYE}%s${CR}\n" "$(_icon flags)" "$flags"
-    [[ -n "$command_display" ]] && printf "  %s %b${CR}\n" "$(_icon cmd)" "$command_display"
+        [[ -n "$services" ]] && printf "  %s ${CMA}%s${CR}\n" "$(_icon services)" "$services"
+        [[ -n "$flags" ]]    && printf "  %s ${CYE}%s${CR}\n" "$(_icon flags)" "$flags"
+        [[ -n "$command_display" ]] && printf "  %s %b${CR}\n" "$(_icon cmd)" "$command_display"
 
-    _hr
+        _hr
+    } >&2
 }
 
 # ---------------------------------------------------------------------------
@@ -183,7 +189,7 @@ _confirm_operation() {
         return 0
     fi
 
-    printf "  %s ${color}${CB}%s${CR} ${CDIM}[yes/N]${CR} " "$(_icon confirm)" "$message"
+    printf "  %s ${color}${CB}%s${CR} ${CDIM}[yes/N]${CR} " "$(_icon confirm)" "$message" >&2
     local response
     read -r response
     [[ "$response" == "yes" || "$response" == "YES" || "$response" == "Yes" ]]
