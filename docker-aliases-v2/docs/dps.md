@@ -58,27 +58,48 @@ Patterns are regular expressions — container names for `dps`, service names fo
 
 ```
    docker ps  ·  3 of 17  ·  filter: redmine
-  NAME               ID            IMAGE                     STATUS   CREATED  PORTS
-  redmine            7af3f67656e7  redmine-custom:6.1.2      Up 5h    3w       3001→3000
-  redmine-db-backup  74a0260254eb  prodrigesti…local:latest  Up 5h ✓  3w       —
-  redmine-postgres   50debfb8b76b  postgres:18-alpine        Up 5h ✓  3w       —
+  CONTAINER ID  IMAGE                                        CREATED  STATUS  PORTS      NAMES
+  7af3f67656e7  redmine-custom:6.1.2                         3w       Up 5h   3001→3000  redmine
+  74a0260254eb  prodrigestivill/postgres-backup-local:latest 3w       Up 5h   —          redmine-db-backup
+  50debfb8b76b  postgres:18-alpine                           3w       Up 5h   —          redmine-postgres
 ```
 
 ```
    compose ps  ·  3 of 3
-  SERVICE   ID            IMAGE                     STATUS   CREATED  PORTS
-  redmine   7af3f67656e7  redmine-custom:6.1.2      Up 5h    3w       3001→3000
-  backup    74a0260254eb  prodrigesti…local:latest  Up 5h ✓  3w       —
-  postgres  50debfb8b76b  postgres:18-alpine        Up 5h ✓  3w       —
+  CONTAINER ID  IMAGE                                        CREATED  STATUS  PORTS      SERVICE
+  7af3f67656e7  redmine-custom:6.1.2                         3w       Up 5h   3001→3000  redmine
+  74a0260254eb  prodrigestivill/postgres-backup-local:latest 3w       Up 5h   —          backup
+  50debfb8b76b  postgres:18-alpine                           3w       Up 5h   —          postgres
 ```
 
-`dcps` leads with SERVICE because inside a project that is the name you type
-into `dclt`, `dcx` and `dcup`. It drops the container NAME column: the ID
-already identifies the container exactly, and both would not fit.
+## The column order is `docker ps`'s
 
-There is no PROJECT column. Seven pieces of information do not fit in one row,
-and the project is one command away — [`dcd`](dcd.md) takes you to it, and
-`dcps` shows you what is inside it.
+`CONTAINER ID · IMAGE · CREATED · STATUS · PORTS · NAMES` — the same sequence
+docker uses, minus COMMAND. Muscle memory is worth more than any ordering we
+could invent, and the identifier belongs last because that is where you have
+learned to look for it.
+
+`dcps` uses the same order with SERVICE in the last slot: inside a project that
+is the name you type into `dclt`, `dcx` and `dcup`. Its container NAME column is
+dropped — the ID already identifies the container exactly.
+
+There is no PROJECT column. Seven columns do not fit in one row, and the project
+is one command away: [`dcd`](dcd.md) takes you to it.
+
+## Nothing is truncated
+
+The image is shown **whole**. A tag is what tells you which build is running,
+and `…support:v1.0.0` does not — so `cr.sintesis.com.bo/crossborder-dev/crossborder-support:v1.0.0`
+appears in full, all sixty-one characters of it.
+
+Names are whole too, and that one is free: the identifier is the **last**
+column, and a last column needs no padding, so it can run as long as it likes
+without pushing anything out of alignment.
+
+The cost is honest — one long image widens that column for every row, exactly
+as it does in `docker ps`. This table still comes out far narrower than
+`docker ps` does, because the ports and the status are compacted and COMMAND is
+gone entirely.
 
 ## STATUS and CREATED are not the same thing
 
@@ -101,11 +122,16 @@ prints twice.
 
 | docker | here |
 |---|---|
-| `Up 5 hours (healthy)` | `Up 5h ✓` |
-| `Up 2 minutes (unhealthy)` | `Up 2m ✗` |
+| `Up 5 hours (healthy)` | `Up 5h ` |
+| `Up 2 minutes (unhealthy)` | `Up 2m ` *(in red)* |
 | `Exited (137) 3 minutes ago` | `Exit 137 · 3m` |
 
-Health becomes a glyph. **The exit code is kept**: `Exited (137)` is an
+Health becomes a heartbeat glyph — the **same** glyph in all three states, with
+the colour saying which: green healthy, red unhealthy, yellow starting.
+
+Without a Nerd Font the three states get distinct characters instead
+(`+` `!` `~`). That asymmetry is deliberate: ASCII mode is the degraded path,
+and whoever lost the font may have lost the colour too. **The exit code is kept**: `Exited (137)` is an
 out-of-memory kill and `Exited (0)` is a clean stop, and collapsing both to
 "Exited" throws away the only part that says which one happened.
 

@@ -51,6 +51,7 @@ _icon() {
             flags)    printf '' ;;   # nf-fa-cog
             cmd)      printf '' ;;   # nf-fa-terminal
             dir)      printf '' ;;   # nf-fa-folder
+            health|health_bad|health_wait) printf '' ;;   # nf-fa-heartbeat
             volumes)  printf '' ;;   # nf-fa-trash
             warn)     printf '' ;;   # nf-fa-exclamation_triangle
             confirm)  printf '' ;;   # nf-fa-question_circle
@@ -68,6 +69,9 @@ _icon() {
             flags)    printf '[flags]' ;;
             cmd)      printf '$' ;;
             dir)      printf '[dir]' ;;
+            health)      printf '+' ;;
+            health_bad)  printf '!' ;;
+            health_wait) printf '~' ;;
             volumes)  printf '[vol]' ;;
             warn)     printf '[!]' ;;
             confirm)  printf '[?]' ;;
@@ -332,10 +336,14 @@ _short_duration() {
 _short_status() {
     local s="$1" mark="" rest
 
+    # One glyph for all three states — the COLOUR says which. That is why the
+    # ASCII fallback does not follow suit: it is the degraded path, and whoever
+    # lost the font may well have lost the colour too, so there it stays
+    # explicit (+ ! ~).
     case "$s" in
-        *"(healthy)"*)   mark=" ✓" ;;
-        *"(unhealthy)"*) mark=" ✗" ;;
-        *"(starting)"*)  mark=" …" ;;
+        *"(healthy)"*)   mark=" $(_icon health)" ;;
+        *"(unhealthy)"*) mark=" $(_icon health_bad)" ;;
+        *"(starting)"*)  mark=" $(_icon health_wait)" ;;
     esac
 
     case "$s" in
@@ -442,11 +450,11 @@ _render_container_table() {
     local h1="$5" h2="$6" h3="$7" h4="$8" h5="$9" h6="${10}"
     local rows="${11}"
 
-    # Caps, so one pathological value cannot stretch the table past the screen —
-    # the very thing compacting the ports was meant to fix. Columns still shrink
-    # below these when the content is short. The ID is not capped: it is a fixed
-    # 12 and every character of it is meant to be copied.
-    local cap1=24 cap3=24 cap4=18
+    # Nothing is capped any more. The column order follows `docker ps`, which
+    # puts the name LAST — and a last column needs no padding, so it can run as
+    # long as it likes without pushing anything out of line. The image is left
+    # whole on purpose: a tag is what tells you WHICH build is running, and
+    # "…support:v1.0.0" does not.
 
     local c1 c2 c3 c4 c5 c6
     local w1=${#h1} w2=${#h2} w3=${#h3} w4=${#h4} w5=${#h5}
@@ -460,9 +468,6 @@ _render_container_table() {
             (( ${#c4} > w4 )) && w4=${#c4}
             (( ${#c5} > w5 )) && w5=${#c5}
         done <<< "$rows"
-        (( w1 > cap1 )) && w1=$cap1
-        (( w3 > cap3 )) && w3=$cap3
-        (( w4 > cap4 )) && w4=$cap4
     fi
 
     # Scope line instead of a preview block: for a command whose whole output is
@@ -485,11 +490,9 @@ _render_container_table() {
     while IFS=$'\t' read -r c1 c2 c3 c4 c5 c6 || [[ -n "$c1" ]]; do
         [[ -z "$c1" ]] && continue
         scolor=$(_status_color "$c4")
-        printf "  ${CWH}%s${CR}  ${CDIM}%s${CR}  ${CCY}%s${CR}  ${scolor}%s${CR}  ${CDIM}%s${CR}  ${CGR}%s${CR}\n" \
-            "$(_pad_to "$(_ellipsize "$c1" "$w1")" "$w1")" \
-            "$(_pad_to "$c2" "$w2")" \
-            "$(_pad_to "$(_ellipsize "$c3" "$w3")" "$w3")" \
-            "$(_pad_to "$(_ellipsize "$c4" "$w4")" "$w4")" \
+        printf "  ${CDIM}%s${CR}  ${CCY}%s${CR}  ${CDIM}%s${CR}  ${scolor}%s${CR}  ${CGR}%s${CR}  ${CWH}%s${CR}\n" \
+            "$(_pad_to "$c1" "$w1")" "$(_pad_to "$c2" "$w2")" \
+            "$(_pad_to "$c3" "$w3")" "$(_pad_to "$c4" "$w4")" \
             "$(_pad_to "$c5" "$w5")" "$c6"
     done <<< "$rows"
 }

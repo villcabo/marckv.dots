@@ -133,13 +133,13 @@ dps() {
         else
             when=$(_short_duration "$since")
         fi
-        rows+="${rows:+$nl}${name}	${cid}	${image}	$(_short_status "$cstatus")	${when}	${compacted:-—}"
+        rows+="${rows:+$nl}${cid}	${image}	${when}	$(_short_status "$cstatus")	${compacted:-—}	${name}"
         shown=$(( shown + 1 ))
     done <<< "$raw"
 
     # --- render -------------------------------------------------------------
     _render_container_table "docker ps" "$shown" "$total" "${patterns[*]}" \
-        "NAME" "ID" "IMAGE" "STATUS" "CREATED" "PORTS" "$rows"
+        "CONTAINER ID" "IMAGE" "CREATED" "STATUS" "PORTS" "NAMES" "$rows"
 }
 
 # Completion source: container names across the host.

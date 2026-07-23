@@ -95,7 +95,7 @@ docker compose build && docker compose up -d
 docker compose exec ubuntu24 zsh      # poke around by hand
 ```
 
-464 checks per shell across 7 distros — Debian 11/12/13 and Ubuntu
+474 checks per shell across 7 distros — Debian 11/12/13 and Ubuntu
 20.04/22.04/24.04/26.04, covering bash 5.0→5.3 and zsh 5.8→5.9. The suite is
 hermetic: `docker` is shimmed, so it asserts on the exact argv each command
 would run while being unable to touch a real container.
@@ -141,10 +141,13 @@ because the ports column overflowed the row. Nobody wanted three views; they
 wanted one that fit. When a command sprouts variants, fix what made them
 necessary and the variants delete themselves.
 
-**Shorten visibly, never invisibly.** When a value must be cut to fit, the cut
-is shown (`cross-border-st…support-1`). Silently dropping a redundant prefix
-would read better and would produce a name that looks real, is not, and fails
-when pasted into `docker exec`.
+**Shorten visibly, or not at all.** When a value must be cut, the cut is shown.
+Better still, arrange the table so nothing has to be: `dps` follows `docker ps`'s
+column order, which puts the identifier LAST — and a last column needs no
+padding, so images and names both stay whole.
+
+**Borrow the order people already know.** `dps` lays its columns out exactly as
+`docker ps` does. Muscle memory beats any ordering we could invent.
 
 **Secrets are never printed.** `docker inspect` hands over environment
 variables freely, and in a real project those are database passwords and API

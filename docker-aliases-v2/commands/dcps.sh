@@ -164,13 +164,13 @@ dcps() {
         else
             when=$(_short_duration "$since")
         fi
-        rows+="${rows:+$nl}${service}	${cid}	${image}	$(_short_status "$cstatus")	${when}	${compacted:-—}"
+        rows+="${rows:+$nl}${cid}	${image}	${when}	$(_short_status "$cstatus")	${compacted:-—}	${service}"
         shown=$(( shown + 1 ))
     done <<< "$raw"
 
     # --- render -------------------------------------------------------------
     _render_container_table "compose ps" "$shown" "$total" "${patterns[*]}" \
-        "SERVICE" "ID" "IMAGE" "STATUS" "CREATED" "PORTS" "$rows"
+        "CONTAINER ID" "IMAGE" "CREATED" "STATUS" "PORTS" "SERVICE" "$rows"
 }
 
 # Completion source: service names of the current project.
