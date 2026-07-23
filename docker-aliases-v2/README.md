@@ -61,6 +61,7 @@ page in `docs/`. `init.sh` picks up `commands/*.sh` automatically.
 | Command | Does | Docs |
 |---|---|---|
 | `dcup` | Bring compose services up | [docs/dcup.md](docs/dcup.md) |
+| `dclt` | Tail logs for services matched by regex | [docs/dclt.md](docs/dclt.md) |
 
 ## Testing
 
@@ -83,13 +84,21 @@ See [tests/README.md](tests/README.md) — including an honest account of what i
 
 Every command in v2 follows these. They are the reason v2 exists.
 
-**The preview is mandatory.** Any command that changes state renders what it is
-about to do and waits. No flag disables it.
+**The preview is mandatory.** Every command renders what it is about to do
+before doing it. No flag disables it.
 
 **The preview shows the real command.** Not a description of it, not a
 reconstruction — the actual command line. Commands build one command as an
 array, render those same pieces, and execute it. No `eval`, so quoting can
 never make the preview lie.
+
+**The preview goes to stderr.** It is UI, not data. A command whose output you
+pipe — `dclt -o api | grep error` — must not have its preview land in the pipe.
+
+**Confirmation follows the blast radius, not the habit.** A command that
+changes state (`dcup`) always confirms. A command that only reads (`dclt`)
+never does — making someone type `yes` to look at logs is friction with no
+payoff, and friction people learn to click through stops protecting anything.
 
 **Confirmation takes the full word `yes`.** A bare `y` is rejected. Plain Enter
 cancels. These commands recreate and restart running services; one keystroke is
@@ -97,6 +106,10 @@ too cheap.
 
 **No `-y` flag.** `DOCKER_ALIASES_AUTO_YES=1` exists for tests and CI only. An
 env var is much harder to fire by accident than a mistyped flag.
+
+**Flags mean the same thing everywhere.** `-f` is the compose file in every
+command — never "follow". `-e` is the env file, `-P` the profile. One
+convention, nothing to re-learn per command.
 
 **bash and zsh, equally.** Every command is verified in both. The traps that
 already bit us, kept here so they don't bite twice:

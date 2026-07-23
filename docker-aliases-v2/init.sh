@@ -49,10 +49,15 @@ unset _dav2_cmd
 # Completions
 # ---------------------------------------------------------------------------
 
-if [[ -n "${ZSH_VERSION:-}" ]]; then
-    [[ -f "${DOCKER_ALIASES_V2_DIR}/completions/dcup.zsh" ]] && \
-        . "${DOCKER_ALIASES_V2_DIR}/completions/dcup.zsh"
-elif [[ -n "${BASH_VERSION:-}" ]]; then
-    [[ -f "${DOCKER_ALIASES_V2_DIR}/completions/dcup.bash" ]] && \
-        . "${DOCKER_ALIASES_V2_DIR}/completions/dcup.bash"
+# Globbed like commands, so a new command only needs its files dropped in.
+_dav2_comp_ext=""
+[[ -n "${ZSH_VERSION:-}" ]]  && _dav2_comp_ext="zsh"
+[[ -n "${BASH_VERSION:-}" ]] && _dav2_comp_ext="bash"
+
+if [[ -n "$_dav2_comp_ext" ]]; then
+    for _dav2_comp in "${DOCKER_ALIASES_V2_DIR}"/completions/*."${_dav2_comp_ext}"; do
+        [[ -f "$_dav2_comp" ]] && . "$_dav2_comp"
+    done
+    unset _dav2_comp
 fi
+unset _dav2_comp_ext
