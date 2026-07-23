@@ -41,6 +41,7 @@ dcps [flags] [pattern...]      # the services of this project
 |---|---|:--:|:--:|
 | `-a` | Include stopped | ✓ | ✓ |
 | `-x` | Show exposed-but-unpublished ports, marked `~` | ✓ | ✓ |
+| `-t` | Exact creation date instead of how long ago | ✓ | ✓ |
 | `-f <file>` | Compose file | | ✓ |
 | `-e <file>` | Env file | | ✓ |
 | `-P <profile>` | Compose profile | | ✓ |
@@ -57,24 +58,56 @@ Patterns are regular expressions — container names for `dps`, service names fo
 
 ```
    docker ps  ·  3 of 17  ·  filter: redmine
-  NAME               PROJECT         STATUS                PORTS
-  redmine            redmine-docker  Up 4 hours            3001→3000
-  redmine-db-backup  redmine-docker  Up 4 hours (healthy)  —
-  redmine-postgres   redmine-docker  Up 4 hours (healthy)  —
+  NAME               ID            IMAGE                     STATUS   CREATED  PORTS
+  redmine            7af3f67656e7  redmine-custom:6.1.2      Up 5h    3w       3001→3000
+  redmine-db-backup  74a0260254eb  prodrigesti…local:latest  Up 5h ✓  3w       —
+  redmine-postgres   50debfb8b76b  postgres:18-alpine        Up 5h ✓  3w       —
 ```
 
 ```
    compose ps  ·  3 of 3
-  SERVICE   NAME               STATUS                PORTS
-  redmine   redmine            Up 4 hours            3001→3000
-  backup    redmine-db-backup  Up 4 hours (healthy)  —
-  postgres  redmine-postgres   Up 4 hours (healthy)  —
+  SERVICE   ID            IMAGE                     STATUS   CREATED  PORTS
+  redmine   7af3f67656e7  redmine-custom:6.1.2      Up 5h    3w       3001→3000
+  backup    74a0260254eb  prodrigesti…local:latest  Up 5h ✓  3w       —
+  postgres  50debfb8b76b  postgres:18-alpine        Up 5h ✓  3w       —
 ```
 
-`dps` shows the PROJECT because with many projects running that is the column
-that tells you where a container came from — and it is what [`dcd`](dcd.md)
-takes you to. `dcps` shows the SERVICE first, because inside a project that is
-the name you actually type into `dclt`, `dcx` and `dcup`.
+`dcps` leads with SERVICE because inside a project that is the name you type
+into `dclt`, `dcx` and `dcup`. It drops the container NAME column: the ID
+already identifies the container exactly, and both would not fit.
+
+There is no PROJECT column. Seven pieces of information do not fit in one row,
+and the project is one command away — [`dcd`](dcd.md) takes you to it, and
+`dcps` shows you what is inside it.
+
+## STATUS and CREATED are not the same thing
+
+This is the pair worth reading together:
+
+| | Answers |
+|---|---|
+| `STATUS` — `Up 5h` | how long it has been **running** |
+| `CREATED` — `3w` | when the container was **made** |
+
+A container created `3w` ago showing `Up 5h` **restarted five hours ago**. That
+gap is usually the thing you were trying to find out, and `docker ps` buries it
+by putting them at opposite ends of a very wide row.
+
+Both are compacted the same way: `5h`, `3w`, `20m`, `2mo`. `-t` swaps CREATED
+for the exact date — `2026-06-30 22:04`, without the timezone offset docker
+prints twice.
+
+## Status is compacted, exit codes are not
+
+| docker | here |
+|---|---|
+| `Up 5 hours (healthy)` | `Up 5h ✓` |
+| `Up 2 minutes (unhealthy)` | `Up 2m ✗` |
+| `Exited (137) 3 minutes ago` | `Exit 137 · 3m` |
+
+Health becomes a glyph. **The exit code is kept**: `Exited (137)` is an
+out-of-memory kill and `Exited (0)` is a clean stop, and collapsing both to
+"Exited" throws away the only part that says which one happened.
 
 ## The ports column
 

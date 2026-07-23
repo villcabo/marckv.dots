@@ -14,7 +14,7 @@ _dps_complete_zsh() {
     esac
 
     if [[ "${words[CURRENT]}" == -* ]]; then
-        flags=(-a -x -h --help)
+        flags=(-a -x -t -h --help)
         compadd -a flags
     else
         candidates=(${(f)"$(_dps_candidates 2>/dev/null)"})

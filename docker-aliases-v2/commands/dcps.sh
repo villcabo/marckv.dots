@@ -24,12 +24,13 @@ _dcps_help() {
     printf "${CCY}FLAGS${CR}\n"
     printf "  ${CYE}-a${CR}                 Include stopped services\n"
     printf "  ${CYE}-x${CR}                 Also show exposed-but-unpublished ports ${CI}(marked ~)${CR}\n"
+    printf "  ${CYE}-t${CR}                 Show the creation date instead of how long ago\n"
     printf "  ${CYE}-f${CR} ${CMA}<file>${CR}          Compose file to use ${CI}(repeatable)${CR}\n"
     printf "  ${CYE}-e${CR} ${CMA}<file>${CR}          Env file to use ${CI}(repeatable)${CR}\n"
     printf "  ${CYE}-P${CR} ${CMA}<profile>${CR}       Compose profile ${CI}(repeatable, or comma-separated)${CR}\n"
     printf "  ${CYE}-h${CR}, ${CYE}--help${CR}         Show this help\n\n"
 
-    printf "  ${CI}Short flags combine:${CR} ${CGR}-ax${CR} ${CI}is the same as${CR} ${CGR}-a -x${CR}\n\n"
+    printf "  ${CI}Short flags combine:${CR} ${CGR}-axt${CR} ${CI}is the same as${CR} ${CGR}-a -x${CR}\n\n"
 
     printf "${CCY}PATTERNS${CR}\n"
     printf "  Patterns are ${CB}regular expressions${CR} matched against service names,\n"
@@ -70,7 +71,7 @@ dcps() {
     done
 
     # --- parse --------------------------------------------------------------
-    local all=false show_exposed=false
+    local all=false show_exposed=false absolute=false
     local files=() env_files=() profiles=() patterns=()
     local profile_item
 
@@ -80,6 +81,7 @@ dcps() {
             -h|--help) _dcps_help; return 0 ;;
             -a) all=true ;;
             -x) show_exposed=true ;;
+            -t) absolute=true ;;
             -f)
                 shift
                 [[ $# -eq 0 ]] && { _err dcps "-f requires a compose file"; return 1; }
@@ -130,7 +132,7 @@ dcps() {
     for item in "${files[@]}";     do cmd+=(-f "$item"); done
     for item in "${env_files[@]}"; do cmd+=(--env-file "$item"); done
     for item in "${profiles[@]}";  do cmd+=(--profile "$item"); done
-    cmd+=(ps --format '{{.Service}}	{{.Name}}	{{.Status}}	{{.Ports}}')
+    cmd+=(ps --format '{{.Service}}	{{.ID}}	{{.Image}}	{{.Status}}	{{.RunningFor}}	{{.CreatedAt}}	{{.Ports}}')
     [[ "$all" == true ]] && cmd+=(-a)
 
     local raw
@@ -142,9 +144,9 @@ dcps() {
     local rows="" nl='
 '
     local total=0 shown=0
-    local service name cstatus raw_ports compacted pat keep
+    local service cid image cstatus since created_at raw_ports compacted when pat keep
 
-    while IFS=$'\t' read -r service name cstatus raw_ports || [[ -n "$service" ]]; do
+    while IFS=$'\t' read -r service cid image cstatus since created_at raw_ports || [[ -n "$service" ]]; do
         [[ -z "$service" ]] && continue
         total=$(( total + 1 ))
 
@@ -157,13 +159,18 @@ dcps() {
         fi
 
         compacted=$(_compact_ports "$raw_ports" "$show_exposed")
-        rows+="${rows:+$nl}${service}	${name}	${cstatus}	${compacted:-—}"
+        if [[ "$absolute" == true ]]; then
+            when=$(_short_timestamp "$created_at")
+        else
+            when=$(_short_duration "$since")
+        fi
+        rows+="${rows:+$nl}${service}	${cid}	${image}	$(_short_status "$cstatus")	${when}	${compacted:-—}"
         shown=$(( shown + 1 ))
     done <<< "$raw"
 
     # --- render -------------------------------------------------------------
     _render_container_table "compose ps" "$shown" "$total" "${patterns[*]}" \
-        "SERVICE" "NAME" "STATUS" "PORTS" "$rows"
+        "SERVICE" "ID" "IMAGE" "STATUS" "CREATED" "PORTS" "$rows"
 }
 
 # Completion source: service names of the current project.

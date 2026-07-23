@@ -27,9 +27,10 @@ _dps_help() {
     printf "${CCY}FLAGS${CR}\n"
     printf "  ${CYE}-a${CR}                 Include stopped containers\n"
     printf "  ${CYE}-x${CR}                 Also show exposed-but-unpublished ports ${CI}(marked ~)${CR}\n"
+    printf "  ${CYE}-t${CR}                 Show the creation date instead of how long ago\n"
     printf "  ${CYE}-h${CR}, ${CYE}--help${CR}         Show this help\n\n"
 
-    printf "  ${CI}Short flags combine:${CR} ${CGR}-ax${CR} ${CI}is the same as${CR} ${CGR}-a -x${CR}\n\n"
+    printf "  ${CI}Short flags combine:${CR} ${CGR}-axt${CR} ${CI}is the same as${CR} ${CGR}-a -x${CR}\n\n"
 
     printf "${CCY}PATTERNS${CR}\n"
     printf "  Patterns are ${CB}regular expressions${CR} matched against container names,\n"
@@ -47,6 +48,13 @@ _dps_help() {
     printf "  ${CGR}dps redmine${CR}                   Only what matches 'redmine'\n"
     printf "  ${CGR}dps -a${CR}                        Include stopped containers\n"
     printf "  ${CGR}dps -ax 'db|cache'${CR}            Stopped too, exposed ports too\n"
+    printf "  ${CGR}dps -t${CR}                        Exact creation dates\n\n"
+
+    printf "${CCY}STATUS vs CREATED${CR}\n"
+    printf "  They answer different questions. ${CB}STATUS${CR} is how long it has been\n"
+    printf "  running; ${CB}CREATED${CR} is when the container was made. A container created\n"
+    printf "  ${CB}3w${CR} ago showing ${CB}Up 5h${CR} restarted five hours ago — which is usually\n"
+    printf "  the thing you were trying to find out.\n"
 }
 
 # ---------------------------------------------------------------------------
@@ -77,7 +85,7 @@ dps() {
     done
 
     # --- parse --------------------------------------------------------------
-    local all=false show_exposed=false patterns=()
+    local all=false show_exposed=false absolute=false patterns=()
 
     set -- "${expanded[@]}"
     while [[ $# -gt 0 ]]; do
@@ -85,6 +93,7 @@ dps() {
             -h|--help) _dps_help; return 0 ;;
             -a) all=true ;;
             -x) show_exposed=true ;;
+            -t) absolute=true ;;
             -*) _err dps "unknown flag: $1  (try: dps --help)"; return 1 ;;
             *)  patterns+=("$1") ;;
         esac
@@ -92,7 +101,7 @@ dps() {
     done
 
     # --- collect ------------------------------------------------------------
-    local ps_args=(ps --format '{{.Names}}	{{.Label "com.docker.compose.project"}}	{{.Status}}	{{.Ports}}')
+    local ps_args=(ps --format '{{.Names}}	{{.ID}}	{{.Image}}	{{.Status}}	{{.RunningFor}}	{{.CreatedAt}}	{{.Ports}}')
     [[ "$all" == true ]] && ps_args+=(-a)
 
     local raw
@@ -104,9 +113,9 @@ dps() {
     local rows="" nl='
 '
     local total=0 shown=0
-    local name project cstatus raw_ports compacted pat keep
+    local name cid image cstatus since created_at raw_ports compacted when pat keep
 
-    while IFS=$'\t' read -r name project cstatus raw_ports || [[ -n "$name" ]]; do
+    while IFS=$'\t' read -r name cid image cstatus since created_at raw_ports || [[ -n "$name" ]]; do
         [[ -z "$name" ]] && continue
         total=$(( total + 1 ))
 
@@ -119,13 +128,18 @@ dps() {
         fi
 
         compacted=$(_compact_ports "$raw_ports" "$show_exposed")
-        rows+="${rows:+$nl}${name}	${project:-—}	${cstatus}	${compacted:-—}"
+        if [[ "$absolute" == true ]]; then
+            when=$(_short_timestamp "$created_at")
+        else
+            when=$(_short_duration "$since")
+        fi
+        rows+="${rows:+$nl}${name}	${cid}	${image}	$(_short_status "$cstatus")	${when}	${compacted:-—}"
         shown=$(( shown + 1 ))
     done <<< "$raw"
 
     # --- render -------------------------------------------------------------
     _render_container_table "docker ps" "$shown" "$total" "${patterns[*]}" \
-        "NAME" "PROJECT" "STATUS" "PORTS" "$rows"
+        "NAME" "ID" "IMAGE" "STATUS" "CREATED" "PORTS" "$rows"
 }
 
 # Completion source: container names across the host.

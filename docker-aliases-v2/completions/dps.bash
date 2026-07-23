@@ -13,7 +13,7 @@ _dps_complete_bash() {
     esac
 
     if [[ "$cur" == -* ]]; then
-        COMPREPLY=( $(compgen -W "-a -x -h --help" -- "$cur") )
+        COMPREPLY=( $(compgen -W "-a -x -t -h --help" -- "$cur") )
     else
         COMPREPLY=( $(compgen -W "$(_dps_candidates 2>/dev/null)" -- "$cur") )
     fi

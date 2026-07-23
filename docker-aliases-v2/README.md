@@ -95,7 +95,7 @@ docker compose build && docker compose up -d
 docker compose exec ubuntu24 zsh      # poke around by hand
 ```
 
-430 checks per shell across 7 distros — Debian 11/12/13 and Ubuntu
+464 checks per shell across 7 distros — Debian 11/12/13 and Ubuntu
 20.04/22.04/24.04/26.04, covering bash 5.0→5.3 and zsh 5.8→5.9. The suite is
 hermetic: `docker` is shimmed, so it asserts on the exact argv each command
 would run while being unable to touch a real container.
@@ -172,6 +172,11 @@ already bit us, kept here so they don't bite twice:
   aborts the whole function. Same trap: `path`, `argv`, `options`.
 - `${var:+$'\n'}` does not expand the `$'...'` inside the substitution in zsh.
   Put the newline in a plain variable first.
+- An unquoted `(` inside an expansion **pattern** opens a glob group in zsh:
+  `${s%% (*}` is an unterminated one and aborts. bash reads it as an ordinary
+  character. Quote the literal part — `${s%%" ("*}`.
+- Indirect array expansion has no portable form: `${!v[@]}` in bash, `${(P)v}`
+  in zsh. Pass rows as delimited text instead of arrays by name.
 
 ## Environment variables
 
