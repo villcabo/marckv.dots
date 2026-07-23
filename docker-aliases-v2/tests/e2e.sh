@@ -91,16 +91,16 @@ if [ "\$1" = "inspect" ]; then
 fi
 
 case "\$*" in
-    *"com.docker.compose.project"*)
-        printf 'fx-api\tfixture-proj\tUp 2 hours\t0.0.0.0:9080->9080/tcp, [::]:9080->9080/tcp\n'
-        printf 'fx-db\tfixture-proj\tUp 2 hours (healthy)\t5432/tcp\n'
-        printf 'other-api\tother-proj\tUp 1 hour\t0.0.0.0:3001->3000/tcp, [::]:3001->3000/tcp\n'
-        printf 'plain-box\t\tExited (0) 3 minutes ago\t\n'
+    *"{{.Names}}"*"{{.RunningFor}}"*)
+        printf 'fx-api\ta1b2c3d4e5f6\tnginx:alpine\tUp 2 hours\t3 weeks ago\t2026-06-30 22:04:16 -0400 -04\t0.0.0.0:9080->9080/tcp, [::]:9080->9080/tcp\n'
+        printf 'fx-db\tb2c3d4e5f6a1\tpostgres:18-alpine\tUp 2 hours (healthy)\tAbout an hour ago\t2026-07-23 01:00:00 -0400 -04\t5432/tcp\n'
+        printf 'other-api\tc3d4e5f6a1b2\tquay.io/example/very-long-image-name:1.2.3\tUp 1 hour\t2 months ago\t2026-05-20 10:00:00 -0400 -04\t0.0.0.0:3001->3000/tcp, [::]:3001->3000/tcp\n'
+        printf 'plain-box\td4e5f6a1b2c3\talpine:latest\tExited (137) 3 minutes ago\t5 days ago\t2026-07-18 08:00:00 -0400 -04\t\n'
         exit 0 ;;
     *"{{.Service}}"*)
-        printf 'api\tfx-api\tUp 2 hours\t127.0.0.1:8080->80/tcp\n'
-        printf 'db\tfx-db\tUp 2 hours (unhealthy)\t5432/tcp\n'
-        printf 'dns\tfx-dns\tUp 2 hours\t0.0.0.0:53->53/udp\n'
+        printf 'api\ta1b2c3d4e5f6\tnginx:alpine\tUp 2 hours\t3 weeks ago\t2026-06-30 22:04:16 -0400 -04\t127.0.0.1:8080->80/tcp\n'
+        printf 'db\tb2c3d4e5f6a1\tpostgres:18-alpine\tUp 2 hours (unhealthy)\t5 days ago\t2026-07-18 08:00:00 -0400 -04\t5432/tcp\n'
+        printf 'dns\tc3d4e5f6a1b2\tcoredns:1.11\tUp 2 hours\tAbout a minute ago\t2026-07-23 05:00:00 -0400 -04\t0.0.0.0:53->53/udp\n'
         exit 0 ;;
 esac
 case "\$* " in
@@ -826,8 +826,9 @@ run_ps_checks() {
     out=$(ps_out "$F/basic" dps)
     assert_has "header names the scope"      "docker ps"    "$out"
     assert_has "header counts the rows"      "4 of 4"       "$out"
-    assert_has "columns are labelled"        "PROJECT"      "$out"
-    assert_has "the project is shown"        "fixture-proj" "$out"
+    assert_has "the id column is there"      "ID"           "$out"
+    assert_has "the id is shown in full"     "a1b2c3d4e5f6" "$out"
+    assert_has "the image is shown"          "nginx:alpine" "$out"
     assert_has "ports arrive compacted"      "9080"         "$out"
     assert_lacks "no raw docker port syntax" "0.0.0.0:"     "$out"
     assert_lacks "no /tcp noise"             "/tcp"         "$out"
@@ -843,10 +844,34 @@ run_ps_checks() {
     out=$(ps_out "$F/basic" dcps)
     assert_has "header names the scope"     "compose ps" "$out"
     assert_has "service comes first"        "SERVICE"    "$out"
+    assert_has "the id is shown"            "a1b2c3d4e5f6" "$out"
+    assert_has "the image is shown"         "postgres:18-alpine" "$out"
     assert_has "the localhost mark survives" "lo:8080→80" "$out"
     assert_has "udp survives"                "53/udp"     "$out"
     out=$(ps_out "$F/basic" dcps db)
     assert_has "a pattern filters services" "1 of 3" "$out"
+
+    section "$CURRENT_SHELL — status and duration compaction"
+    dur() { "$CURRENT_SHELL" -c "source '$INIT'; _short_duration '$1'" 2>/dev/null; }
+    st()  { "$CURRENT_SHELL" -c "source '$INIT'; _short_status '$1'"   2>/dev/null; }
+    assert_eq "hours shorten"            "5h"  "$(dur '5 hours ago')"
+    assert_eq "weeks shorten"            "3w"  "$(dur '3 weeks ago')"
+    # minutes and months both start with m and must not collide
+    assert_eq "minutes become m"         "20m" "$(dur '20 minutes ago')"
+    assert_eq "months become mo"         "2mo" "$(dur '2 months ago')"
+    assert_eq "docker's 'About an hour'" "1h"  "$(dur 'About an hour ago')"
+    assert_eq "docker's 'About a minute'" "1m" "$(dur 'About a minute ago')"
+    assert_eq "up plus health"           "Up 5h ✓" "$(st 'Up 5 hours (healthy)')"
+    assert_eq "unhealthy is marked"      "Up 2m ✗" "$(st 'Up 2 minutes (unhealthy)')"
+    # The exit code is the whole point of the line: 137 is an OOM kill.
+    assert_eq "an exit code survives"    "Exit 137 · 3m" "$(st 'Exited (137) 3 minutes ago')"
+    assert_eq "a clean exit survives"    "Exit 0 · 2d"   "$(st 'Exited (0) 2 days ago')"
+    out=$(ps_out "$F/basic" dps)
+    assert_has "the OOM exit code reaches the table" "137" "$out"
+    assert_has "created is relative by default"      "3w"  "$out"
+    out=$(ps_out "$F/basic" dps -t)
+    assert_has "-t switches to a date"    "2026-06-30" "$out"
+    assert_lacks "and drops the doubled zone offset" "-0400 -04" "$out"
 
     section "$CURRENT_SHELL — ps errors"
     assert_eq "dps rejects an unknown flag"  "1" \

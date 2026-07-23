@@ -114,7 +114,11 @@ inside a container act on the host's real containers.
 
 ## What is covered
 
-430 checks per shell, per distro.
+464 checks per shell, per distro.
+
+Also covered: duration shortening (minutes → `m` vs months → `mo`, and docker's
+"About an hour"), status compaction, and that an `Exited (137)` **keeps its exit
+code** all the way to the table — 137 is an OOM kill and 0 is a clean stop.
 
 `dps` / `dcps`:
 
