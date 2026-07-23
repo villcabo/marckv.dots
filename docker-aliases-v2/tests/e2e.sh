@@ -44,10 +44,16 @@ fi
 
 cat > "${WORK}/bin/docker" <<SHIM
 #!/usr/bin/env bash
-# Passes 'config' through to the real docker (YAML parsing, no daemon needed)
-# and captures anything else as argv instead of executing it.
+# Read-only queries reach the real docker; everything that would mutate state or
+# stream forever is captured as argv instead.
+#
+#   config → parses YAML, needs no daemon, so it answers for real.
+#   ps     → needs a daemon. There is none here, so it fails, which is exactly
+#            the "cannot reach the daemon" path dcdown has to handle.
 for a in "\$@"; do
-    [[ "\$a" == "config" ]] && exec "${REAL_DOCKER}" "\$@"
+    case "\$a" in
+        config|ps) exec "${REAL_DOCKER}" "\$@" ;;
+    esac
 done
 printf 'ARGV:'
 for a in "\$@"; do printf ' [%s]' "\$a"; done
@@ -171,6 +177,52 @@ dclt_rc() {
     printf '%s' "$?"
 }
 
+# dcdown_argv <dir> <args...> → argv, auto-confirmed
+dcdown_argv() {
+    local dir="$1"; shift
+    "$CURRENT_SHELL" -c "
+        cd '$dir' || exit 99
+        export DOCKER_ALIASES_AUTO_YES=1
+        source '$INIT'
+        dcdown $*
+    " 2>&1 | strip_ansi | grep '^ARGV:'
+}
+
+# dcdown_err <dir> <args...> → stderr only (preview + notes), declined
+dcdown_err() {
+    local dir="$1"; shift
+    printf 'no\n' | "$CURRENT_SHELL" -c "
+        cd '$dir' || exit 99
+        source '$INIT'
+        dcdown $*
+    " 2>&1 >/dev/null | strip_ansi
+}
+
+# dcdown_answer <dir> <answer> <args...> → ACCEPT when it ran, REJECT when not
+dcdown_answer() {
+    local dir="$1" answer="$2"; shift 2
+    local out
+    out=$(printf '%s\n' "$answer" | "$CURRENT_SHELL" -c "
+        cd '$dir' || exit 99
+        source '$INIT'
+        dcdown $*
+    " 2>&1 | strip_ansi)
+    case "$out" in
+        *"ARGV:"*"down"*) printf 'ACCEPT' ;;
+        *)                printf 'REJECT' ;;
+    esac
+}
+
+dcdown_rc() {
+    local dir="$1"; shift
+    printf 'no\n' | "$CURRENT_SHELL" -c "
+        cd '$dir' || exit 99
+        source '$INIT'
+        dcdown $*
+    " >/dev/null 2>&1
+    printf '%s' "$?"
+}
+
 # ---------------------------------------------------------------------------
 # Checks
 # ---------------------------------------------------------------------------
@@ -276,9 +328,86 @@ run_suite() {
     assert_has "profiles are discovered" "debug"  "$out"
 
     run_dclt_checks "$F"
+    run_dcdown_checks "$F"
 
     section "$CURRENT_SHELL — completion"
     run_completion_checks "$F"
+}
+
+# ---------------------------------------------------------------------------
+# dcdown
+# ---------------------------------------------------------------------------
+
+run_dcdown_checks() {
+    local F="$1" out
+
+    section "$CURRENT_SHELL — dcdown help"
+    out=$(in_shell "$F/volumes" 'dcdown --help')
+    assert_has "help shows USAGE"                    "USAGE"        "$out"
+    assert_has "help flags -v as destroying data"    "destroys data" "$out"
+    assert_has "help explains the project-name rule" "project name" "$out"
+
+    section "$CURRENT_SHELL — dcdown command"
+    assert_has "plain down takes no extra flags" \
+        "[down]" "$(dcdown_argv "$F/volumes")"
+    assert_has "-v emits --volumes" \
+        "[--volumes]" "$(dcdown_argv "$F/volumes" -v)"
+    assert_has "-O emits --remove-orphans" \
+        "[--remove-orphans]" "$(dcdown_argv "$F/volumes" -O)"
+    out=$(dcdown_argv "$F/volumes" -vO)
+    assert_has "-vO still removes volumes" "[--volumes]"         "$out"
+    assert_has "-vO still clears orphans"  "[--remove-orphans]"  "$out"
+    assert_has "a pattern narrows the target" \
+        "[db]" "$(dcdown_argv "$F/volumes" db)"
+    assert_lacks "a pattern excludes the rest" \
+        "[cache]" "$(dcdown_argv "$F/volumes" db)"
+
+    section "$CURRENT_SHELL — dcdown volume warning"
+    out=$(dcdown_err "$F/volumes" -v)
+    assert_has "preview names the first volume"   "pgdata"          "$out"
+    assert_has "preview names the second volume"  "redis_data"      "$out"
+    assert_has "preview says it cannot be undone" "cannot be undone" "$out"
+    assert_has "prompt asks for the project name" "dav2-fixture-volumes" "$out"
+    out=$(dcdown_err "$F/volumes")
+    assert_lacks "no -v means no volume line"     "cannot be undone" "$out"
+    assert_has  "no -v asks the ordinary way"     "[yes/N]"          "$out"
+
+    section "$CURRENT_SHELL — dcdown confirmation strength"
+    # The whole point: the answer that works everywhere else must NOT work here.
+    assert_eq "-v rejects 'yes'" \
+        "REJECT" "$(dcdown_answer "$F/volumes" yes -v)"
+    assert_eq "-v rejects a wrong project name" \
+        "REJECT" "$(dcdown_answer "$F/volumes" not-the-project -v)"
+    assert_eq "-v accepts the project name" \
+        "ACCEPT" "$(dcdown_answer "$F/volumes" dav2-fixture-volumes -v)"
+    assert_eq "without -v 'yes' is enough" \
+        "ACCEPT" "$(dcdown_answer "$F/volumes" yes)"
+    assert_eq "without -v a bare 'y' still fails" \
+        "REJECT" "$(dcdown_answer "$F/volumes" y)"
+
+    section "$CURRENT_SHELL — dcdown daemon awareness"
+    # Asserted without assuming a daemon: the suite runs both on a workstation
+    # that has one and inside containers that do not. What must hold either way
+    # is that dcdown says WHICH picture it is showing — silently presenting
+    # declared services as if they were running is the failure mode here.
+    out=$(dcdown_err "$F/volumes")
+    case "$out" in
+        *"could not reach"*|*"nothing is running"*)
+            pass "states whether the list is running or declared" ;;
+        *)
+            fail "states whether the list is running or declared" \
+                 "a note about the daemon or about nothing running" "$out" ;;
+    esac
+    assert_has "still lists the services" "cache" "$out"
+
+    section "$CURRENT_SHELL — dcdown errors"
+    assert_eq "no match exits 1"         "1" "$(dcdown_rc "$F/volumes" zzz)"
+    assert_eq "unknown flag exits 1"     "1" "$(dcdown_rc "$F/volumes" -Z)"
+    assert_eq "-f without value exits 1" "1" "$(dcdown_rc "$F/volumes" -f)"
+    assert_eq "missing file exits 1"     "1" "$(dcdown_rc "$F/volumes" -f nope.yml)"
+    assert_eq "declining exits 1"        "1" "$(dcdown_rc "$F/volumes")"
+    out=$(dcdown_err "$F/volumes" zzz)
+    assert_has "no match lists what exists" "available:" "$out"
 }
 
 # ---------------------------------------------------------------------------
@@ -445,6 +574,21 @@ run_completion_checks() {
             _dclt_complete_bash
             printf '%s\n' \"\${COMPREPLY[@]}\"" 2>&1)
         assert_has "bash: dclt -s suggests durations" "10m" "$out"
+
+        out=$(cd "$F/volumes" && bash -c "
+            source '$INIT'
+            COMP_WORDS=(dcdown ''); COMP_CWORD=1
+            _dcdown_complete_bash
+            printf '%s\n' \"\${COMPREPLY[@]}\"" 2>&1)
+        assert_has "bash: dcdown completes services" "cache" "$out"
+
+        out=$(cd "$F/volumes" && bash -c "
+            source '$INIT'
+            COMP_WORDS=(dcdown '-'); COMP_CWORD=1
+            _dcdown_complete_bash
+            printf '%s\n' \"\${COMPREPLY[@]}\"" 2>&1)
+        assert_has "bash: dcdown offers -v" "-v" "$out"
+        assert_has "bash: dcdown offers -O" "-O" "$out"
         return
     fi
 
@@ -517,6 +661,21 @@ run_completion_checks() {
         words=(dclt -s ''); CURRENT=3
         _dclt_complete_zsh" 2>&1)
     assert_has "zsh: dclt -s suggests durations" "10m" "$out"
+
+    out=$(cd "$F/volumes" && zsh -c "
+        source '$INIT'
+        $stub
+        words=(dcdown ''); CURRENT=2
+        _dcdown_complete_zsh" 2>&1)
+    assert_has "zsh: dcdown completes services" "cache" "$out"
+
+    out=$(cd "$F/volumes" && zsh -c "
+        source '$INIT'
+        $stub
+        words=(dcdown '-'); CURRENT=2
+        _dcdown_complete_zsh" 2>&1)
+    assert_has "zsh: dcdown offers -v" "-v" "$out"
+    assert_has "zsh: dcdown offers -O" "-O" "$out"
 }
 
 # ---------------------------------------------------------------------------

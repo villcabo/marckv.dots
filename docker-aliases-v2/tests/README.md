@@ -86,12 +86,17 @@ stay on this machine. **Docker Hub repositories are public by default.**
 | `multifile/` | Repeated `-f`: base + override, including an override-only service |
 | `detect-env/` | `DOCKER_COMPOSE_FILE=` inside `.env` pointing at `custom.yml` |
 | `spaces/` | A compose file literally named `my stack.yml` |
+| `volumes/` | Two named volumes — what `dcdown -v` destroys |
 
 ## How the suite stays safe
 
-`docker` is shimmed onto `PATH` before every run. The shim passes `config`
-through to the real binary — YAML parsing, which needs no daemon — and captures
-everything else as `ARGV: [...]` instead of running it.
+`docker` is shimmed onto `PATH` before every run. The shim passes read-only
+queries through to the real binary and captures everything else as
+`ARGV: [...]` instead of running it:
+
+- `config` parses YAML and needs no daemon, so it answers for real.
+- `ps` does need one. There is none here, so it fails — which is exactly the
+  "cannot reach the daemon" path `dcdown` has to handle.
 
 So the suite asserts against the **exact argv** `dcup` would hand to docker,
 while being physically unable to start, stop or delete a container. That is
@@ -100,7 +105,17 @@ inside a container act on the host's real containers.
 
 ## What is covered
 
-176 checks per shell, per distro.
+240 checks per shell, per distro.
+
+`dcdown`:
+
+- `-v` names every volume it would delete, read from `config --volumes`
+- `-v` demands the **project name** — `yes` and a wrong name are both rejected
+- Without `-v`, `yes` is enough (and a bare `y` still is not)
+- `-O` / `-vO` clustering, regex patterns, errors listing what was available
+- Always states whether the service list is *running* or *declared* — asserted
+  without assuming a daemon, since the suite runs both on a workstation that
+  has one and in containers that do not
 
 `dclt`:
 
