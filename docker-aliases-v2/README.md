@@ -44,17 +44,24 @@ docker-aliases-v2/
 ├── lib/
 │   ├── ui.sh            colors, icons, preview renderer, confirmation
 │   └── compose.sh       compose file detection, service/profile discovery
-├── commands/
-│   └── dcup.sh          one file per command
-├── completions/
-│   ├── dcup.bash
-│   └── dcup.zsh
-└── docs/
-    └── dcup.md          one page per command
+├── commands/            one file per command
+│   ├── dcup.sh
+│   ├── dclt.sh
+│   └── dcdown.sh
+├── completions/         one pair per command
+│   ├── dcup.bash / dcup.zsh
+│   ├── dclt.bash / dclt.zsh
+│   └── dcdown.bash / dcdown.zsh
+├── docs/                one page per command
+│   ├── dcup.md
+│   ├── dclt.md
+│   └── dcdown.md
+└── tests/               e2e across 7 distros and both shells
 ```
 
 Adding a command means dropping a file in `commands/`, its completions, and a
-page in `docs/`. `init.sh` picks up `commands/*.sh` automatically.
+page in `docs/`. `init.sh` globs both `commands/*.sh` and the completions for
+the running shell, so it never needs editing.
 
 ## Commands
 
@@ -62,6 +69,7 @@ page in `docs/`. `init.sh` picks up `commands/*.sh` automatically.
 |---|---|---|
 | `dcup` | Bring compose services up | [docs/dcup.md](docs/dcup.md) |
 | `dclt` | Tail logs for services matched by regex | [docs/dclt.md](docs/dclt.md) |
+| `dcdown` | Stop and remove services | [docs/dcdown.md](docs/dcdown.md) |
 
 ## Testing
 
@@ -72,10 +80,10 @@ docker compose build && docker compose up -d
 docker compose exec ubuntu24 zsh      # poke around by hand
 ```
 
-98 checks per shell across 7 distros — Debian 11/12/13 and Ubuntu
+240 checks per shell across 7 distros — Debian 11/12/13 and Ubuntu
 20.04/22.04/24.04/26.04, covering bash 5.0→5.3 and zsh 5.8→5.9. The suite is
-hermetic: `docker` is shimmed, so it asserts on the exact argv `dcup` would run
-while being unable to touch a real container.
+hermetic: `docker` is shimmed, so it asserts on the exact argv each command
+would run while being unable to touch a real container.
 
 See [tests/README.md](tests/README.md) — including an honest account of what is
 **not** covered (real `docker compose up`, and interactive zsh TAB).
@@ -100,6 +108,12 @@ changes state (`dcup`) always confirms. A command that only reads (`dclt`)
 never does — making someone type `yes` to look at logs is friction with no
 payoff, and friction people learn to click through stops protecting anything.
 
+**Destroying data asks a different question.** `dcdown` takes `yes`; `dcdown -v`
+makes you type the project name, and names every volume it is about to delete.
+Not because `yes` is too short, but because `yes` is the answer to every other
+prompt — repeat it enough and it stops being an answer. A prompt that can only
+be satisfied by looking at the screen is the only kind that still works.
+
 **Confirmation takes the full word `yes`.** A bare `y` is rejected. Plain Enter
 cancels. These commands recreate and restart running services; one keystroke is
 too cheap.
@@ -108,8 +122,9 @@ too cheap.
 env var is much harder to fire by accident than a mistyped flag.
 
 **Flags mean the same thing everywhere.** `-f` is the compose file in every
-command — never "follow". `-e` is the env file, `-P` the profile. One
-convention, nothing to re-learn per command.
+command — never "follow". `-e` is the env file, `-P` the profile. A letter is
+never reused for a second meaning: `-o` is *once* in `dclt`, so `dcdown` spells
+orphans `-O`, and anything that would collide is long-form only.
 
 **bash and zsh, equally.** Every command is verified in both. The traps that
 already bit us, kept here so they don't bite twice:
