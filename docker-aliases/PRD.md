@@ -212,7 +212,7 @@ Continue with operation? [yes/N]:
    api  worker  db
    --build  --pull
 ─
-  Continue? [y/N] 
+  Continue? [yes/N] 
 ```
 
 Icons used (Nerd Font codepoints — fall back to ASCII if `tput civis` unavailable or `NO_NERD_FONT=1`):

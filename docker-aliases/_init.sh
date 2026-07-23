@@ -142,6 +142,7 @@ _render_preview() {
 # _confirm_operation [message] [action_color]
 # Returns 0 (yes) or 1 (no/cancel).
 # Honors DOCKER_ALIASES_AUTO_YES=1 → immediate yes.
+# Requires typing the full word "yes" (yes/YES/Yes) to confirm.
 # Default response on plain Enter is NO.
 _confirm_operation() {
     local message="${1:-Continue?}"
@@ -152,10 +153,10 @@ _confirm_operation() {
         return 0
     fi
 
-    printf "  %s ${color}${CB}%s [y/N] ${CR}" "$(_icon confirm)" "$message"
+    printf "  %s ${color}${CB}%s [yes/N] ${CR}" "$(_icon confirm)" "$message"
     local response
     read -r response
-    [[ "$response" == "y" || "$response" == "Y" ]]
+    [[ "$response" == "yes" || "$response" == "YES" || "$response" == "Yes" ]]
 }
 
 # ---------------------------------------------------------------------------
