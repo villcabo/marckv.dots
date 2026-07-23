@@ -287,6 +287,94 @@ _compact_ports() {
 # as if they were characters, and every column drifts.
 # ---------------------------------------------------------------------------
 
+# _short_duration <docker relative time> → 2-4 characters
+#
+# Docker writes "3 weeks ago", "About an hour ago", "20 minutes ago". As a
+# column that is 11-18 characters of mostly English. As "3w", "1h", "20m" it is
+# three, and reads just as fast.
+#
+# Note minutes and months both start with m: minutes become m, months mo.
+_short_duration() {
+    local t="$1"
+    [[ -z "$t" ]] && { printf '—'; return 0; }
+
+    t="${t% ago}"
+    # Docker hedges with "About a minute" / "About an hour" / "About a year".
+    t="${t#About }"
+    t="${t#an }"
+    t="${t#a }"
+
+    local n="${t%% *}" unit="${t#* }"
+    case "$n" in
+        ''|*[!0-9]*) n=1 ;;      # what was "a minute" is one of them
+    esac
+
+    case "$unit" in
+        second*)  printf '%ss'  "$n" ;;
+        minute*)  printf '%sm'  "$n" ;;
+        hour*)    printf '%sh'  "$n" ;;
+        day*)     printf '%sd'  "$n" ;;
+        week*)    printf '%sw'  "$n" ;;
+        month*)   printf '%smo' "$n" ;;
+        year*)    printf '%sy'  "$n" ;;
+        *)        printf '%s'   "$1" ;;
+    esac
+}
+
+# _short_status <docker status> → the same meaning, a third of the width
+#
+# "Up 4 hours (healthy)" is twenty characters to say two things. Health becomes
+# a glyph; the duration is shortened the same way as everywhere else.
+#
+# Exit codes are KEPT. "Exited (137)" is an out-of-memory kill and "Exited (0)"
+# is a clean stop — collapsing both to "Exited" throws away the only part that
+# tells you which of those happened.
+_short_status() {
+    local s="$1" mark="" rest
+
+    case "$s" in
+        *"(healthy)"*)   mark=" ✓" ;;
+        *"(unhealthy)"*) mark=" ✗" ;;
+        *"(starting)"*)  mark=" …" ;;
+    esac
+
+    case "$s" in
+        Up*)
+            rest="${s#Up }"
+            # The literal parts are quoted: in zsh an unquoted "(" inside an
+            # expansion pattern opens a glob group, and "%% (*" is then an
+            # unterminated one. bash reads the same paren as an ordinary
+            # character, so this only ever breaks on one of the two shells.
+            rest="${rest%%" ("*}"
+            printf 'Up %s%s' "$(_short_duration "$rest")" "$mark"
+            ;;
+        Exited*)
+            # Exited (137) 3 minutes ago
+            rest="${s#"Exited ("}"
+            local code="${rest%%")"*}"
+            local when="${rest#*") "}"
+            printf 'Exit %s · %s' "$code" "$(_short_duration "$when")"
+            ;;
+        Restarting*)
+            rest="${s#"Restarting ("}"
+            local rcode="${rest%%")"*}"
+            local rwhen="${rest#*") "}"
+            printf 'Restart %s · %s' "$rcode" "$(_short_duration "$rwhen")"
+            ;;
+        *) printf '%s' "$s" ;;
+    esac
+}
+
+# _short_timestamp <docker CreatedAt> → yyyy-mm-dd hh:mm
+#
+# Docker appends the offset twice — "2026-07-22 23:08:56 -0400 -04". Seconds
+# and both copies of the zone are dropped.
+_short_timestamp() {
+    local t="$1"
+    [[ -z "$t" ]] && { printf '—'; return 0; }
+    printf '%s' "${t:0:16}"
+}
+
 # _ellipsize <text> <max> → text, shortened from the middle if it must be
 #
 # Middle rather than end, because container names are usually
@@ -351,27 +439,30 @@ _status_color() {
 
 _render_container_table() {
     local title="$1" shown="$2" total="$3" filter="$4"
-    local h1="$5" h2="$6" h3="$7" h4="$8"
-    local rows="$9"
+    local h1="$5" h2="$6" h3="$7" h4="$8" h5="$9" h6="${10}"
+    local rows="${11}"
 
-    # Caps, so one pathological name cannot stretch the table past the screen —
-    # which is the very thing compacting the ports was meant to fix. Columns
-    # still shrink below these when the content is short.
-    local cap1=32 cap2=22 cap3=22
+    # Caps, so one pathological value cannot stretch the table past the screen —
+    # the very thing compacting the ports was meant to fix. Columns still shrink
+    # below these when the content is short. The ID is not capped: it is a fixed
+    # 12 and every character of it is meant to be copied.
+    local cap1=24 cap3=24 cap4=18
 
-    local c1 c2 c3 c4
-    local w1=${#h1} w2=${#h2} w3=${#h3}
+    local c1 c2 c3 c4 c5 c6
+    local w1=${#h1} w2=${#h2} w3=${#h3} w4=${#h4} w5=${#h5}
 
     if [[ -n "$rows" ]]; then
-        while IFS=$'\t' read -r c1 c2 c3 c4 || [[ -n "$c1" ]]; do
+        while IFS=$'\t' read -r c1 c2 c3 c4 c5 c6 || [[ -n "$c1" ]]; do
             [[ -z "$c1" ]] && continue
             (( ${#c1} > w1 )) && w1=${#c1}
             (( ${#c2} > w2 )) && w2=${#c2}
             (( ${#c3} > w3 )) && w3=${#c3}
+            (( ${#c4} > w4 )) && w4=${#c4}
+            (( ${#c5} > w5 )) && w5=${#c5}
         done <<< "$rows"
         (( w1 > cap1 )) && w1=$cap1
-        (( w2 > cap2 )) && w2=$cap2
         (( w3 > cap3 )) && w3=$cap3
+        (( w4 > cap4 )) && w4=$cap4
     fi
 
     # Scope line instead of a preview block: for a command whose whole output is
@@ -381,9 +472,9 @@ _render_container_table() {
     [[ -n "$filter" ]] && printf "  ${CDIM}·${CR}  ${CDIM}filter:${CR} ${CMA}%s${CR}" "$filter"
     printf "\n"
 
-    printf "  ${CDIM}%s  %s  %s  %s${CR}\n" \
-        "$(_pad_to "$h1" "$w1")" "$(_pad_to "$h2" "$w2")" \
-        "$(_pad_to "$h3" "$w3")" "$h4"
+    printf "  ${CDIM}%s  %s  %s  %s  %s  %s${CR}\n" \
+        "$(_pad_to "$h1" "$w1")" "$(_pad_to "$h2" "$w2")" "$(_pad_to "$h3" "$w3")" \
+        "$(_pad_to "$h4" "$w4")" "$(_pad_to "$h5" "$w5")" "$h6"
 
     if [[ -z "$rows" ]]; then
         printf "  ${CDIM}(nothing to show)${CR}\n"
@@ -391,13 +482,15 @@ _render_container_table() {
     fi
 
     local scolor
-    while IFS=$'\t' read -r c1 c2 c3 c4 || [[ -n "$c1" ]]; do
+    while IFS=$'\t' read -r c1 c2 c3 c4 c5 c6 || [[ -n "$c1" ]]; do
         [[ -z "$c1" ]] && continue
-        scolor=$(_status_color "$c3")
-        printf "  ${CWH}%s${CR}  ${CDIM}%s${CR}  ${scolor}%s${CR}  ${CGR}%s${CR}\n" \
+        scolor=$(_status_color "$c4")
+        printf "  ${CWH}%s${CR}  ${CDIM}%s${CR}  ${CCY}%s${CR}  ${scolor}%s${CR}  ${CDIM}%s${CR}  ${CGR}%s${CR}\n" \
             "$(_pad_to "$(_ellipsize "$c1" "$w1")" "$w1")" \
-            "$(_pad_to "$(_ellipsize "$c2" "$w2")" "$w2")" \
-            "$(_pad_to "$(_ellipsize "$c3" "$w3")" "$w3")" "$c4"
+            "$(_pad_to "$c2" "$w2")" \
+            "$(_pad_to "$(_ellipsize "$c3" "$w3")" "$w3")" \
+            "$(_pad_to "$(_ellipsize "$c4" "$w4")" "$w4")" \
+            "$(_pad_to "$c5" "$w5")" "$c6"
     done <<< "$rows"
 }
 
