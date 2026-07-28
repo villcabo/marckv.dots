@@ -20,15 +20,6 @@
 # Configuration:
 #   DOCKER_ALIASES_GIT_PROPS  Extra paths to search, ":"-separated. Tried first.
 
-# Where the file usually lives. Ordered by how often it is the right answer.
-_DAV2_PROP_PATHS='/app/resources/git.properties
-/app/BOOT-INF/classes/git.properties
-/app/classes/git.properties
-/app/git.properties
-/deployments/git.properties
-/usr/share/nginx/html/git.properties
-/usr/share/nginx/html/assets/git.properties'
-
 # ---------------------------------------------------------------------------
 # Help
 # ---------------------------------------------------------------------------
@@ -158,16 +149,8 @@ dcver() {
     # --- the lookup, run inside each container ------------------------------
     # One `sh -c` per service that walks the candidate paths and prints the
     # first hit, prefixed with where it came from.
-    local search_paths="$_DAV2_PROP_PATHS"
-    [[ -n "${DOCKER_ALIASES_GIT_PROPS:-}" ]] && \
-        search_paths="$(_split_on ':' "$DOCKER_ALIASES_GIT_PROPS")
-$search_paths"
-
-    local probe='for f in'
-    while IFS= read -r file; do
-        [[ -n "$file" ]] && probe+=" '$file'"
-    done <<< "$search_paths"
-    probe+='; do [ -f "$f" ] && { echo "@@PATH@@$f"; cat "$f"; exit 0; }; done; exit 1'
+    local probe
+    probe=$(_git_props_probe)
 
     local base=(docker compose)
     local item
@@ -227,21 +210,12 @@ $search_paths"
         found=$(( found + 1 ))
 
         props="${out#*$'\n'}"
-        version=$(_prop_value app.version "$props") || version=""
-        [[ -z "$version" ]] && version=$(_prop_value git.build.version "$props")
-        commit=$(_prop_value git.commit.id.abbrev "$props") || commit=""
-        if [[ -z "$commit" ]]; then
-            commit=$(_prop_value git.commit.id "$props")
-            commit="${commit:0:7}"
-        fi
-        branch=$(_prop_value git.branch "$props") || branch=""
-        dirty=$(_prop_value git.dirty "$props") || dirty=""
-        when=$(_age_of "$(_prop_value git.commit.time "$props")")
+        IFS=$'\t' read -r version commit branch when dirty <<< "$(_git_props_row "$props")"
 
         flags=""
         [[ "$dirty" == "true" ]] && flags="$(_icon warn) dirty"
 
-        rows+="${rows:+$nl}${svc}	${version:-—}	${commit:-—}	${branch:-—}	${when:-—}	${flags}"
+        rows+="${rows:+$nl}${svc}	${version}	${commit}	${branch}	${when}	${flags}"
     done
     rm -rf "$tmp"
 

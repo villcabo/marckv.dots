@@ -465,3 +465,67 @@ _age_of() {
     else                            printf '%dy'  $(( diff / 31536000 ))
     fi
 }
+
+# ---------------------------------------------------------------------------
+# git.properties — shared by dcver (compose services) and dver (containers)
+#
+# The file the git-commit-id plugin bakes into a Spring Boot / JHipster
+# artifact. Both commands ask the same question of different populations, so
+# the probe and the parsing live here rather than in either one.
+# ---------------------------------------------------------------------------
+
+# Where it usually is, ordered by how often it is the right answer.
+_DAV2_PROP_PATHS='/app/resources/git.properties
+/app/BOOT-INF/classes/git.properties
+/app/classes/git.properties
+/app/git.properties
+/deployments/git.properties
+/usr/share/nginx/html/git.properties
+/usr/share/nginx/html/assets/git.properties'
+
+# _git_props_probe → an sh -c script that prints the first git.properties found
+#
+# The hit is prefixed with @@PATH@@<path> so the caller can say WHERE it came
+# from — which is the quick way to learn where your image actually puts it.
+# DOCKER_ALIASES_GIT_PROPS entries are searched first.
+_git_props_probe() {
+    local paths="$_DAV2_PROP_PATHS"
+    [[ -n "${DOCKER_ALIASES_GIT_PROPS:-}" ]] && \
+        paths="$(_split_on ':' "$DOCKER_ALIASES_GIT_PROPS")
+$paths"
+
+    local probe='for f in' item
+    while IFS= read -r item; do
+        [[ -n "$item" ]] && probe+=" '$item'"
+    done <<< "$paths"
+    probe+='; do [ -f "$f" ] && { echo "@@PATH@@$f"; cat "$f"; exit 0; }; done; exit 1'
+
+    printf '%s' "$probe"
+}
+
+# _git_props_row <properties text> → version, commit, branch, age, dirty
+#                                    as five TAB-separated fields
+#
+# app.version answers the question in one string, which is why it leads. The
+# 40-character hash and the full commit message that v1 printed are left out:
+# on a merge commit that message is a paragraph.
+_git_props_row() {
+    local props="$1"
+    local version commit branch dirty when
+
+    version=$(_prop_value app.version "$props") || version=""
+    [[ -z "$version" ]] && version=$(_prop_value git.build.version "$props")
+
+    commit=$(_prop_value git.commit.id.abbrev "$props") || commit=""
+    if [[ -z "$commit" ]]; then
+        commit=$(_prop_value git.commit.id "$props")
+        commit="${commit:0:7}"
+    fi
+
+    branch=$(_prop_value git.branch "$props") || branch=""
+    dirty=$(_prop_value git.dirty "$props") || dirty=""
+    when=$(_age_of "$(_prop_value git.commit.time "$props")")
+
+    printf '%s\t%s\t%s\t%s\t%s' \
+        "${version:-—}" "${commit:-—}" "${branch:-—}" "${when:-—}" "$dirty"
+}
