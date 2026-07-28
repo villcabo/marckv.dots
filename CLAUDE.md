@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**marckv.dots** is a personal Linux dotfiles repo: modular bash, Docker aliases with colored output, Neovim (LazyVim — full `nvim/` and server-focused `nvim-lite/`), Kitty, and Tmux. Targets Debian/Ubuntu (Ubuntu 20/22/24, Debian 11/12).
+**marckv.dots** is a personal Linux dotfiles repo: modular bash, Docker aliases with colored output and previews, Neovim (LazyVim — full `nvim/` and server-focused `nvim-lite/`), Kitty, and Tmux. Targets Debian/Ubuntu (Ubuntu 20/22/24, Debian 11/12).
 
 ## Commands
 
@@ -14,7 +14,7 @@ Core installers — numbered prefixes define execution order. Each supports `ins
 
 ```bash
 ./01-install-bash.sh                    # Bash modules (robbyrussell theme, aliases, functions)
-./02-install-docker-color.sh            # Docker aliases + docker-color-output binary
+./02-install-docker-aliases.sh          # Docker & Compose shortcuts (bash + zsh)
 ./03-install-tmux.sh                    # Tmux config (symlink) + TPM
 ./04-install-nvim-lite.sh [--copy]      # Server-focused Neovim config (symlink, or copy)
 ```
@@ -65,7 +65,11 @@ Colors must load first as other modules depend on them. The theme depends on fun
 ### Component layout
 - `bash/` — modules loaded by `bash/.bashrc` (see load order above)
 - `bash-extensions/` — optional add-ons sourced separately (e.g. `bash_gradle_functions.sh`)
-- `docker-aliases/` — docker/compose shortcuts with completion
+- `docker-aliases/` — docker/compose shortcuts with completion. Nine commands,
+  bash and zsh, each with a doc page in `docker-aliases/docs/`. Its own e2e suite
+  runs every check in both shells across 7 distros — see
+  `docker-aliases/tests/README.md`. No external binaries: it renders its own
+  coloured tables rather than piping through `docker-color-output`.
 - `nvim/` vs `nvim-lite/` — full LazyVim setup vs. minimal server profile; both have their own `stylua.toml`
 - `kitty/`, `tmux/` — terminal/multiplexer configs
 

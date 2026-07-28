@@ -56,7 +56,7 @@ Each script is independent — install only what you need.
 
 ```bash
 ./01-install-bash.sh                    # Custom bash config (robbyrussell theme, aliases, functions)
-./02-install-docker-color.sh            # Docker aliases + docker-color-output binary
+./02-install-docker-aliases.sh          # Docker & Compose shortcuts (bash + zsh)
 ./03-install-tmux.sh                    # Tmux config (symlink) + TPM plugin manager
 ./04-install-nvim-lite.sh               # Neovim config — server-focused, minimal (symlink)
 ./04-install-nvim-lite.sh --copy        # Same but copies the directory (no repo dependency)
@@ -84,7 +84,7 @@ source ~/.bashrc
 ~/.marckv.dots/
 ├── bash/                   # Bash modules (colors, aliases, functions, theme)
 ├── bash-extensions/        # Extra functions (Gradle, etc.)
-├── docker-aliases/         # Docker & Compose shortcuts with completion
+├── docker-aliases/         # Docker & Compose shortcuts with completion (bash + zsh)
 ├── nvim/                   # Full Neovim config (LazyVim)
 ├── nvim-lite/              # Minimal Neovim config for servers (LazyVim)
 ├── kitty/                  # Kitty terminal config

@@ -4,8 +4,8 @@
 This repository is a Linux dotfiles/developer-environment setup.
 
 - `bash/`: modular shell config loaded by `bash/.bashrc` (`aliases.sh`, `environment.sh`, `functions.sh`, `themes/robbyrussell.sh`, etc.).
-- `docker-aliases/`: Docker and Docker Compose shortcuts (`docker-color_aliases.sh`).
-- `installer/`: executable setup scripts (`01-install-bash.sh`, `02-install-docker-color.sh`, plus optional tooling installers like `install-node.sh` and `install-nvim.sh`).
+- `docker-aliases/`: Docker and Docker Compose shortcuts (`init.sh` loads `commands/*.sh`); bash + zsh, with its own e2e suite in `docker-aliases/tests/`.
+- `installer/`: executable setup scripts (`01-install-bash.sh`, `02-install-docker-aliases.sh`, plus optional tooling installers like `install-node.sh` and `install-nvim.sh`).
 - `nvim/`: Neovim/LazyVim configuration (`init.lua`, `lua/config`, `lua/plugins`, `stylua.toml`).
 - `docker-compose.yml`: multi-distro test environment (Ubuntu 20/22/24, Debian 11/12).
 - `.github/copilot-instructions.md`: contributor testing/safety expectations.
@@ -15,7 +15,7 @@ No compile/build step exists; use installer and container-based validation.
 
 - `cd installer && ./01-install-bash.sh`: install shell configuration.
 - `cd installer && ./01-install-bash.sh status|uninstall`: verify or remove bash setup.
-- `cd installer && ./02-install-docker-color.sh`: install Docker aliases + binary checks.
+- `cd installer && ./02-install-docker-aliases.sh`: install Docker aliases (adds one source line; downloads nothing).
 - `docker compose up -d ubuntu-24`: start primary test container.
 - `docker compose exec ubuntu-24 bash`: run installer tests in-container.
 - `docker compose down`: stop test environment.
