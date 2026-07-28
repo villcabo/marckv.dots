@@ -52,7 +52,8 @@ docker-aliases-v2/
 │   ├── dcd.sh
 │   ├── dps.sh
 │   ├── dcps.sh
-│   └── dcver.sh
+│   ├── dcver.sh
+│   └── dver.sh
 ├── completions/         one pair per command
 │   ├── dcup.bash / dcup.zsh
 │   ├── dclt.bash / dclt.zsh
@@ -61,7 +62,8 @@ docker-aliases-v2/
 │   ├── dcd.bash / dcd.zsh
 │   ├── dps.bash / dps.zsh
 │   ├── dcps.bash / dcps.zsh
-│   └── dcver.bash / dcver.zsh
+│   ├── dcver.bash / dcver.zsh
+│   └── dver.bash / dver.zsh
 ├── docs/                one page per command
 │   ├── dcup.md
 │   ├── dclt.md
@@ -69,7 +71,8 @@ docker-aliases-v2/
 │   ├── dcx.md
 │   ├── dcd.md
 │   ├── dps.md          (dcps.md links here)
-│   └── dcver.md
+│   ├── dcver.md
+│   └── dver.md
 └── tests/               e2e across 7 distros and both shells
 ```
 
@@ -89,6 +92,7 @@ the running shell, so it never needs editing.
 | `dps` | List containers on this host | [docs/dps.md](docs/dps.md) |
 | `dcps` | List this project's services | [docs/dps.md](docs/dps.md) |
 | `dcver` | Which build is running in each service | [docs/dcver.md](docs/dcver.md) |
+| `dver` | Which build is running, host-wide | [docs/dver.md](docs/dver.md) |
 
 ## Testing
 
@@ -99,7 +103,7 @@ docker compose build && docker compose up -d
 docker compose exec ubuntu24 zsh      # poke around by hand
 ```
 
-678 checks per shell across 7 distros — Debian 11/12/13 and Ubuntu
+730 checks per shell across 7 distros — Debian 11/12/13 and Ubuntu
 20.04/22.04/24.04/26.04, covering bash 5.0→5.3 and zsh 5.8→5.9. The suite is
 hermetic: `docker` is shimmed, so it asserts on the exact argv each command
 would run while being unable to touch a real container.
@@ -149,6 +153,14 @@ necessary and the variants delete themselves.
 Better still, arrange the table so nothing has to be: `dps` follows `docker ps`'s
 column order, which puts the identifier LAST — and a last column needs no
 padding, so images and names both stay whole.
+
+**Host and project are the same command twice.** `dps`/`dcps` and
+`dver`/`dcver` ask one question at two scopes, and the `dc` prefix always means
+"this compose project". Learning one teaches the other.
+
+**Hide only what you can account for.** `dver` drops containers with no version
+— but the header still counts them, the footer names them, and `-a` brings them
+back. An omission you can check is a filter; one you cannot is a lie.
 
 **Borrow the order people already know.** `dps` lays its columns out exactly as
 `docker ps` does. Muscle memory beats any ordering we could invent.
