@@ -5,55 +5,141 @@
 # and which services live in it.
 #
 # Configuration env vars:
-#   DOCKER_COMPOSE_FILE       Explicit compose file, wins over everything else
+#   COMPOSE_FILE              docker's own: a SEPARATED LIST of compose files
+#   COMPOSE_PATH_SEPARATOR    what separates them (default ":")
+#   DOCKER_COMPOSE_FILE       a v1 invention, one file, kept for compatibility
 #   DOCKER_ALIASES_CACHE_TTL  Service-list cache TTL in seconds (default 5,
 #                             0 disables caching)
 
 # ---------------------------------------------------------------------------
 # Compose file detection
 #
-# Priority:
-#   1. $DOCKER_COMPOSE_FILE
-#   2. DOCKER_COMPOSE_FILE= inside ./.env
-#   3. ./docker-compose.yml
-#   4. ./docker-compose.yaml
+# The goal is simple to state and easy to get wrong: in any directory, these
+# commands must act on the SAME files `docker compose` would act on. Anything
+# else means the preview says one thing and docker does another.
 #
-# Prints the path on stdout, returns 1 when nothing is found.
+# Resolution order, mirroring docker's own:
+#   1. $COMPOSE_FILE          — docker's native variable, a LIST
+#   2. COMPOSE_FILE= in .env  — same, and docker reads it from there too
+#   3. $DOCKER_COMPOSE_FILE   — a v1 invention, kept so old setups keep working
+#   4. DOCKER_COMPOSE_FILE= in .env
+#   5. ./docker-compose.yml (or .yaml), plus its override sibling
+#
+# COMPOSE_FILE holds a SEPARATED LIST, not one path — ":" by default, or
+# whatever COMPOSE_PATH_SEPARATOR says. Reading only the first entry is how a
+# project with five compose files ends up starting one of them.
+#
+# Whenever an explicit list is given (1-4), the override sibling is NOT added.
+# That is not our choice: setting COMPOSE_FILE disables docker's automatic
+# docker-compose.override.yml merge exactly the way passing -f does, so adding
+# it back would make us diverge from docker in the other direction.
 # ---------------------------------------------------------------------------
 
+# _env_value <KEY> → the value of KEY in ./.env, empty if unset
+#
+# Parsed in pure shell: a minimal server has no guarantee of grep or cut, and
+# this runs on every completion keystroke.
+_env_value() {
+    [[ -f .env ]] || return 1
+
+    local key="$1" line value=""
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        case "$line" in
+            "$key"=*)
+                value="${line#"$key"=}"
+                value="${value%\"}"; value="${value#\"}"
+                value="${value%\'}"; value="${value#\'}"
+                ;;
+        esac
+    done < .env
+
+    [[ -z "$value" ]] && return 1
+    printf '%s' "$value"
+}
+
+# _split_on <separator> <string> → one item per line
+_split_on() {
+    local sep="$1" rest="$2"
+    while [[ "$rest" == *"$sep"* ]]; do
+        printf '%s\n' "${rest%%"$sep"*}"
+        rest="${rest#*"$sep"}"
+    done
+    [[ -n "$rest" ]] && printf '%s\n' "$rest"
+    return 0
+}
+
+# _resolve_compose_files → every compose file in play, one per line
+#
+# This is the single source of truth. _get_compose_file is a thin wrapper that
+# returns the first line, for the few places that only need one.
+_resolve_compose_files() {
+    local sep item found=""
+    # A literal newline in a plain variable: zsh does not expand $'\n' inside
+    # a ${var:+...} substitution, so building a list with it silently produces
+    # one run-on line. Documented in the README, and worth re-reading before
+    # every list you assemble.
+    local nl='
+' 
+
+    # The separator can be redefined, and is read the same way docker reads it.
+    sep="${COMPOSE_PATH_SEPARATOR:-}"
+    [[ -z "$sep" ]] && sep=$(_env_value COMPOSE_PATH_SEPARATOR)
+    [[ -z "$sep" ]] && sep=":"
+
+    # --- 1 & 2: COMPOSE_FILE, environment first, then .env -----------------
+    local list="${COMPOSE_FILE:-}"
+    [[ -z "$list" ]] && list=$(_env_value COMPOSE_FILE)
+
+    if [[ -n "$list" ]]; then
+        while IFS= read -r item; do
+            [[ -z "$item" ]] && continue
+            # A listed file that does not exist is docker's error to report,
+            # not ours to hide — pass it through and let docker say so.
+            found+="${found:+$nl}${item}"
+        done <<< "$(_split_on "$sep" "$list")"
+        [[ -n "$found" ]] && { printf '%s\n' "$found"; return 0; }
+    fi
+
+    # --- 3 & 4: DOCKER_COMPOSE_FILE, the v1 variable ------------------------
+    local single="${DOCKER_COMPOSE_FILE:-}"
+    [[ -z "$single" ]] && single=$(_env_value DOCKER_COMPOSE_FILE)
+    if [[ -n "$single" && -f "$single" ]]; then
+        printf '%s\n' "$single"
+        return 0
+    fi
+
+    # --- 5: the conventional names, plus the override sibling ---------------
+    local base=""
+    if   [[ -f docker-compose.yml ]];  then base="docker-compose.yml"
+    elif [[ -f docker-compose.yaml ]]; then base="docker-compose.yaml"
+    elif [[ -f compose.yml ]];         then base="compose.yml"
+    elif [[ -f compose.yaml ]];        then base="compose.yaml"
+    else return 1
+    fi
+
+    printf '%s\n' "$base"
+
+    local candidate=""
+    case "$base" in
+        docker-compose.yml)  candidate="docker-compose.override.yml" ;;
+        docker-compose.yaml) candidate="docker-compose.override.yaml" ;;
+        compose.yml)         candidate="compose.override.yml" ;;
+        compose.yaml)        candidate="compose.override.yaml" ;;
+    esac
+    [[ -n "$candidate" && -f "$candidate" ]] && printf '%s\n' "$candidate"
+
+    return 0
+}
+
+# _get_compose_file → the FIRST resolved compose file
+#
+# Kept because several callers only need something to point at. Anything that
+# acts on the project should use _resolve_compose_files instead: this one
+# cannot represent a multi-file project, which is precisely the bug it caused.
 _get_compose_file() {
-    if [[ -n "$DOCKER_COMPOSE_FILE" && -f "$DOCKER_COMPOSE_FILE" ]]; then
-        printf '%s\n' "$DOCKER_COMPOSE_FILE"
-        return 0
-    fi
-
-    # Parsed in pure bash so the lookup works on a box without grep/cut.
-    if [[ -f .env ]]; then
-        local line value=""
-        while IFS= read -r line || [[ -n "$line" ]]; do
-            case "$line" in
-                DOCKER_COMPOSE_FILE=*)
-                    value="${line#DOCKER_COMPOSE_FILE=}"
-                    value="${value%\"}"; value="${value#\"}"
-                    value="${value%\'}"; value="${value#\'}"
-                    ;;
-            esac
-        done < .env
-        if [[ -n "$value" && -f "$value" ]]; then
-            printf '%s\n' "$value"
-            return 0
-        fi
-    fi
-
-    if [[ -f docker-compose.yml ]]; then
-        printf '%s\n' "docker-compose.yml"
-        return 0
-    elif [[ -f docker-compose.yaml ]]; then
-        printf '%s\n' "docker-compose.yaml"
-        return 0
-    fi
-
-    return 1
+    local first
+    first=$(_resolve_compose_files) || return 1
+    printf '%s\n' "${first%%$'\n'*}"
 }
 
 # ---------------------------------------------------------------------------
@@ -68,45 +154,6 @@ _DAV2_SVC_KEY=""
 _DAV2_SVC_VAL=""
 _DAV2_SVC_TS=0
 
-# _resolve_compose_files → one compose file per line
-#
-# The base file, plus its override sibling when there is one.
-#
-# This exists because of a trap worth stating plainly: `docker compose` merges
-# docker-compose.override.yml automatically, but ONLY when no -f is passed. The
-# moment you pass `-f docker-compose.yml`, the override is silently dropped —
-# and since every command here passes -f so the preview can name the file, the
-# override has to be added back explicitly or it disappears.
-#
-# The sibling is only added for the two standard base names. A file chosen by
-# hand (prod.yml, or DOCKER_COMPOSE_FILE pointing somewhere specific) is taken
-# at its word, exactly as docker would.
-_resolve_compose_files() {
-    local base
-    base=$(_get_compose_file) || return 1
-    printf '%s\n' "$base"
-
-    local dir="${base%/*}"
-    [[ "$dir" == "$base" ]] && dir="."
-    local stem="${base##*/}"
-    local candidate=""
-
-    case "$stem" in
-        docker-compose.yml)  candidate="$dir/docker-compose.override.yml" ;;
-        docker-compose.yaml) candidate="$dir/docker-compose.override.yaml" ;;
-        compose.yml)         candidate="$dir/compose.override.yml" ;;
-        compose.yaml)        candidate="$dir/compose.override.yaml" ;;
-    esac
-
-    if [[ -n "$candidate" && -f "$candidate" ]]; then
-        # Keep it relative when the base was relative, so the preview stays
-        # readable instead of printing an absolute path out of nowhere.
-        printf '%s\n' "${candidate#./}"
-    fi
-
-    return 0
-}
-
 # _get_compose_services [file...] → one service name per line
 #
 # Takes every compose file, not just the first: with layered files the merged
@@ -115,9 +162,13 @@ _resolve_compose_files() {
 _get_compose_services() {
     local files=("$@")
     if [[ ${#files[@]} -eq 0 ]]; then
-        local detected
-        detected=$(_get_compose_file) || return 1
-        files=("$detected")
+        # EVERY resolved file, not just the first. Falling back to one is what
+        # made completion in a COMPOSE_FILE project offer a single service.
+        local detected_item
+        while IFS= read -r detected_item; do
+            [[ -n "$detected_item" ]] && files+=("$detected_item")
+        done <<< "$(_resolve_compose_files)"
+        [[ ${#files[@]} -eq 0 ]] && return 1
     fi
 
     local ttl="${DOCKER_ALIASES_CACHE_TTL:-5}"
@@ -157,9 +208,13 @@ _get_compose_services() {
 _get_compose_profiles() {
     local files=("$@")
     if [[ ${#files[@]} -eq 0 ]]; then
-        local detected
-        detected=$(_get_compose_file) || return 1
-        files=("$detected")
+        # EVERY resolved file, not just the first. Falling back to one is what
+        # made completion in a COMPOSE_FILE project offer a single service.
+        local detected_item
+        while IFS= read -r detected_item; do
+            [[ -n "$detected_item" ]] && files+=("$detected_item")
+        done <<< "$(_resolve_compose_files)"
+        [[ ${#files[@]} -eq 0 ]] && return 1
     fi
 
     local args=() file
@@ -180,9 +235,13 @@ _get_compose_profiles() {
 _get_compose_project() {
     local files=("$@")
     if [[ ${#files[@]} -eq 0 ]]; then
-        local detected
-        detected=$(_get_compose_file) || return 1
-        files=("$detected")
+        # EVERY resolved file, not just the first. Falling back to one is what
+        # made completion in a COMPOSE_FILE project offer a single service.
+        local detected_item
+        while IFS= read -r detected_item; do
+            [[ -n "$detected_item" ]] && files+=("$detected_item")
+        done <<< "$(_resolve_compose_files)"
+        [[ ${#files[@]} -eq 0 ]] && return 1
     fi
 
     local args=() file
@@ -216,9 +275,13 @@ _get_compose_project() {
 _get_compose_volumes() {
     local files=("$@")
     if [[ ${#files[@]} -eq 0 ]]; then
-        local detected
-        detected=$(_get_compose_file) || return 1
-        files=("$detected")
+        # EVERY resolved file, not just the first. Falling back to one is what
+        # made completion in a COMPOSE_FILE project offer a single service.
+        local detected_item
+        while IFS= read -r detected_item; do
+            [[ -n "$detected_item" ]] && files+=("$detected_item")
+        done <<< "$(_resolve_compose_files)"
+        [[ ${#files[@]} -eq 0 ]] && return 1
     fi
 
     local args=() file
@@ -241,9 +304,13 @@ _get_compose_volumes() {
 _get_running_services() {
     local files=("$@")
     if [[ ${#files[@]} -eq 0 ]]; then
-        local detected
-        detected=$(_get_compose_file) || return 1
-        files=("$detected")
+        # EVERY resolved file, not just the first. Falling back to one is what
+        # made completion in a COMPOSE_FILE project offer a single service.
+        local detected_item
+        while IFS= read -r detected_item; do
+            [[ -n "$detected_item" ]] && files+=("$detected_item")
+        done <<< "$(_resolve_compose_files)"
+        [[ ${#files[@]} -eq 0 ]] && return 1
     fi
 
     local args=() file

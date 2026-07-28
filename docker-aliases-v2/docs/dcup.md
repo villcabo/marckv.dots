@@ -59,12 +59,28 @@ dcup -P dev,debug                 # enable two profiles
 
 When `-f` is not given, the file is resolved in this order:
 
-1. `$DOCKER_COMPOSE_FILE`
-2. `DOCKER_COMPOSE_FILE=` inside `./.env`
-3. `./docker-compose.yml`
-4. `./docker-compose.yaml`
+1. `$COMPOSE_FILE` — docker's own variable, holding a **list**
+2. `COMPOSE_FILE=` inside `./.env` — same, docker reads it there too
+3. `$DOCKER_COMPOSE_FILE` — a v1 invention, one file, kept working
+4. `DOCKER_COMPOSE_FILE=` inside `./.env`
+5. `./docker-compose.yml` / `.yaml` (or `compose.yml` / `.yaml`), **plus its
+   `.override.` sibling when one exists**
 
 If none of these exist, `dcup` stops with an error and runs nothing.
+
+`COMPOSE_FILE` is a separated list, not one path — `:` by default, or whatever
+`COMPOSE_PATH_SEPARATOR` says:
+
+```
+COMPOSE_FILE=docker-compose.yml:docker-compose.http.yml:docker-compose.obs.yml
+```
+
+Every one of those is used. Setting it also **disables** docker's automatic
+`docker-compose.override.yml` merge, and these commands follow suit — your list
+is the whole truth.
+
+This resolution is shared by every command here, so `dcup`, `dclt`, `dcps` and
+TAB completion all act on exactly the files `docker compose` would.
 
 ## The preview
 
