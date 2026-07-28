@@ -51,7 +51,8 @@ docker-aliases-v2/
 │   ├── dcx.sh
 │   ├── dcd.sh
 │   ├── dps.sh
-│   └── dcps.sh
+│   ├── dcps.sh
+│   └── dcver.sh
 ├── completions/         one pair per command
 │   ├── dcup.bash / dcup.zsh
 │   ├── dclt.bash / dclt.zsh
@@ -59,14 +60,16 @@ docker-aliases-v2/
 │   ├── dcx.bash / dcx.zsh
 │   ├── dcd.bash / dcd.zsh
 │   ├── dps.bash / dps.zsh
-│   └── dcps.bash / dcps.zsh
+│   ├── dcps.bash / dcps.zsh
+│   └── dcver.bash / dcver.zsh
 ├── docs/                one page per command
 │   ├── dcup.md
 │   ├── dclt.md
 │   ├── dcdown.md
 │   ├── dcx.md
 │   ├── dcd.md
-│   └── dps.md          (dcps.md links here)
+│   ├── dps.md          (dcps.md links here)
+│   └── dcver.md
 └── tests/               e2e across 7 distros and both shells
 ```
 
@@ -85,6 +88,7 @@ the running shell, so it never needs editing.
 | `dcd` | Jump to a container's compose project directory | [docs/dcd.md](docs/dcd.md) |
 | `dps` | List containers on this host | [docs/dps.md](docs/dps.md) |
 | `dcps` | List this project's services | [docs/dps.md](docs/dps.md) |
+| `dcver` | Which build is running in each service | [docs/dcver.md](docs/dcver.md) |
 
 ## Testing
 
@@ -95,7 +99,7 @@ docker compose build && docker compose up -d
 docker compose exec ubuntu24 zsh      # poke around by hand
 ```
 
-548 checks per shell across 7 distros — Debian 11/12/13 and Ubuntu
+678 checks per shell across 7 distros — Debian 11/12/13 and Ubuntu
 20.04/22.04/24.04/26.04, covering bash 5.0→5.3 and zsh 5.8→5.9. The suite is
 hermetic: `docker` is shimmed, so it asserts on the exact argv each command
 would run while being unable to touch a real container.
@@ -170,6 +174,10 @@ it), and `COMPOSE_PROFILES` — including that `-P` *replaces* it rather than
 adding to it. Diverging by one file or one profile means the preview describes
 something docker is not about to do.
 
+**Nothing beyond a POSIX shell and coreutils.** `sd`, `rg`, `jq` and friends are
+excellent and none of them is on a fresh Debian server, which is where these
+aliases get used. A guard test enforces it.
+
 **A test that cannot fail is not a test.** The suite runs with
 `DOCKER_ALIASES_NERD_FONT=0`, so for a long time it never executed the Nerd Font
 branch at all — and that branch shipped completely broken behind a wall of green
@@ -208,3 +216,4 @@ already bit us, kept here so they don't bite twice:
 | `DOCKER_ALIASES_NERD_FONT` | `1` | `0` forces ASCII icons |
 | `DOCKER_ALIASES_CACHE_TTL` | `5` | Service-list cache seconds, `0` disables |
 | `DOCKER_ALIASES_AUTO_YES` | `0` | `1` bypasses confirmation. **Tests/CI only** |
+| `DOCKER_ALIASES_GIT_PROPS` | — | Extra `git.properties` paths for `dcver`, `:`-separated |
