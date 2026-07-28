@@ -185,7 +185,7 @@ dcup() {
     local preview_services="${services[*]}"
     if [[ ${#services[@]} -eq 0 ]]; then
         local discovered
-        if discovered=$(_get_compose_services "${files[@]}" 2>/dev/null); then
+        if discovered=$(_get_compose_services --profiles "${profiles[*]}" "${files[@]}" 2>/dev/null); then
             preview_services=$(printf '%s' "$discovered" | tr '\n' ' ')
         fi
     fi

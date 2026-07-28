@@ -163,7 +163,7 @@ dclt() {
     local services=() svc
     while IFS= read -r svc; do
         [[ -n "$svc" ]] && services+=("$svc")
-    done <<< "$(_get_compose_services "${files[@]}")"
+    done <<< "$(_get_compose_services --profiles "${profiles[*]}" "${files[@]}")"
 
     if [[ ${#services[@]} -eq 0 ]]; then
         _err dclt "no services found in the compose file"

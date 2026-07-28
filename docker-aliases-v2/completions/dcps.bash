@@ -15,7 +15,7 @@ _dcps_complete_bash() {
     if [[ "$cur" == -* ]]; then
         COMPREPLY=( $(compgen -W "-a -x -t -f -e -P -h --help" -- "$cur") )
     else
-        COMPREPLY=( $(compgen -W "$(_dcps_candidates 2>/dev/null)" -- "$cur") )
+        COMPREPLY=( $(compgen -W "$(_dcps_candidates "${COMP_WORDS[@]}" 2>/dev/null)" -- "$cur") )
     fi
     return 0
 }

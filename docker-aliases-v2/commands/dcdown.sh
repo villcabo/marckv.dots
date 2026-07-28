@@ -139,7 +139,7 @@ dcdown() {
     local declared=() running=() svc
     while IFS= read -r svc; do
         [[ -n "$svc" ]] && declared+=("$svc")
-    done <<< "$(_get_compose_services "${files[@]}")"
+    done <<< "$(_get_compose_services --profiles "${profiles[*]}" "${files[@]}")"
 
     if [[ ${#declared[@]} -eq 0 ]]; then
         _err dcdown "no services found in the compose file"

@@ -41,6 +41,17 @@ dcup -P dev -P debug      # repeated
 dcup -P dev,debug         # comma-separated
 ```
 
+### Profiles change which services exist
+
+`COMPOSE_PROFILES` in your environment or `.env` is applied by docker on its
+own, and every command here reflects it — the preview, the table and TAB
+completion all list the services that profile actually brings in.
+
+**`-P` replaces `COMPOSE_PROFILES`, it does not add to it.** That is docker's
+behaviour, not ours: with `COMPOSE_PROFILES=dev` in `.env`, `dcup -P debug`
+enables `debug` alone. These commands follow the same rule, so what the preview
+names is what the command starts.
+
 ## Examples
 
 ```bash

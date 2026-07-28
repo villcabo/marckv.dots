@@ -57,6 +57,25 @@ _env_value() {
     printf '%s' "$value"
 }
 
+# _profiles_from_words <word>... → the -P values on a command line, comma-joined
+#
+# Completion needs to know which profiles the half-typed command already names,
+# so the services it offers match the ones that command would actually act on.
+# Takes the words as arguments because the array holding them is COMP_WORDS in
+# bash and words in zsh.
+_profiles_from_words() {
+    local out="" expect=0 w
+    for w in "$@"; do
+        if (( expect )); then
+            out+="${out:+,}${w}"
+            expect=0
+            continue
+        fi
+        [[ "$w" == "-P" ]] && expect=1
+    done
+    printf '%s' "$out"
+}
+
 # _split_on <separator> <string> → one item per line
 _split_on() {
     local sep="$1" rest="$2"
@@ -160,6 +179,15 @@ _DAV2_SVC_TS=0
 # service list is what actually gets started, and the preview must not show
 # anything but the truth.
 _get_compose_services() {
+    # Profiles change WHICH services exist, so a list built without them is a
+    # different list. Passed explicitly rather than read from the environment:
+    # `--profile` REPLACES $COMPOSE_PROFILES rather than adding to it, so once a
+    # command names one, that is the whole set.
+    local profiles=""
+    if [[ "${1:-}" == "--profiles" ]]; then
+        profiles="$2"; shift 2
+    fi
+
     local files=("$@")
     if [[ ${#files[@]} -eq 0 ]]; then
         # EVERY resolved file, not just the first. Falling back to one is what
@@ -172,7 +200,9 @@ _get_compose_services() {
     fi
 
     local ttl="${DOCKER_ALIASES_CACHE_TTL:-5}"
-    local key="${PWD}:${files[*]}"
+    # The profiles belong in the cache key: the same directory answers
+    # differently depending on them.
+    local key="${PWD}:${files[*]}:${profiles}"
     local now
     now=$(date +%s 2>/dev/null || printf '0')
 
@@ -181,10 +211,15 @@ _get_compose_services() {
         return 0
     fi
 
-    local args=() file
+    local args=() file prof
     for file in "${files[@]}"; do
         args+=(-f "$file")
     done
+    if [[ -n "$profiles" ]]; then
+        while IFS= read -r prof; do
+            [[ -n "$prof" ]] && args+=(--profile "$prof")
+        done <<< "$(_split_commas "$profiles")"
+    fi
 
     # Sorted because `config --services` does NOT guarantee an order — the same
     # file can come back as "api db worker" or "worker api db" on consecutive

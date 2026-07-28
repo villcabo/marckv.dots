@@ -174,4 +174,7 @@ dcps() {
 }
 
 # Completion source: service names of the current project.
-_dcps_candidates() { _get_compose_services 2>/dev/null; }
+# Completion source: service names, honouring any -P already typed.
+_dcps_candidates() {
+    _get_compose_services --profiles "$(_profiles_from_words "$@")" 2>/dev/null
+}

@@ -95,7 +95,7 @@ docker compose build && docker compose up -d
 docker compose exec ubuntu24 zsh      # poke around by hand
 ```
 
-520 checks per shell across 7 distros — Debian 11/12/13 and Ubuntu
+548 checks per shell across 7 distros — Debian 11/12/13 and Ubuntu
 20.04/22.04/24.04/26.04, covering bash 5.0→5.3 and zsh 5.8→5.9. The suite is
 hermetic: `docker` is shimmed, so it asserts on the exact argv each command
 would run while being unable to touch a real container.
@@ -163,10 +163,11 @@ command — never "follow". `-e` is the env file, `-P` the profile. A letter is
 never reused for a second meaning: `-o` is *once* in `dclt`, so `dcdown` spells
 orphans `-O`, and anything that would collide is long-form only.
 
-**Resolve files exactly as docker does.** Whatever `docker compose` would act
-on in a directory, these commands act on too — `COMPOSE_FILE` list included,
-override sibling included, and the sibling deliberately skipped when an explicit
-list disables it. Diverging by even one file means the preview describes
+**Resolve files and profiles exactly as docker does.** Whatever `docker compose`
+would act on in a directory, these commands act on too: the `COMPOSE_FILE` list,
+the override sibling (and its deliberate absence when an explicit list disables
+it), and `COMPOSE_PROFILES` — including that `-P` *replaces* it rather than
+adding to it. Diverging by one file or one profile means the preview describes
 something docker is not about to do.
 
 **A test that cannot fail is not a test.** The suite runs with
@@ -202,6 +203,7 @@ already bit us, kept here so they don't bite twice:
 |---|---|---|
 | `COMPOSE_FILE` | — | **docker's own**: `:`-separated list of compose files |
 | `COMPOSE_PATH_SEPARATOR` | `:` | What separates the entries in `COMPOSE_FILE` |
+| `COMPOSE_PROFILES` | — | **docker's own**: profiles to enable. `-P` replaces it |
 | `DOCKER_COMPOSE_FILE` | — | A v1 invention, a single file. Kept for compatibility |
 | `DOCKER_ALIASES_NERD_FONT` | `1` | `0` forces ASCII icons |
 | `DOCKER_ALIASES_CACHE_TTL` | `5` | Service-list cache seconds, `0` disables |

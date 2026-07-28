@@ -17,7 +17,7 @@ _dcps_complete_zsh() {
         flags=(-a -x -t -f -e -P -h --help)
         compadd -a flags
     else
-        candidates=(${(f)"$(_dcps_candidates 2>/dev/null)"})
+        candidates=(${(f)"$(_dcps_candidates "${words[@]}" 2>/dev/null)"})
         (( ${#candidates} )) && compadd -a candidates
     fi
 }
