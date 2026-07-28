@@ -410,3 +410,58 @@ _container_compose_info() {
 {{index .Config.Labels "com.docker.compose.project.working_dir"}}
 {{index .Config.Labels "com.docker.compose.project.config_files"}}' 2>/dev/null
 }
+
+# ---------------------------------------------------------------------------
+# Java .properties helpers
+# ---------------------------------------------------------------------------
+
+# _unescape_prop <value> → the value with .properties escaping undone
+#
+# Java escapes ":", "=", "#" and "!" on write, so a timestamp reaches us as
+# 2024-04-18T16\:56\:45-0400 and reads like a typo if passed through raw.
+# The backslash pair is handled last so an escaped backslash is not mistaken
+# for the start of another escape.
+_unescape_prop() {
+    local v="$1"
+    v="${v//\\:/:}"
+    v="${v//\\=/=}"
+    v="${v//\\#/#}"
+    v="${v//\\!/!}"
+    v="${v//\\\\/\\}"
+    printf '%s' "$v"
+}
+
+# _prop_value <key> <properties text> → the value of key
+_prop_value() {
+    local key="$1" text="$2" line
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        case "$line" in
+            "$key"=*) _unescape_prop "${line#"$key"=}"; return 0 ;;
+        esac
+    done <<< "$text"
+    return 1
+}
+
+# _age_of <ISO-8601 timestamp> → 3d, 2w, 5mo …
+#
+# Falls back to the raw string rather than guessing when date cannot parse it:
+# a wrong age is worse than an unformatted one.
+_age_of() {
+    local ts="$1"
+    [[ -z "$ts" ]] && { printf '—'; return 0; }
+
+    local then now diff
+    then=$(date -d "$ts" +%s 2>/dev/null) || { printf '%s' "${ts%%T*}"; return 0; }
+    now=$(date +%s 2>/dev/null) || { printf '%s' "${ts%%T*}"; return 0; }
+
+    diff=$(( now - then ))
+    (( diff < 0 )) && diff=0
+
+    if   (( diff < 3600 ));    then printf '%dm'  $(( diff / 60 ))
+    elif (( diff < 86400 ));   then printf '%dh'  $(( diff / 3600 ))
+    elif (( diff < 604800 ));  then printf '%dd'  $(( diff / 86400 ))
+    elif (( diff < 2592000 )); then printf '%dw'  $(( diff / 604800 ))
+    elif (( diff < 31536000 ));then printf '%dmo' $(( diff / 2592000 ))
+    else                            printf '%dy'  $(( diff / 31536000 ))
+    fi
+}

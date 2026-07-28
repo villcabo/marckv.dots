@@ -425,6 +425,24 @@ _pad_to() {
     done
 }
 
+# _color_named <name> <cell> → the escape a named colour resolves to
+#
+# "@status" defers to _status_color so the cell decides its own colour.
+_color_named() {
+    case "$1" in
+        dim)    printf '%s' "$CDIM" ;;
+        cyan)   printf '%s' "$CCY" ;;
+        green)  printf '%s' "$CGR" ;;
+        yellow) printf '%s' "$CYE" ;;
+        blue)   printf '%s' "$CBL" ;;
+        magenta) printf '%s' "$CMA" ;;
+        red)    printf '%s' "$CRE" ;;
+        white)  printf '%s' "$CWH" ;;
+        @status) _status_color "$2" ;;
+        *)      printf '%s' "$CWH" ;;
+    esac
+}
+
 # _status_color <status text> → the color that status deserves
 #
 # Health is read out of the status string rather than left buried in it: a
@@ -458,6 +476,19 @@ _render_container_table() {
     local title="$1" shown="$2" total="$3" filter="$4"
     local h1="$5" h2="$6" h3="$7" h4="$8" h5="$9" h6="${10}"
     local rows="${11}"
+    # Per-column colours, comma separated. "@status" means run the cell through
+    # _status_color. Defaults to what dps/dcps want; dcver overrides it, because
+    # the same table shape can carry columns that mean quite different things.
+    local colors="${12:-dim,cyan,dim,@status,green,white}"
+
+    local _c1 _c2 _c3 _c4 _c5 _c6 _ci=0 _cname
+    while IFS= read -r _cname; do
+        _ci=$(( _ci + 1 ))
+        case "$_ci" in
+            1) _c1="$_cname" ;; 2) _c2="$_cname" ;; 3) _c3="$_cname" ;;
+            4) _c4="$_cname" ;; 5) _c5="$_cname" ;; 6) _c6="$_cname" ;;
+        esac
+    done <<< "$(_split_commas "$colors")"
 
     # Nothing is capped any more. The column order follows `docker ps`, which
     # puts the name LAST — and a last column needs no padding, so it can run as
@@ -495,11 +526,13 @@ _render_container_table() {
         return 0
     fi
 
-    local scolor
+    local k1 k2 k3 k4 k5 k6
     while IFS=$'\t' read -r c1 c2 c3 c4 c5 c6 || [[ -n "$c1" ]]; do
         [[ -z "$c1" ]] && continue
-        scolor=$(_status_color "$c4")
-        printf "  ${CDIM}%s${CR}  ${CCY}%s${CR}  ${CDIM}%s${CR}  ${scolor}%s${CR}  ${CGR}%s${CR}  ${CWH}%s${CR}\n" \
+        k1=$(_color_named "$_c1" "$c1"); k2=$(_color_named "$_c2" "$c2")
+        k3=$(_color_named "$_c3" "$c3"); k4=$(_color_named "$_c4" "$c4")
+        k5=$(_color_named "$_c5" "$c5"); k6=$(_color_named "$_c6" "$c6")
+        printf "  ${k1}%s${CR}  ${k2}%s${CR}  ${k3}%s${CR}  ${k4}%s${CR}  ${k5}%s${CR}  ${k6}%s${CR}\n" \
             "$(_pad_to "$c1" "$w1")" "$(_pad_to "$c2" "$w2")" \
             "$(_pad_to "$c3" "$w3")" "$(_pad_to "$c4" "$w4")" \
             "$(_pad_to "$c5" "$w5")" "$c6"
