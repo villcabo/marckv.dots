@@ -58,6 +58,31 @@ cat > "${WORK}/bin/docker" <<SHIM
 # dcx probes the container for bash before opening a shell. There is no real
 # container here, so the answer is driven by DAV2_FAKE_BASH — which lets the
 # suite exercise BOTH the bash branch and the sh fallback.
+#
+# dcver probes each container for git.properties. Answered from an invented
+# world so the parsing, the dirty flag and the "not found" row are all
+# exercised: cleanapp has one, dirtyapp has a dirty one, nothing has none.
+case "\$*" in
+    *"@@PATH@@"*)
+        for a in "\$@"; do
+            case "\$a" in
+                cleanapp)
+                    printf '@@PATH@@/app/resources/git.properties\n'
+                    printf 'app.version=1.1.0-d3cabc9\ngit.branch=main\n'
+                    printf 'git.commit.id.abbrev=d3cabc9\ngit.dirty=false\n'
+                    printf 'git.commit.time=2024-04-18T16\\:56\\:45-0400\n'
+                    exit 0 ;;
+                dirtyapp)
+                    printf '@@PATH@@/app/BOOT-INF/classes/git.properties\n'
+                    printf 'app.version=2.0.0-aabbccd\ngit.branch=develop\n'
+                    printf 'git.commit.id.abbrev=aabbccd\ngit.dirty=true\n'
+                    printf 'git.commit.time=2024-04-18T16\\:56\\:45-0400\n'
+                    exit 0 ;;
+                nothing) exit 1 ;;
+            esac
+        done
+        exit 1 ;;
+esac
 case "\$*" in
     *"command -v bash"*)
         [ "\${DAV2_FAKE_BASH:-0}" = "1" ] && exit 0 || exit 1 ;;
@@ -334,6 +359,67 @@ run_suite() {
     out=$(dcup_out "$F/multifile" -f base.yml -f override.yml)
     assert_has "merged services include the override-only one" "sidecar" "$out"
 
+    section "$CURRENT_SHELL — no workstation-only tools"
+    # These are excellent and they are on the author's machine. None of them is
+    # on a fresh Debian server, which is where these aliases get used. An `sd`
+    # slipped into dcver and only the distro matrix caught it — this catches the
+    # next one before the matrix has to.
+    local tool hits
+    for tool in sd rg fd bat eza exa jq yq delta dust procs fzf; do
+        hits=$(grep -rnE "(^|[;&|(\\\`]|\\\$\\()[[:space:]]*${tool}[[:space:]]" \
+            "$V2_DIR/commands" "$V2_DIR/lib" "$V2_DIR/completions" "$V2_DIR/init.sh" \
+            2>/dev/null | grep -v '^\s*#' | grep -vE '^[^:]+:[0-9]+:[[:space:]]*#' || true)
+        assert_eq "no '$tool' in the sources" "" "$hits"
+    done
+
+    section "$CURRENT_SHELL — properties parsing"
+    # Java .properties escapes ":" on write, so a timestamp arrives as
+    # 2024-04-18T16\:56\:45 and reads like a typo if passed through raw.
+    local pv
+    pv() { "$CURRENT_SHELL" -c "source '$INIT'; _prop_value '$1' '$2'" 2>/dev/null; }
+    assert_eq "a plain value is read" "main" \
+        "$(pv git.branch 'git.branch=main')"
+    assert_eq "escaped colons are undone" "2024-04-18T16:56:45-0400" \
+        "$(pv git.commit.time 'git.commit.time=2024-04-18T16\:56\:45-0400')"
+    assert_eq "escaped hashes too" "fix #136" \
+        "$(pv git.msg 'git.msg=fix \#136')"
+    # A key that is a prefix of another must not match it.
+    assert_eq "keys match exactly" "7" \
+        "$(pv git.commit.id.abbrev 'git.commit.id=abcdefg1234
+git.commit.id.abbrev=7')"
+
+    section "$CURRENT_SHELL — dcver"
+    out=$(ps_out "$F/versions" dcver)
+    assert_has "the table is titled"            "compose versions" "$out"
+    assert_has "version comes from app.version" "1.1.0-d3cabc9"    "$out"
+    assert_has "a second service is listed"     "2.0.0-aabbccd"    "$out"
+    assert_has "the short commit is shown"      "d3cabc9"          "$out"
+    assert_has "the branch is shown"            "develop"          "$out"
+    # THE flag: a dirty build cannot be reproduced from the commit it names.
+    assert_has "a dirty build is flagged"       "dirty"            "$out"
+    # …and a clean one must NOT be, or the flag stops meaning anything.
+    out=$(ps_out "$F/versions" dcver cleanapp)
+    assert_lacks "a clean build is not flagged" "dirty"            "$out"
+    assert_has  "the filter narrows it"         "1 of 1"           "$out"
+    # A service without the file is reported, not silently dropped.
+    out=$(ps_out "$F/versions" dcver)
+    assert_has "a missing file is stated"       "no git.properties" "$out"
+    assert_has "and counted honestly"           "2 of 3"            "$out"
+    # The 40-char hash and the merge-commit paragraph v1 printed are gone.
+    assert_lacks "no full-length commit hash"   "d3cabc9876e722"    "$out"
+
+    out=$(ps_out "$F/versions" dcver -r cleanapp)
+    assert_has "raw mode dumps every field"     "git.commit.id.abbrev" "$out"
+    assert_has "raw mode says where it found it" "/app/resources"      "$out"
+    # Raw means raw: the file as it is on disk, escaping included. The table is
+    # where values get cleaned up.
+    assert_has "raw keeps the file verbatim"    "16\\:56"             "$out"
+
+    assert_eq "an unknown flag exits 1" "1" \
+        "$("$CURRENT_SHELL" -c "cd '$F/versions'; source '$INIT'; dcver -Z" >/dev/null 2>&1; printf '%s' "$?")"
+    out=$("$CURRENT_SHELL" -c "cd '$F/versions'; source '$INIT'; dcver zzz" 2>&1 | strip_ansi)
+    assert_has "no match lists what exists" "available:" "$out"
+
     section "$CURRENT_SHELL — profiles"
     out=$(dcup_argv "$F/profiles" -P dev,debug)
     assert_has "comma split, first profile"  "[--profile] [dev]"   "$out"
@@ -383,6 +469,67 @@ run_suite() {
     assert_has "services are discovered" "worker" "$out"
     out=$(in_shell "$F/profiles" '_get_compose_profiles')
     assert_has "profiles are discovered" "debug"  "$out"
+
+    section "$CURRENT_SHELL — no workstation-only tools"
+    # These are excellent and they are on the author's machine. None of them is
+    # on a fresh Debian server, which is where these aliases get used. An `sd`
+    # slipped into dcver and only the distro matrix caught it — this catches the
+    # next one before the matrix has to.
+    local tool hits
+    for tool in sd rg fd bat eza exa jq yq delta dust procs fzf; do
+        hits=$(grep -rnE "(^|[;&|(\\\`]|\\\$\\()[[:space:]]*${tool}[[:space:]]" \
+            "$V2_DIR/commands" "$V2_DIR/lib" "$V2_DIR/completions" "$V2_DIR/init.sh" \
+            2>/dev/null | grep -v '^\s*#' | grep -vE '^[^:]+:[0-9]+:[[:space:]]*#' || true)
+        assert_eq "no '$tool' in the sources" "" "$hits"
+    done
+
+    section "$CURRENT_SHELL — properties parsing"
+    # Java .properties escapes ":" on write, so a timestamp arrives as
+    # 2024-04-18T16\:56\:45 and reads like a typo if passed through raw.
+    local pv
+    pv() { "$CURRENT_SHELL" -c "source '$INIT'; _prop_value '$1' '$2'" 2>/dev/null; }
+    assert_eq "a plain value is read" "main" \
+        "$(pv git.branch 'git.branch=main')"
+    assert_eq "escaped colons are undone" "2024-04-18T16:56:45-0400" \
+        "$(pv git.commit.time 'git.commit.time=2024-04-18T16\:56\:45-0400')"
+    assert_eq "escaped hashes too" "fix #136" \
+        "$(pv git.msg 'git.msg=fix \#136')"
+    # A key that is a prefix of another must not match it.
+    assert_eq "keys match exactly" "7" \
+        "$(pv git.commit.id.abbrev 'git.commit.id=abcdefg1234
+git.commit.id.abbrev=7')"
+
+    section "$CURRENT_SHELL — dcver"
+    out=$(ps_out "$F/versions" dcver)
+    assert_has "the table is titled"            "compose versions" "$out"
+    assert_has "version comes from app.version" "1.1.0-d3cabc9"    "$out"
+    assert_has "a second service is listed"     "2.0.0-aabbccd"    "$out"
+    assert_has "the short commit is shown"      "d3cabc9"          "$out"
+    assert_has "the branch is shown"            "develop"          "$out"
+    # THE flag: a dirty build cannot be reproduced from the commit it names.
+    assert_has "a dirty build is flagged"       "dirty"            "$out"
+    # …and a clean one must NOT be, or the flag stops meaning anything.
+    out=$(ps_out "$F/versions" dcver cleanapp)
+    assert_lacks "a clean build is not flagged" "dirty"            "$out"
+    assert_has  "the filter narrows it"         "1 of 1"           "$out"
+    # A service without the file is reported, not silently dropped.
+    out=$(ps_out "$F/versions" dcver)
+    assert_has "a missing file is stated"       "no git.properties" "$out"
+    assert_has "and counted honestly"           "2 of 3"            "$out"
+    # The 40-char hash and the merge-commit paragraph v1 printed are gone.
+    assert_lacks "no full-length commit hash"   "d3cabc9876e722"    "$out"
+
+    out=$(ps_out "$F/versions" dcver -r cleanapp)
+    assert_has "raw mode dumps every field"     "git.commit.id.abbrev" "$out"
+    assert_has "raw mode says where it found it" "/app/resources"      "$out"
+    # Raw means raw: the file as it is on disk, escaping included. The table is
+    # where values get cleaned up.
+    assert_has "raw keeps the file verbatim"    "16\\:56"             "$out"
+
+    assert_eq "an unknown flag exits 1" "1" \
+        "$("$CURRENT_SHELL" -c "cd '$F/versions'; source '$INIT'; dcver -Z" >/dev/null 2>&1; printf '%s' "$?")"
+    out=$("$CURRENT_SHELL" -c "cd '$F/versions'; source '$INIT'; dcver zzz" 2>&1 | strip_ansi)
+    assert_has "no match lists what exists" "available:" "$out"
 
     section "$CURRENT_SHELL — profiles"
     # Profiles decide WHICH SERVICES EXIST, so a service list built without them
@@ -1123,6 +1270,13 @@ run_completion_checks() {
             printf '%s\n' \"\${COMPREPLY[@]}\"" 2>&1)
         assert_has "bash: dcd offers -p" "-p" "$out"
         assert_has "bash: dcd offers -i" "-i" "$out"
+
+        out=$(cd "$F/versions" && bash -c "
+            source '$INIT'
+            COMP_WORDS=(dcver ''); COMP_CWORD=1
+            _dcver_complete_bash
+            printf '%s\n' \"\${COMPREPLY[@]}\"" 2>&1)
+        assert_has "bash: dcver completes services" "dirtyapp" "$out"
         return
     fi
 
@@ -1254,6 +1408,13 @@ run_completion_checks() {
         _dcd_complete_zsh" 2>&1)
     assert_has "zsh: dcd offers -p" "-p" "$out"
     assert_has "zsh: dcd offers -i" "-i" "$out"
+
+    out=$(cd "$F/versions" && zsh -c "
+        source '$INIT'
+        $stub
+        words=(dcver ''); CURRENT=2
+        _dcver_complete_zsh" 2>&1)
+    assert_has "zsh: dcver completes services" "dirtyapp" "$out"
 }
 
 # ---------------------------------------------------------------------------

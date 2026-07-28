@@ -91,6 +91,7 @@ stay on this machine. **Docker Hub repositories are public by default.**
 | `composefile-sep/` | The same with a custom `COMPOSE_PATH_SEPARATOR` |
 | `composeprofiles/` | `COMPOSE_PROFILES` in `.env`, and two rival profiles to prove `-P` replaces it |
 | `multimatch/` | `api` and `api-worker` share a prefix — what `dcx` must refuse to guess |
+| `versions/` | Three services: one clean build, one dirty, one with no `git.properties` |
 
 ## How the suite stays safe
 
@@ -117,7 +118,21 @@ inside a container act on the host's real containers.
 
 ## What is covered
 
-548 checks per shell, per distro.
+678 checks per shell, per distro.
+
+A guard also asserts the sources call no workstation-only tool (`sd`, `rg`,
+`fd`, `jq`…). One `sd` reached `dcver` and only the distro matrix caught it;
+this catches the next one first. Verified by planting one and watching it fail.
+
+`dcver`:
+
+- `.properties` unescaping (Java escapes `:` and `#` on write), and that a key
+  which is a prefix of another does not match it
+- `app.version`, short commit, branch and age come through
+- A dirty build is flagged and a clean one is **not** — a flag everything
+  carries stops meaning anything
+- A service with no `git.properties` is listed and explained, not dropped
+- `-r` keeps the file verbatim, escaping included, and names the path it used
 
 Profiles (they decide which services **exist**):
 

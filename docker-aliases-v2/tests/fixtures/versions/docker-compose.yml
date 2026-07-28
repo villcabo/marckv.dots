@@ -1,0 +1,26 @@
+# Two services carrying a git.properties (one clean, one dirty) and a third
+# with none — the three outcomes dcver has to render.
+name: dav2-fixture-versions
+
+networks:
+  appnet:
+    driver: bridge
+
+services:
+  cleanapp:
+    image: alpine:latest
+    command: ["sleep", "infinity"]
+    restart: unless-stopped
+    networks: [appnet]
+
+  dirtyapp:
+    image: alpine:latest
+    command: ["sleep", "infinity"]
+    restart: unless-stopped
+    networks: [appnet]
+
+  nothing:
+    image: alpine:latest
+    command: ["sleep", "infinity"]
+    restart: unless-stopped
+    networks: [appnet]
