@@ -89,6 +89,7 @@ stay on this machine. **Docker Hub repositories are public by default.**
 | `volumes/` | Two named volumes — what `dcdown -v` destroys |
 | `composefile/` | `COMPOSE_FILE` in `.env` joining three files, plus an unlisted override that must stay out |
 | `composefile-sep/` | The same with a custom `COMPOSE_PATH_SEPARATOR` |
+| `composeprofiles/` | `COMPOSE_PROFILES` in `.env`, and two rival profiles to prove `-P` replaces it |
 | `multimatch/` | `api` and `api-worker` share a prefix — what `dcx` must refuse to guess |
 
 ## How the suite stays safe
@@ -116,7 +117,16 @@ inside a container act on the host's real containers.
 
 ## What is covered
 
-520 checks per shell, per distro.
+548 checks per shell, per distro.
+
+Profiles (they decide which services **exist**):
+
+- Discovery with and without profiles, comma-separated lists included
+- `COMPOSE_PROFILES` from `.env` is reflected without us passing anything
+- `-P` **replaces** `COMPOSE_PROFILES` rather than adding to it, matching docker
+- The services the preview names are the services the printed command would act
+  on — the bug here had the preview list one while the command started two
+- TAB after `-P debug` offers that profile's services
 
 `COMPOSE_FILE` (docker's own multi-file variable):
 

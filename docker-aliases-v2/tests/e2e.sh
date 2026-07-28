@@ -384,6 +384,42 @@ run_suite() {
     out=$(in_shell "$F/profiles" '_get_compose_profiles')
     assert_has "profiles are discovered" "debug"  "$out"
 
+    section "$CURRENT_SHELL — profiles"
+    # Profiles decide WHICH SERVICES EXIST, so a service list built without them
+    # describes a different project. Getting this wrong made the preview name
+    # one service while the command it printed would start two.
+    out=$("$CURRENT_SHELL" -c "cd '$F/profiles'; source '$INIT'; _get_compose_services" 2>/dev/null)
+    assert_has  "unprofiled services always show" "api"      "$out"
+    assert_lacks "profiled ones stay hidden"      "debugger" "$out"
+
+    out=$("$CURRENT_SHELL" -c "cd '$F/profiles'; source '$INIT'; _get_compose_services --profiles debug" 2>/dev/null)
+    assert_has  "a profile reveals its services" "debugger" "$out"
+    assert_lacks "and only its own"              "seeder"   "$out"
+
+    out=$("$CURRENT_SHELL" -c "cd '$F/profiles'; source '$INIT'; _get_compose_services --profiles dev,debug" 2>/dev/null)
+    assert_has "comma-separated profiles, first"  "seeder"   "$out"
+    assert_has "comma-separated profiles, second" "debugger" "$out"
+
+    # THE RULE: the services named in the preview must be the services the
+    # printed command would actually act on.
+    out=$(dcup_out "$F/profiles" -P debug)
+    assert_has "the preview lists the profiled service" "debugger"          "$out"
+    assert_has "and the command enables that profile"   "--profile debug"   "$out"
+    out=$(dcup_out "$F/profiles")
+    assert_lacks "with no -P it stays out of both"      "debugger"          "$out"
+
+    # COMPOSE_PROFILES in .env — docker applies it unprompted, so discovery
+    # must reflect it without us passing anything.
+    out=$("$CURRENT_SHELL" -c "cd '$F/composeprofiles'; source '$INIT'; _get_compose_services" 2>/dev/null)
+    assert_has  "COMPOSE_PROFILES from .env is honoured" "dev_only"   "$out"
+    assert_lacks "and does not enable other profiles"    "debug_only" "$out"
+
+    # -P REPLACES COMPOSE_PROFILES rather than adding to it. Verified against
+    # real docker; discovery has to agree or the preview drifts again.
+    out=$("$CURRENT_SHELL" -c "cd '$F/composeprofiles'; source '$INIT'; _get_compose_services --profiles debug" 2>/dev/null)
+    assert_has  "-P brings in its own profile"     "debug_only" "$out"
+    assert_lacks "-P REPLACES the .env profiles"   "dev_only"   "$out"
+
     section "$CURRENT_SHELL — COMPOSE_FILE"
     # docker's own variable, holding a SEPARATED LIST of files. Reading only its
     # first entry is how a five-file project starts one of them — and how TAB
@@ -997,6 +1033,15 @@ run_completion_checks() {
             printf '%s\n' \"\${COMPREPLY[@]}\"" 2>&1)
         assert_has "bash: -P completes profiles" "debug" "$out"
 
+        # A half-typed command already naming a profile must offer that
+        # profile's services — otherwise TAB describes a different project.
+        out=$(cd "$F/profiles" && bash -c "
+            source '$INIT'
+            COMP_WORDS=(dcup -P debug ''); COMP_CWORD=3
+            _dcup_complete_bash
+            printf '%s\n' \"\${COMPREPLY[@]}\"" 2>&1)
+        assert_has "bash: services follow the typed -P" "debugger" "$out"
+
         out=$(cd "$F/basic" && bash -c "
             source '$INIT'
             COMP_WORDS=(dclt ''); COMP_CWORD=1
@@ -1113,6 +1158,13 @@ run_completion_checks() {
         words=(dcup -P ''); CURRENT=3
         _dcup_complete_zsh" 2>&1)
     assert_has "zsh: -P completes profiles" "debug" "$out"
+
+    out=$(cd "$F/profiles" && zsh -c "
+        source '$INIT'
+        $stub
+        words=(dcup -P debug ''); CURRENT=4
+        _dcup_complete_zsh" 2>&1)
+    assert_has "zsh: services follow the typed -P" "debugger" "$out"
 
     out=$(cd "$F/multifile" && zsh -c "
         source '$INIT'
