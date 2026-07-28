@@ -118,7 +118,13 @@ inside a container act on the host's real containers.
 
 ## What is covered
 
-678 checks per shell, per distro.
+730 checks per shell, per distro.
+
+`dver` (the host-wide twin of `dcver`):
+
+- Containers with no `git.properties` leave the TABLE but are still named in
+  the footer and counted in the header — asserted on the table body alone
+- `-a` brings them back; patterns filter; the project label comes through
 
 A guard also asserts the sources call no workstation-only tool (`sd`, `rg`,
 `fd`, `jq`…). One `sd` reached `dcver` and only the distro matrix caught it;

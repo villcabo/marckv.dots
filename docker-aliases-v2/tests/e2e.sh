@@ -66,6 +66,16 @@ case "\$*" in
     *"@@PATH@@"*)
         for a in "\$@"; do
             case "\$a" in
+                fx-api)
+                    printf '@@PATH@@/app/resources/git.properties\n'
+                    printf 'app.version=9.9.9-hostwide\ngit.branch=main\n'
+                    printf 'git.commit.id.abbrev=ffee001\ngit.dirty=true\n'
+                    exit 0 ;;
+                fx-db|other-api|plain-box) exit 1 ;;
+            esac
+        done
+        for a in "\$@"; do
+            case "\$a" in
                 cleanapp)
                     printf '@@PATH@@/app/resources/git.properties\n'
                     printf 'app.version=1.1.0-d3cabc9\ngit.branch=main\n'
@@ -126,6 +136,16 @@ case "\$*" in
         printf 'api\ta1b2c3d4e5f6\tnginx:alpine\tUp 2 hours\t3 weeks ago\t2026-06-30 22:04:16 -0400 -04\t127.0.0.1:8080->80/tcp\n'
         printf 'db\tb2c3d4e5f6a1\tpostgres:18-alpine\tUp 2 hours (unhealthy)\t5 days ago\t2026-07-18 08:00:00 -0400 -04\t5432/tcp\n'
         printf 'dns\tc3d4e5f6a1b2\tcoredns:1.11\tUp 2 hours\tAbout a minute ago\t2026-07-23 05:00:00 -0400 -04\t0.0.0.0:53->53/udp\n'
+        exit 0 ;;
+esac
+# dver asks ps for names + the compose project label. Safe to match on the
+# label alone: `inspect` (which also names it) was already settled above.
+case "\$*" in
+    *"com.docker.compose.project"*)
+        printf 'fx-api\tfixture-proj\n'
+        printf 'fx-db\tfixture-proj\n'
+        printf 'other-api\tother-proj\n'
+        printf 'plain-box\t\n'
         exit 0 ;;
 esac
 case "\$* " in
@@ -420,6 +440,35 @@ git.commit.id.abbrev=7')"
     out=$("$CURRENT_SHELL" -c "cd '$F/versions'; source '$INIT'; dcver zzz" 2>&1 | strip_ansi)
     assert_has "no match lists what exists" "available:" "$out"
 
+    section "$CURRENT_SHELL — dver"
+    # Same question as dcver, asked of the whole host — the dps/dcps pairing.
+    out=$("$CURRENT_SHELL" -c "cd '$WORK'; source '$INIT'; dver" 2>&1 | strip_ansi)
+    assert_has "the table is titled"          "docker versions" "$out"
+    assert_has "a versioned container shows"  "9.9.9-hostwide"  "$out"
+    assert_has "with its project"             "fixture-proj"    "$out"
+    assert_has "and its dirty flag"           "dirty"           "$out"
+    # The point of hiding: three answers should not be buried under fifteen
+    # rows of dashes. They are still NAMED in the footer, so the omission is
+    # checkable rather than silent — assert on the table body alone.
+    local body
+    body=$(printf '%s\n' "$out" | grep -v "with no git.properties")
+    assert_lacks "unversioned ones leave the table" "plain-box" "$body"
+    assert_has  "but the footer names them"    "plain-box"      "$out"
+    assert_has  "and says how many"            "with no git.properties" "$out"
+    assert_has  "and the header stays honest"  "1 of 4"         "$out"
+
+    out=$("$CURRENT_SHELL" -c "cd '$WORK'; source '$INIT'; dver -a" 2>&1 | strip_ansi)
+    assert_has "-a brings them back"           "plain-box"      "$out"
+
+    out=$("$CURRENT_SHELL" -c "cd '$WORK'; source '$INIT'; dver fx-api" 2>&1 | strip_ansi)
+    assert_has "a pattern filters"             "9.9.9-hostwide" "$out"
+    assert_lacks "excluding the rest"          "other-api"      "$out"
+
+    assert_eq "an unknown flag exits 1" "1" \
+        "$("$CURRENT_SHELL" -c "cd '$WORK'; source '$INIT'; dver -Z" >/dev/null 2>&1; printf '%s' "$?")"
+    assert_eq "no match exits 1" "1" \
+        "$("$CURRENT_SHELL" -c "cd '$WORK'; source '$INIT'; dver zzzz" >/dev/null 2>&1; printf '%s' "$?")"
+
     section "$CURRENT_SHELL — profiles"
     out=$(dcup_argv "$F/profiles" -P dev,debug)
     assert_has "comma split, first profile"  "[--profile] [dev]"   "$out"
@@ -530,6 +579,35 @@ git.commit.id.abbrev=7')"
         "$("$CURRENT_SHELL" -c "cd '$F/versions'; source '$INIT'; dcver -Z" >/dev/null 2>&1; printf '%s' "$?")"
     out=$("$CURRENT_SHELL" -c "cd '$F/versions'; source '$INIT'; dcver zzz" 2>&1 | strip_ansi)
     assert_has "no match lists what exists" "available:" "$out"
+
+    section "$CURRENT_SHELL — dver"
+    # Same question as dcver, asked of the whole host — the dps/dcps pairing.
+    out=$("$CURRENT_SHELL" -c "cd '$WORK'; source '$INIT'; dver" 2>&1 | strip_ansi)
+    assert_has "the table is titled"          "docker versions" "$out"
+    assert_has "a versioned container shows"  "9.9.9-hostwide"  "$out"
+    assert_has "with its project"             "fixture-proj"    "$out"
+    assert_has "and its dirty flag"           "dirty"           "$out"
+    # The point of hiding: three answers should not be buried under fifteen
+    # rows of dashes. They are still NAMED in the footer, so the omission is
+    # checkable rather than silent — assert on the table body alone.
+    local body
+    body=$(printf '%s\n' "$out" | grep -v "with no git.properties")
+    assert_lacks "unversioned ones leave the table" "plain-box" "$body"
+    assert_has  "but the footer names them"    "plain-box"      "$out"
+    assert_has  "and says how many"            "with no git.properties" "$out"
+    assert_has  "and the header stays honest"  "1 of 4"         "$out"
+
+    out=$("$CURRENT_SHELL" -c "cd '$WORK'; source '$INIT'; dver -a" 2>&1 | strip_ansi)
+    assert_has "-a brings them back"           "plain-box"      "$out"
+
+    out=$("$CURRENT_SHELL" -c "cd '$WORK'; source '$INIT'; dver fx-api" 2>&1 | strip_ansi)
+    assert_has "a pattern filters"             "9.9.9-hostwide" "$out"
+    assert_lacks "excluding the rest"          "other-api"      "$out"
+
+    assert_eq "an unknown flag exits 1" "1" \
+        "$("$CURRENT_SHELL" -c "cd '$WORK'; source '$INIT'; dver -Z" >/dev/null 2>&1; printf '%s' "$?")"
+    assert_eq "no match exits 1" "1" \
+        "$("$CURRENT_SHELL" -c "cd '$WORK'; source '$INIT'; dver zzzz" >/dev/null 2>&1; printf '%s' "$?")"
 
     section "$CURRENT_SHELL — profiles"
     # Profiles decide WHICH SERVICES EXIST, so a service list built without them
