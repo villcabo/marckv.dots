@@ -384,6 +384,41 @@ run_suite() {
     out=$(in_shell "$F/profiles" '_get_compose_profiles')
     assert_has "profiles are discovered" "debug"  "$out"
 
+    section "$CURRENT_SHELL — COMPOSE_FILE"
+    # docker's own variable, holding a SEPARATED LIST of files. Reading only its
+    # first entry is how a five-file project starts one of them — and how TAB
+    # offered a single service in a project that has five.
+    out=$("$CURRENT_SHELL" -c "cd '$F/composefile'; source '$INIT'; _resolve_compose_files" 2>/dev/null)
+    assert_has "the first listed file is used"  "docker-compose.yml"       "$out"
+    assert_has "the second one too"             "docker-compose.extra.yml" "$out"
+    assert_has "and the third"                  "docker-compose.more.yml"  "$out"
+    # Setting COMPOSE_FILE disables docker's automatic override merge, so adding
+    # the sibling back would diverge from docker in the other direction.
+    assert_lacks "the override is NOT merged in" "docker-compose.override.yml" "$out"
+
+    out=$("$CURRENT_SHELL" -c "cd '$F/composefile'; source '$INIT'; _get_compose_services" 2>/dev/null)
+    assert_has "services come from the whole list"   "extra" "$out"
+    assert_has "including the last file's"           "more"  "$out"
+    assert_lacks "and not from the unlisted override" "must_not_appear" "$out"
+
+    # The env var outranks .env, exactly as docker resolves it.
+    out=$("$CURRENT_SHELL" -c "
+        cd '$F/composefile'
+        COMPOSE_FILE=docker-compose.yml
+        export COMPOSE_FILE
+        source '$INIT'
+        _resolve_compose_files" 2>/dev/null)
+    assert_lacks "the environment overrides .env" "extra" "$out"
+
+    out=$("$CURRENT_SHELL" -c "cd '$F/composefile-sep'; source '$INIT'; _resolve_compose_files" 2>/dev/null)
+    assert_has "COMPOSE_PATH_SEPARATOR is honoured" "docker-compose.extra.yml" "$out"
+
+    # The command must ACT on all of them, not merely display them.
+    out=$(dcup_argv "$F/composefile")
+    assert_has "dcup passes the first file"  "[-f] [docker-compose.yml]"       "$out"
+    assert_has "dcup passes the second"      "[-f] [docker-compose.extra.yml]" "$out"
+    assert_has "dcup passes the third"       "[-f] [docker-compose.more.yml]"  "$out"
+
     section "$CURRENT_SHELL — override auto-detection"
     # `docker compose` merges docker-compose.override.yml on its own, but ONLY
     # when no -f is passed. Every command here passes -f so the preview can name

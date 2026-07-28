@@ -1,0 +1,8 @@
+# Deliberately NOT listed in COMPOSE_FILE. Setting COMPOSE_FILE disables
+# docker's automatic override merge, so this service must NOT appear.
+services:
+  must_not_appear:
+    image: alpine:latest
+    command: ["sleep", "infinity"]
+    restart: unless-stopped
+    networks: [appnet]

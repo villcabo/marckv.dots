@@ -1,0 +1,13 @@
+# Base of a project split across several files, joined by COMPOSE_FILE in .env
+# — the shape that made every command see one service instead of four.
+name: dav2-fixture-composefile
+
+networks:
+  appnet:
+    driver: bridge
+
+services:
+  base:
+    image: nginx:alpine
+    restart: unless-stopped
+    networks: [appnet]

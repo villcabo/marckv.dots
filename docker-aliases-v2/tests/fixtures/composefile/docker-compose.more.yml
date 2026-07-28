@@ -1,0 +1,5 @@
+services:
+  more:
+    image: redis:alpine
+    restart: unless-stopped
+    networks: [appnet]

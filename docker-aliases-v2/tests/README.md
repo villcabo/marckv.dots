@@ -87,6 +87,8 @@ stay on this machine. **Docker Hub repositories are public by default.**
 | `detect-env/` | `DOCKER_COMPOSE_FILE=` inside `.env` pointing at `custom.yml` |
 | `spaces/` | A compose file literally named `my stack.yml` |
 | `volumes/` | Two named volumes — what `dcdown -v` destroys |
+| `composefile/` | `COMPOSE_FILE` in `.env` joining three files, plus an unlisted override that must stay out |
+| `composefile-sep/` | The same with a custom `COMPOSE_PATH_SEPARATOR` |
 | `multimatch/` | `api` and `api-worker` share a prefix — what `dcx` must refuse to guess |
 
 ## How the suite stays safe
@@ -114,7 +116,15 @@ inside a container act on the host's real containers.
 
 ## What is covered
 
-464 checks per shell, per distro.
+520 checks per shell, per distro.
+
+`COMPOSE_FILE` (docker's own multi-file variable):
+
+- The list is split on the separator and **every** entry is used — reading only
+  the first is how a five-file project acted on one of them
+- `COMPOSE_PATH_SEPARATOR` is honoured; the environment outranks `.env`
+- The `.override.` sibling is **not** merged in, because setting `COMPOSE_FILE`
+  disables docker's automatic merge
 
 Also covered: duration shortening (minutes → `m` vs months → `mo`, and docker's
 "About an hour"), status compaction, and that an `Exited (137)` **keeps its exit
