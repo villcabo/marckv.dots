@@ -36,6 +36,28 @@ cat > "${WORK}/bin/docker" <<SHIM
 # dcver probes each container for git.properties. Answered from an invented
 # world so the parsing, the dirty flag and the "not found" row are all
 # exercised: cleanapp has one, dirtyapp has a dirty one, nothing has none.
+#
+# di asks for images and for the reclaimable figure. The invented world mirrors
+# the shape that matters: tagged images with and without containers, plus
+# dangling ones — which the real docker HIDES from a plain `images` call and
+# only returns for `-f dangling=true`.
+case "\$*" in
+    *"dangling=true"*)
+        printf '<none>\t<none>\tdd11ee22ff33\t3 days ago\t2026-07-26 08:00:00 -0400 -04\t175MB\t0\n'
+        printf '<none>\t<none>\tee22ff33aa44\t3 days ago\t2026-07-26 08:00:00 -0400 -04\t208MB\t0\n'
+        exit 0 ;;
+    *"{{.Repository}}"*"{{.Containers}}"*)
+        printf 'nginx\talpine\taa11bb22cc33\t3 weeks ago\t2026-07-08 10:00:00 -0400 -04\t8.42MB\t2\n'
+        printf 'postgres\t18-alpine\tbb22cc33dd44\t2 months ago\t2026-05-20 10:00:00 -0400 -04\t404MB\t0\n'
+        printf 'quay.io/example/very-long-image-name\tv1.0.0\tcc33dd44ee55\t5 days ago\t2026-07-24 10:00:00 -0400 -04\t1.37GB\t1\n'
+        exit 0 ;;
+    *'{{.Repository}}:{{.Tag}}'*)
+        printf 'nginx:alpine\npostgres:18-alpine\nquay.io/example/very-long-image-name:v1.0.0\n'
+        exit 0 ;;
+    *"system df"*)
+        printf 'Images\t4.721GB (37%%)\n'
+        exit 0 ;;
+esac
 case "\$*" in
     *"@@PATH@@"*)
         for a in "\$@"; do
