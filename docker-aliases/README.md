@@ -111,15 +111,17 @@ the running shell, so it never needs editing.
 
 ```bash
 cd tests
-./e2e.sh                              # this machine, bash + zsh
+./run.sh                              # this machine, bash + zsh
+./run.sh bash dcup                    # one shell, one case
 docker compose build && docker compose up -d
 docker compose exec ubuntu24 zsh      # poke around by hand
 ```
 
-730 checks per shell across 7 distros — Debian 11/12/13 and Ubuntu
+320 checks per shell across 7 distros — Debian 11/12/13 and Ubuntu
 20.04/22.04/24.04/26.04, covering bash 5.0→5.3 and zsh 5.8→5.9. The suite is
 hermetic: `docker` is shimmed, so it asserts on the exact argv each command
-would run while being unable to touch a real container.
+would run while being unable to touch a real container. It runs on
+[bats-core](https://github.com/bats-core/bats-core), one case file per command.
 
 See [tests/README.md](tests/README.md) — including an honest account of what is
 **not** covered (real `docker compose up`, and interactive zsh TAB).
