@@ -81,8 +81,11 @@ else
     # Resolve version
     if [[ -z "$ATUIN_VERSION" ]]; then
         info "Resolving latest release..."
-        ATUIN_VERSION="$(curl -fsSL https://api.github.com/repos/atuinsh/atuin/releases/latest \
-            | grep -m1 '"tag_name"' | cut -d'"' -f4 | sed 's/^v//')"
+        # Capture the response before parsing it: piping curl straight into
+        # `grep -m1` closes the pipe early and curl reports
+        # "(23) Failure writing output to destination".
+        RELEASE_JSON="$(curl -fsSL https://api.github.com/repos/atuinsh/atuin/releases/latest)"
+        ATUIN_VERSION="$(printf '%s' "$RELEASE_JSON" | grep -m1 '"tag_name"' | cut -d'"' -f4 | sed 's/^v//')"
         [[ -z "$ATUIN_VERSION" ]] && { error "Could not resolve the latest version"; exit 1; }
     fi
 
