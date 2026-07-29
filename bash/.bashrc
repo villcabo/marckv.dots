@@ -43,6 +43,11 @@ fi
 # Load welcome message
 source "$BASH_MODULES_DIR/welcome.sh"
 
+# Load atuin (shell history). Must come after the theme: atuin hooks into
+# PROMPT_COMMAND and a theme loaded afterwards would override it.
+# No-op when atuin is not installed.
+source "$BASH_MODULES_DIR/atuin.sh"
+
 # =============================================================================
 # ADDITIONAL CONFIGURATIONS
 # =============================================================================
