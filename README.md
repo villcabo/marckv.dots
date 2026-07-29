@@ -1,6 +1,10 @@
 # marckv.dots
 
-Personal dotfiles for Linux — enhanced bash, Docker aliases with colored output, Neovim, Kitty, and Tmux. Targets Debian/Ubuntu systems (Ubuntu 20/22/24, Debian 11/12).
+Personal dotfiles for Linux — enhanced bash, Docker and Compose shortcuts,
+Neovim, Kitty, and Tmux.
+
+Targets Debian 11/12/13 and Ubuntu 20.04/22.04/24.04/26.04, in **bash and
+zsh**.
 
 ## Installation
 
@@ -84,7 +88,7 @@ source ~/.bashrc
 ~/.marckv.dots/
 ├── bash/                   # Bash modules (colors, aliases, functions, theme)
 ├── bash-extensions/        # Extra functions (Gradle, etc.)
-├── docker-aliases/         # Docker & Compose shortcuts with completion (bash + zsh)
+├── docker-aliases/         # Ten Docker & Compose commands, with docs and tests
 ├── nvim/                   # Full Neovim config (LazyVim)
 ├── nvim-lite/              # Minimal Neovim config for servers (LazyVim)
 ├── kitty/                  # Kitty terminal config
@@ -92,15 +96,56 @@ source ~/.bashrc
 └── installer/              # Installation scripts
 ```
 
-### Docker Binary Installation
-- **System-wide**: Requires sudo, installs to `/usr/local/bin`
-- **User-only**: No sudo needed, installs to `~/.local/bin`
-- **Architecture**: Supports x86_64 and aarch64
+---
+
+## Docker aliases
+
+Ten commands, in bash and zsh, each with its own page in
+[`docker-aliases/docs/`](docker-aliases/docs/).
+
+| | Host-wide | This compose project |
+|---|---|---|
+| what is running | `dps` | `dcps` |
+| which build is running | `dver` | `dcver` |
+| images, and what is reclaimable | `di` | |
+| bring up | | `dcup` |
+| logs | | `dclt` |
+| shell in, or run a command | | `dcx` |
+| stop and remove | | `dcdown` |
+| jump to the project directory | `dcd` | |
+
+Every command previews what it is about to do — **naming the exact command it
+will run** — before running it, and asks before anything that changes state.
+Patterns are regular expressions everywhere: `dclt 'api|db'`, `dcd redmine`.
+
+They need nothing but a POSIX shell, coreutils and docker itself — no binaries
+to download. See [`docker-aliases/README.md`](docker-aliases/README.md) for the
+design rules.
+
+## Testing
+
+The installers have a container per distro at the repo root:
+
+```bash
+docker compose up -d ubuntu24
+docker compose exec ubuntu24 bash -c "cd /root/.marckv.dots/installer && ./01-install-bash.sh"
+```
+
+The docker aliases have their own suite — 357 checks per shell, run in **both**
+bash and zsh across seven distros:
+
+```bash
+cd docker-aliases/tests
+./run.sh                       # everything
+./run.sh bash dcup             # one shell, one case
+docker compose up -d           # the seven distro images
+```
 
 ## Contributing
 
-1. Use the Docker Compose testing environment
-2. Test changes across multiple distributions
+1. Use the Docker Compose testing environments above
+2. Test across distributions **and both shells** — most bugs found here were
+   bash-vs-zsh differences that bash was perfectly happy with
 3. Follow the modular structure for new features
 4. Update documentation and help messages
 5. Ensure backward compatibility and proper cleanup
