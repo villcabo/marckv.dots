@@ -13,6 +13,7 @@ FROM ${BASE_IMAGE}
 
 ARG DOCKER_VERSION=29.4.1
 ARG COMPOSE_VERSION=5.1.3
+ARG BATS_VERSION=1.14.0
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -46,6 +47,19 @@ RUN set -eux; \
     chmod +x /usr/local/lib/docker/cli-plugins/docker-compose; \
     docker --version; \
     docker compose version
+
+# bats-core, pinned like everything else. The distro packages differ per
+# release (1.10 here, older there) and a test harness that is not the same
+# everywhere cannot tell you the code behaves the same everywhere.
+# It is pure bash — nothing to compile.
+RUN set -eux; \
+    curl -fsSL "https://github.com/bats-core/bats-core/archive/refs/tags/v${BATS_VERSION}.tar.gz" \
+        -o /tmp/bats.tar.gz; \
+    mkdir -p /tmp/bats; \
+    tar -xzf /tmp/bats.tar.gz -C /tmp/bats --strip-components=1; \
+    /tmp/bats/install.sh /usr/local; \
+    rm -rf /tmp/bats /tmp/bats.tar.gz; \
+    bats --version
 
 # zsh only defines compdef after compinit has run. The completion tests depend
 # on it, so bake it in rather than making every test remember.
