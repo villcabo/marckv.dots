@@ -1,0 +1,54 @@
+# Atuin configuration - marckv.dots
+# Docs: https://docs.atuin.sh/configuration/config/
+#
+# Installed as a symlink to ~/.config/atuin/config.toml by
+# installer/05-install-atuin.sh
+
+# Accept the selected command with Enter instead of only editing it
+enter_accept = true
+
+# ---------------------------------------------------------------------------
+# Sync
+# ---------------------------------------------------------------------------
+# Disabled on purpose. These dotfiles are deployed on servers with access to
+# production; the shell history must never leave the machine.
+# Enable it only on personal workstations, and preferably against a self-hosted
+# sync server.
+auto_sync = false
+update_check = false
+
+# ---------------------------------------------------------------------------
+# Secrets
+# ---------------------------------------------------------------------------
+# Do not record commands that look like they contain credentials.
+# Built-in filter (AWS keys, GitHub tokens, private keys, ...)
+secrets_filter = true
+
+# Extra patterns for our own tooling. Any command matching these is not stored.
+history_filter = [
+  "(--token|--password|--passwd|--secret)[= ]",
+  "(PASSWORD|PASSWD|TOKEN|SECRET|API_KEY|APIKEY|ACCESS_KEY)=",
+  "Authorization: *(Bearer|Basic)",
+  "^\\s*(mysql|psql|mongosh)\\s+.*-p\\S",
+  "vault (login|token create|kv put)",
+  "docker login .*(-p|--password)",
+]
+
+# Never record history from these paths (e.g. CI workspaces)
+cwd_filter = [
+  "^/data/actions-runner",
+  "^/home2/actions-runner",
+]
+
+[stats]
+
+[keys]
+
+[sync]
+records = true
+
+[preview]
+
+[daemon]
+
+[search]
