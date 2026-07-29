@@ -1,0 +1,28 @@
+# COMPOSE_PROFILES in .env selects which profiled services exist. Docker applies
+# it on its own, so discovery must NOT pass --profile unless the command names
+# one — because -P REPLACES the variable rather than adding to it.
+name: dav2-fixture-composeprofiles
+
+networks:
+  appnet:
+    driver: bridge
+
+services:
+  always:
+    image: nginx:alpine
+    restart: unless-stopped
+    networks: [appnet]
+
+  dev_only:
+    image: alpine:latest
+    profiles: ["dev"]
+    command: ["sleep", "infinity"]
+    restart: unless-stopped
+    networks: [appnet]
+
+  debug_only:
+    image: alpine:latest
+    profiles: ["debug"]
+    command: ["sleep", "infinity"]
+    restart: unless-stopped
+    networks: [appnet]

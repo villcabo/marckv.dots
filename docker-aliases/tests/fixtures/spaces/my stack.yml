@@ -1,0 +1,13 @@
+# Filename contains a space: proves argv quoting survives to docker.
+name: dav2-fixture-spaces
+
+networks:
+  appnet:
+    driver: bridge
+
+services:
+  spaced:
+    image: alpine:latest
+    command: ["sleep", "infinity"]
+    restart: unless-stopped
+    networks: [appnet]

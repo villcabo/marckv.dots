@@ -1,0 +1,12 @@
+# Adds a service and retags an existing one. Only visible when BOTH -f are passed.
+name: dav2-fixture-multifile
+
+services:
+  api:
+    image: nginx:stable-alpine
+
+  sidecar:
+    image: alpine:latest
+    command: ["sleep", "infinity"]
+    restart: unless-stopped
+    networks: [appnet]

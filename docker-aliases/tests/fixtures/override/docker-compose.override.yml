@@ -1,0 +1,8 @@
+# Adds a service the base file knows nothing about. If a command misses this
+# file, 'sidecar' silently disappears.
+services:
+  sidecar:
+    image: alpine:latest
+    command: ["sleep", "infinity"]
+    restart: unless-stopped
+    networks: [appnet]

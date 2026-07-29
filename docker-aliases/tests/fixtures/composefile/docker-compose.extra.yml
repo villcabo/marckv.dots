@@ -1,0 +1,6 @@
+services:
+  extra:
+    image: alpine:latest
+    command: ["sleep", "infinity"]
+    restart: unless-stopped
+    networks: [appnet]

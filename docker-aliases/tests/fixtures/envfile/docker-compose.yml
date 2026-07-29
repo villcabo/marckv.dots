@@ -1,0 +1,17 @@
+# Exercises -e: every value comes from an env file, so picking the wrong one
+# is visible in `docker compose config`.
+name: dav2-fixture-envfile
+
+networks:
+  appnet:
+    driver: bridge
+
+services:
+  api:
+    image: nginx:${NGINX_TAG:-alpine}
+    restart: unless-stopped
+    networks: [appnet]
+    ports:
+      - "${API_PORT:-8080}:80"
+    environment:
+      APP_ENV: ${APP_ENV:-unset}

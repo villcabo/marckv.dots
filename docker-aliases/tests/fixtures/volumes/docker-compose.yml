@@ -1,0 +1,28 @@
+# Named volumes: exactly what `dcdown -v` destroys, and what the preview
+# must name before you confirm.
+name: dav2-fixture-volumes
+
+networks:
+  appnet:
+    driver: bridge
+
+volumes:
+  pgdata:
+  redis_data:
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    networks: [appnet]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    environment:
+      POSTGRES_PASSWORD: fixture
+
+  cache:
+    image: redis:alpine
+    restart: unless-stopped
+    networks: [appnet]
+    volumes:
+      - redis_data:/data
