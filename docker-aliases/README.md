@@ -66,7 +66,8 @@ docker-aliases/
 │   ├── dps.sh
 │   ├── dcps.sh
 │   ├── dcver.sh
-│   └── dver.sh
+│   ├── dver.sh
+│   └── di.sh
 ├── completions/         one pair per command
 │   ├── dcup.bash / dcup.zsh
 │   ├── dclt.bash / dclt.zsh
@@ -76,7 +77,8 @@ docker-aliases/
 │   ├── dps.bash / dps.zsh
 │   ├── dcps.bash / dcps.zsh
 │   ├── dcver.bash / dcver.zsh
-│   └── dver.bash / dver.zsh
+│   ├── dver.bash / dver.zsh
+│   └── di.bash / di.zsh
 ├── docs/                one page per command
 │   ├── dcup.md
 │   ├── dclt.md
@@ -85,7 +87,8 @@ docker-aliases/
 │   ├── dcd.md
 │   ├── dps.md          (dcps.md links here)
 │   ├── dcver.md
-│   └── dver.md
+│   ├── dver.md
+│   └── di.md
 └── tests/               e2e across 7 distros and both shells
 ```
 
@@ -106,6 +109,7 @@ the running shell, so it never needs editing.
 | `dcps` | List this project's services | [docs/dps.md](docs/dps.md) |
 | `dcver` | Which build is running in each service | [docs/dcver.md](docs/dcver.md) |
 | `dver` | Which build is running, host-wide | [docs/dver.md](docs/dver.md) |
+| `di` | List images, and what you could delete | [docs/di.md](docs/di.md) |
 
 ## Testing
 
@@ -117,7 +121,7 @@ docker compose build && docker compose up -d
 docker compose exec ubuntu24 zsh      # poke around by hand
 ```
 
-320 checks per shell across 7 distros — Debian 11/12/13 and Ubuntu
+357 checks per shell across 7 distros — Debian 11/12/13 and Ubuntu
 20.04/22.04/24.04/26.04, covering bash 5.0→5.3 and zsh 5.8→5.9. The suite is
 hermetic: `docker` is shimmed, so it asserts on the exact argv each command
 would run while being unable to touch a real container. It runs on

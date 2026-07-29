@@ -153,7 +153,17 @@ inside a container act on the host's real containers.
 
 ## What is covered
 
-320 checks per shell, per distro — 640 per distro, 4480 across the matrix.
+357 checks per shell, per distro — 714 per distro, 4998 across the matrix.
+
+`di`:
+
+- Dangling images appear at all — `docker images` hides them by default, and
+  the first version of the command reported `0 dangling` with fifteen on disk
+- They are labelled `<dangling>`, never left as `<none>:<none>`
+- The reclaimable figure comes from `docker system df`, not from summing sizes
+  (summing overstates by more than double, because images share layers)
+- The footer disappears on a filtered view, where those totals would be a claim
+  about rows that do not represent the machine
 
 `dver` (the host-wide twin of `dcver`):
 
