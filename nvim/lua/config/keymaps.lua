@@ -164,3 +164,7 @@ end
 
 -- Cambiar filetype del buffer (estilo "Change Language Mode" de VSCode)
 vim.keymap.set("n", "<leader>cf", "<cmd>FzfLua filetypes<cr>", { desc = "Change filetype" })
+-- Reload the current file from disk. checktime, not :e — it keeps unsaved
+-- changes instead of refusing (:e) or discarding them (:e!).
+vim.keymap.set("n", "<leader>br", "<cmd>checktime<CR>", { desc = "Reload file from disk" })
+vim.keymap.set("n", "<F5>", "<cmd>checktime<CR>", { desc = "Reload file from disk" })
