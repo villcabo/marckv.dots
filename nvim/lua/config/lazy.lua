@@ -94,7 +94,7 @@ require("lazy").setup({
     rtp = {
       -- Disable some runtime path plugins to improve performance
       disabled_plugins = {
-        "gzip",
+        -- "gzip",        -- keep enabled: transparent read/write of .gz files
         -- "matchit",
         -- "matchparen",
         -- "netrwPlugin",
