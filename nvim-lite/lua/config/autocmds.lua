@@ -127,3 +127,21 @@ autocmd("FileType", {
     vim.fn.matchadd("Type", [=[\v^[^#]*\ze\s+(ssh-|ecdsa-|sk-)]=])
   end,
 })
+-- Reload files changed outside the editor, without being asked to.
+--
+-- 'autoread' is already on by default, but Neovim does not watch the file: it
+-- only notices a change at certain moments, which is why reaching for :e
+-- becomes a habit. The manual says as much under :help timestamp — "if you
+-- don't get warned often enough you can use :checktime".
+--
+-- checktime rather than :e on purpose: it reloads only when the buffer has no
+-- unsaved changes. :e refuses in that case and :e! would throw the edits away.
+vim.api.nvim_create_autocmd({ "FocusGained", "BufEnter", "TermClose", "TermLeave" }, {
+  callback = function()
+    -- Skip while a command line is open: there checktime is postponed anyway
+    -- and only litters the message area.
+    if vim.fn.mode() ~= "c" then
+      vim.cmd.checktime()
+    end
+  end,
+})
