@@ -185,6 +185,14 @@ contract the tests check never moved. Constants get resolved once above the
 loop, not inside it. `dps` went 104 → 21 ms, `dps -a` 201 → 27 ms, with the
 output byte-identical in both shells.
 
+**Read a file with `$(<file)`, never `$(cat file)`.** bash and zsh both
+special-case the first form and read the file inline — no subshell, no
+`/bin/cat`. Measured 0.032 ms against 2.06 ms, **65 times cheaper**, and `dver`
+does it once per container. One catch: `$(<file)` on a missing file prints to
+stderr, and `2>/dev/null` on the assignment does **not** suppress that in bash
+(zsh does). Guard with `[[ -s file ]]` instead — the redirection looks like it
+works right up until you run it in the other shell.
+
 **Do not reach for `printf "%-*s"` to pad a column.** bash pads that by
 **bytes** and zsh by **characters**. A port rendered `3001→3000` is 9
 characters and 11 bytes, so the column lands two short in bash and correct in
