@@ -122,6 +122,10 @@ ${loose}"
     local total=0 shown=0 dangling=0 unused=0
     local repo tag iid since created_at size containers
     local name when used pat keep is_dangling
+    # _DA_R carries the helpers' results back without a subshell. Declared
+    # local here so the _into calls below write into this function's scope
+    # and nothing leaks to the global namespace.
+    local _DA_R
 
     while IFS=$'\t' read -r repo tag iid since created_at size containers || [[ -n "$repo" ]]; do
         [[ -z "$iid" ]] && continue
@@ -151,10 +155,11 @@ ${loose}"
         fi
 
         if [[ "$absolute" == true ]]; then
-            when=$(_short_timestamp "$created_at")
+            _short_timestamp_into "$created_at"
         else
-            when=$(_short_duration "$since")
+            _short_duration_into "$since"
         fi
+        when="$_DA_R"
 
         # The count matters more than the fact: 6 containers on one image says
         # something a checkmark would not.

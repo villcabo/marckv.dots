@@ -168,6 +168,29 @@ because the ports column overflowed the row. Nobody wanted three views; they
 wanted one that fit. When a command sprouts variants, fix what made them
 necessary and the variants delete themselves.
 
+**Nothing forks inside a per-row loop.** `x=$(helper …)` is not a function
+call — it is a `fork()`: the shell clones itself, runs the helper in the copy,
+reads the answer back through a pipe and reaps the child. Measured here: **0.50
+ms every time**, no matter how trivial the helper. `dps` used to spend 19 of
+those per container — three in the collect loop, three more inside
+`_compact_ports` (one of them an `exec` of `/usr/bin/tr` just to split on
+commas), two inside `_short_status`, and **eleven in the renderer**, which
+recomputed `IMAGE is cyan` once per row for thirteen rows. Ninety percent of a
+104 ms `dps` was that, and none of it was docker.
+
+So helpers on a per-row path come in two forms: `_thing_into` assigns to
+`_DA_R` and prints nothing, `_thing` is a one-line wrapper that prints it.
+Loops call the `_into` form; everything else keeps the printed one, so the
+contract the tests check never moved. Constants get resolved once above the
+loop, not inside it. `dps` went 104 → 21 ms, `dps -a` 201 → 27 ms, with the
+output byte-identical in both shells.
+
+**Do not reach for `printf "%-*s"` to pad a column.** bash pads that by
+**bytes** and zsh by **characters**. A port rendered `3001→3000` is 9
+characters and 11 bytes, so the column lands two short in bash and correct in
+zsh — and every mapped port and health glyph in these tables is multibyte.
+Pad on `${#text}`, which counts characters in both.
+
 **Shorten visibly, or not at all.** When a value must be cut, the cut is shown.
 Better still, arrange the table so nothing has to be: `dps` follows `docker ps`'s
 column order, which puts the identifier LAST — and a last column needs no
