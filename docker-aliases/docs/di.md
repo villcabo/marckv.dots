@@ -18,6 +18,7 @@ di [flags] [pattern...]
 | `-u` | Only images no container is using |
 | `-d` | Only dangling images |
 | `-t` | Exact creation date instead of how long ago |
+| `-s` | Add the reclaimable size to the footer — costs ~300ms, see below |
 | `-h`, `--help` | Show the built-in help |
 
 Patterns are regular expressions matched against **`repository:tag`**, so a tag
@@ -32,6 +33,12 @@ local/docker-aliases-test  ubuntu24  812e61bcaefe  57m      179MB   1
 quay.io/keycloak/keycloak  26.6.2    9b0455f766d5  2mo      474MB   1
 redmine-mcp-lab            6.1.3     da4eecadf851  28h      907MB   —
 <dangling>                 —         7f7b633061f6  19h      179MB   —
+ 15 dangling · 28 unused
+```
+
+With `-s`, the footer also carries how much disk that would give back:
+
+```
  15 dangling · 28 unused · 4.721GB (37%) reclaimable
 ```
 
@@ -76,6 +83,19 @@ images share layers, so a shared base counts once per image that references it.
 
 A footer that overstates by more than double is worse than no footer, so this
 one asks docker rather than doing arithmetic.
+
+**Which is why it is behind `-s`.** Honest costs: `docker system df` walks every
+volume and every build cache entry on the host — 209 and 152 of them on this
+machine — to answer one question about images, and there is no way to narrow it
+down, the command takes no `--type`. Measured at **333ms**, against roughly
+130ms for everything else `di` does put together. It was also being called
+before the check that decides whether to print anything, so a host with nothing
+to reclaim paid for the number twice over: once to compute it, once to throw it
+away.
+
+The `dangling` and `unused` counts come free with the listing that is already on
+screen, so those stay. The figure that costs ten times the command is one `-s`
+away when you actually want it.
 
 The footer also **disappears on a filtered view** (`di nginx`, `di -u`): those
 totals describe the machine, and printing them under rows that do not represent

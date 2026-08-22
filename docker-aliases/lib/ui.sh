@@ -39,6 +39,46 @@ _use_nerd_font() {
     return 0
 }
 
+# ---------------------------------------------------------------------------
+# Returning a value without forking
+#
+# `x=$(helper …)` is not a function call: it is a fork(). The shell clones
+# itself, runs the helper in the copy, reads the result back through a pipe and
+# waits for the child to die. Measured on this machine that is 0.50 ms EVERY
+# TIME, whatever the helper does — and the table helpers do almost nothing, so
+# the fork was the entire cost.
+#
+# So every helper on a per-row path comes in two forms:
+#
+#   _thing_into <args>   computes, assigns to _DA_R, prints nothing
+#   _thing <args>        the same, printed — a wrapper over _thing_into
+#
+# Callers in a loop use the _into form and read $_DA_R. Everything else keeps
+# using the plain form, so the contract the tests check never changed.
+#
+# _DA_R is assigned WITHOUT `local`: both bash and zsh scope `local`
+# dynamically, so the assignment lands in the caller's own `local _DA_R` and
+# never reaches the global namespace. Verified in both.
+# ---------------------------------------------------------------------------
+
+# A block of spaces to slice padding out of, instead of appending one at a
+# time. It grows if a column ever needs more than it holds.
+_DA_SP="                                                                                "
+
+# _pad_into <text> <width> — text padded to width, in _DA_R
+#
+# Pads on the CHARACTER count, like the _pad_to it replaces. printf "%-*s"
+# would be the obvious way to write this and it is wrong: bash pads that by
+# BYTES and zsh by characters, so a port rendered "3001→3000" (9 characters,
+# 11 bytes) lands two columns short in bash and correct in zsh. Every mapped
+# port and every health glyph is multibyte, so that is most of a real table.
+_pad_into() {
+    local _t="$1" _w="$2" _n
+    _n=$(( _w - ${#_t} ))
+    while (( _n > ${#_DA_SP} )); do _DA_SP="${_DA_SP}${_DA_SP}"; done
+    if (( _n > 0 )); then _DA_R="${_t}${_DA_SP:0:_n}"; else _DA_R="$_t"; fi
+}
+
 # _icon <name> → glyph on stdout
 #
 # Codepoints are written as \u escapes, never as literal glyphs. Nerd Font
@@ -242,15 +282,25 @@ _confirm_operation() {
 # ---------------------------------------------------------------------------
 
 # _compact_ports <ports string> [show_exposed]
-_compact_ports() {
+_compact_ports_into() {
     local raw="$1"
     local show_exposed="${2:-false}"
 
+    _DA_R=""
     [[ -z "$raw" ]] && return 0
 
-    local out="" entry hostpart container proto cport hport hip label
+    local out="" rest="$raw" entry hostpart container proto cport hport hip label
 
-    while IFS= read -r entry || [[ -n "$entry" ]]; do
+    # Split on commas in the shell. This used to be
+    #     <<< "$(printf '%s\n' "$raw" | tr ',' '\n')"
+    # which is a subshell, a pipe and an exec of /usr/bin/tr — 2.20 ms of the
+    # 3.05 ms this function cost, per container, to do something ${x%%,*} does
+    # for free.
+    while [[ -n "$rest" ]]; do
+        case "$rest" in
+            *,*) entry="${rest%%,*}"; rest="${rest#*,}" ;;
+            *)   entry="$rest"; rest="" ;;
+        esac
         entry="${entry# }"
         [[ -z "$entry" ]] && continue
 
@@ -287,10 +337,12 @@ _compact_ports() {
             *" $label "*) continue ;;
         esac
         out+="${out:+ }${label}"
-    done <<< "$(printf '%s\n' "$raw" | tr ',' '\n')"
+    done
 
-    printf '%s' "$out"
+    _DA_R="$out"
 }
+
+_compact_ports() { local _DA_R; _compact_ports_into "$@"; printf '%s' "$_DA_R"; }
 
 # ---------------------------------------------------------------------------
 # Table helpers
@@ -307,9 +359,9 @@ _compact_ports() {
 # three, and reads just as fast.
 #
 # Note minutes and months both start with m: minutes become m, months mo.
-_short_duration() {
+_short_duration_into() {
     local t="$1"
-    [[ -z "$t" ]] && { printf '—'; return 0; }
+    [[ -z "$t" ]] && { _DA_R='—'; return 0; }
 
     t="${t% ago}"
     # Docker hedges with "About a minute" / "About an hour" / "About a year".
@@ -323,16 +375,18 @@ _short_duration() {
     esac
 
     case "$unit" in
-        second*)  printf '%ss'  "$n" ;;
-        minute*)  printf '%sm'  "$n" ;;
-        hour*)    printf '%sh'  "$n" ;;
-        day*)     printf '%sd'  "$n" ;;
-        week*)    printf '%sw'  "$n" ;;
-        month*)   printf '%smo' "$n" ;;
-        year*)    printf '%sy'  "$n" ;;
-        *)        printf '%s'   "$1" ;;
+        second*)  _DA_R="${n}s"  ;;
+        minute*)  _DA_R="${n}m"  ;;
+        hour*)    _DA_R="${n}h"  ;;
+        day*)     _DA_R="${n}d"  ;;
+        week*)    _DA_R="${n}w"  ;;
+        month*)   _DA_R="${n}mo" ;;
+        year*)    _DA_R="${n}y"  ;;
+        *)        _DA_R="$1"     ;;
     esac
 }
+
+_short_duration() { local _DA_R; _short_duration_into "$@"; printf '%s' "$_DA_R"; }
 
 # _short_status <docker status> → the same meaning, a third of the width
 #
@@ -342,17 +396,29 @@ _short_duration() {
 # Exit codes are KEPT. "Exited (137)" is an out-of-memory kill and "Exited (0)"
 # is a clean stop — collapsing both to "Exited" throws away the only part that
 # tells you which of those happened.
-_short_status() {
+_short_status_into() {
     local s="$1" mark="" rest
+
+    # The three health glyphs are the same on every row of the table, so they
+    # are resolved once per process instead of once per container. The cache is
+    # keyed on the font setting rather than merely "unset", so flipping
+    # DOCKER_ALIASES_NERD_FONT inside one shell still gets the right glyph —
+    # a bare "compute it once" would have silently frozen the first answer.
+    if [[ "${_DA_IC_MODE-}" != "${DOCKER_ALIASES_NERD_FONT:-1}" ]]; then
+        _DA_IC_MODE="${DOCKER_ALIASES_NERD_FONT:-1}"
+        _DA_IC_OK="$(_icon health)"
+        _DA_IC_BAD="$(_icon health_bad)"
+        _DA_IC_WAIT="$(_icon health_wait)"
+    fi
 
     # One glyph for all three states — the COLOUR says which. That is why the
     # ASCII fallback does not follow suit: it is the degraded path, and whoever
     # lost the font may well have lost the colour too, so there it stays
     # explicit (+ ! ~).
     case "$s" in
-        *"(healthy)"*)   mark=" $(_icon health)" ;;
-        *"(unhealthy)"*) mark=" $(_icon health_bad)" ;;
-        *"(starting)"*)  mark=" $(_icon health_wait)" ;;
+        *"(healthy)"*)   mark=" $_DA_IC_OK" ;;
+        *"(unhealthy)"*) mark=" $_DA_IC_BAD" ;;
+        *"(starting)"*)  mark=" $_DA_IC_WAIT" ;;
     esac
 
     case "$s" in
@@ -363,34 +429,41 @@ _short_status() {
             # unterminated one. bash reads the same paren as an ordinary
             # character, so this only ever breaks on one of the two shells.
             rest="${rest%%" ("*}"
-            printf 'Up %s%s' "$(_short_duration "$rest")" "$mark"
+            _short_duration_into "$rest"
+            _DA_R="Up ${_DA_R}${mark}"
             ;;
         Exited*)
             # Exited (137) 3 minutes ago
             rest="${s#"Exited ("}"
             local code="${rest%%")"*}"
             local when="${rest#*") "}"
-            printf 'Exit %s · %s' "$code" "$(_short_duration "$when")"
+            _short_duration_into "$when"
+            _DA_R="Exit ${code} · ${_DA_R}"
             ;;
         Restarting*)
             rest="${s#"Restarting ("}"
             local rcode="${rest%%")"*}"
             local rwhen="${rest#*") "}"
-            printf 'Restart %s · %s' "$rcode" "$(_short_duration "$rwhen")"
+            _short_duration_into "$rwhen"
+            _DA_R="Restart ${rcode} · ${_DA_R}"
             ;;
-        *) printf '%s' "$s" ;;
+        *) _DA_R="$s" ;;
     esac
 }
+
+_short_status() { local _DA_R; _short_status_into "$@"; printf '%s' "$_DA_R"; }
 
 # _short_timestamp <docker CreatedAt> → yyyy-mm-dd hh:mm
 #
 # Docker appends the offset twice — "2026-07-22 23:08:56 -0400 -04". Seconds
 # and both copies of the zone are dropped.
-_short_timestamp() {
+_short_timestamp_into() {
     local t="$1"
-    [[ -z "$t" ]] && { printf '—'; return 0; }
-    printf '%s' "${t:0:16}"
+    [[ -z "$t" ]] && { _DA_R='—'; return 0; }
+    _DA_R="${t:0:16}"
 }
+
+_short_timestamp() { local _DA_R; _short_timestamp_into "$@"; printf '%s' "$_DA_R"; }
 
 # _ellipsize <text> <max> → text, shortened from the middle if it must be
 #
@@ -428,35 +501,39 @@ _pad_to() {
 # _color_named <name> <cell> → the escape a named colour resolves to
 #
 # "@status" defers to _status_color so the cell decides its own colour.
-_color_named() {
+_color_named_into() {
     case "$1" in
-        dim)    printf '%s' "$CDIM" ;;
-        cyan)   printf '%s' "$CCY" ;;
-        green)  printf '%s' "$CGR" ;;
-        yellow) printf '%s' "$CYE" ;;
-        blue)   printf '%s' "$CBL" ;;
-        magenta) printf '%s' "$CMA" ;;
-        red)    printf '%s' "$CRE" ;;
-        white)  printf '%s' "$CWH" ;;
-        @status) _status_color "$2" ;;
-        *)      printf '%s' "$CWH" ;;
+        dim)    _DA_R="$CDIM" ;;
+        cyan)   _DA_R="$CCY" ;;
+        green)  _DA_R="$CGR" ;;
+        yellow) _DA_R="$CYE" ;;
+        blue)   _DA_R="$CBL" ;;
+        magenta) _DA_R="$CMA" ;;
+        red)    _DA_R="$CRE" ;;
+        white)  _DA_R="$CWH" ;;
+        @status) _status_color_into "$2" ;;
+        *)      _DA_R="$CWH" ;;
     esac
 }
+
+_color_named() { local _DA_R; _color_named_into "$@"; printf '%s' "$_DA_R"; }
 
 # _status_color <status text> → the color that status deserves
 #
 # Health is read out of the status string rather than left buried in it: a
 # container that is up but unhealthy looks exactly like a healthy one otherwise.
-_status_color() {
+_status_color_into() {
     case "$1" in
-        *"(unhealthy)"*) printf '%s' "$CRE" ;;
-        *"(starting)"*)  printf '%s' "$CYE" ;;
-        *"(healthy)"*)   printf '%s' "$CGR" ;;
-        Up*|up*|running*) printf '%s' "$CGR" ;;
-        Restarting*|restarting*|Paused*|paused*) printf '%s' "$CYE" ;;
-        *) printf '%s' "$CRE" ;;
+        *"(unhealthy)"*) _DA_R="$CRE" ;;
+        *"(starting)"*)  _DA_R="$CYE" ;;
+        *"(healthy)"*)   _DA_R="$CGR" ;;
+        Up*|up*|running*) _DA_R="$CGR" ;;
+        Restarting*|restarting*|Paused*|paused*) _DA_R="$CYE" ;;
+        *) _DA_R="$CRE" ;;
     esac
 }
+
+_status_color() { local _DA_R; _status_color_into "$@"; printf '%s' "$_DA_R"; }
 
 # ---------------------------------------------------------------------------
 # Container table
@@ -517,25 +594,43 @@ _render_container_table() {
     [[ -n "$filter" ]] && printf "  ${CDIM}·${CR}  ${CDIM}filter:${CR} ${CMA}%s${CR}" "$filter"
     printf "\n"
 
-    printf "  ${CDIM}%s  %s  %s  %s  %s  %s${CR}\n" \
-        "$(_pad_to "$h1" "$w1")" "$(_pad_to "$h2" "$w2")" "$(_pad_to "$h3" "$w3")" \
-        "$(_pad_to "$h4" "$w4")" "$(_pad_to "$h5" "$w5")" "$h6"
+    local _DA_R p1 p2 p3 p4 p5
+    _pad_into "$h1" "$w1"; p1="$_DA_R"; _pad_into "$h2" "$w2"; p2="$_DA_R"
+    _pad_into "$h3" "$w3"; p3="$_DA_R"; _pad_into "$h4" "$w4"; p4="$_DA_R"
+    _pad_into "$h5" "$w5"; p5="$_DA_R"
+    printf "  ${CDIM}%s  %s  %s  %s  %s  %s${CR}\n" "$p1" "$p2" "$p3" "$p4" "$p5" "$h6"
 
     if [[ -z "$rows" ]]; then
         printf "  ${CDIM}(nothing to show)${CR}\n"
         return 0
     fi
 
+    # Five of the six column colours are the same on every row — "IMAGE is
+    # cyan" does not become truer by asking again thirteen times. They are
+    # resolved once here; only a column declared @status depends on the cell
+    # and gets recomputed inside the loop.
     local k1 k2 k3 k4 k5 k6
+    local d1=0 d2=0 d3=0 d4=0 d5=0 d6=0
+    if [[ "$_c1" == "@status" ]]; then d1=1; else _color_named_into "$_c1"; k1="$_DA_R"; fi
+    if [[ "$_c2" == "@status" ]]; then d2=1; else _color_named_into "$_c2"; k2="$_DA_R"; fi
+    if [[ "$_c3" == "@status" ]]; then d3=1; else _color_named_into "$_c3"; k3="$_DA_R"; fi
+    if [[ "$_c4" == "@status" ]]; then d4=1; else _color_named_into "$_c4"; k4="$_DA_R"; fi
+    if [[ "$_c5" == "@status" ]]; then d5=1; else _color_named_into "$_c5"; k5="$_DA_R"; fi
+    if [[ "$_c6" == "@status" ]]; then d6=1; else _color_named_into "$_c6"; k6="$_DA_R"; fi
+
     while IFS=$'\t' read -r c1 c2 c3 c4 c5 c6 || [[ -n "$c1" ]]; do
         [[ -z "$c1" ]] && continue
-        k1=$(_color_named "$_c1" "$c1"); k2=$(_color_named "$_c2" "$c2")
-        k3=$(_color_named "$_c3" "$c3"); k4=$(_color_named "$_c4" "$c4")
-        k5=$(_color_named "$_c5" "$c5"); k6=$(_color_named "$_c6" "$c6")
+        if (( d1 )); then _status_color_into "$c1"; k1="$_DA_R"; fi
+        if (( d2 )); then _status_color_into "$c2"; k2="$_DA_R"; fi
+        if (( d3 )); then _status_color_into "$c3"; k3="$_DA_R"; fi
+        if (( d4 )); then _status_color_into "$c4"; k4="$_DA_R"; fi
+        if (( d5 )); then _status_color_into "$c5"; k5="$_DA_R"; fi
+        if (( d6 )); then _status_color_into "$c6"; k6="$_DA_R"; fi
+        _pad_into "$c1" "$w1"; p1="$_DA_R"; _pad_into "$c2" "$w2"; p2="$_DA_R"
+        _pad_into "$c3" "$w3"; p3="$_DA_R"; _pad_into "$c4" "$w4"; p4="$_DA_R"
+        _pad_into "$c5" "$w5"; p5="$_DA_R"
         printf "  ${k1}%s${CR}  ${k2}%s${CR}  ${k3}%s${CR}  ${k4}%s${CR}  ${k5}%s${CR}  ${k6}%s${CR}\n" \
-            "$(_pad_to "$c1" "$w1")" "$(_pad_to "$c2" "$w2")" \
-            "$(_pad_to "$c3" "$w3")" "$(_pad_to "$c4" "$w4")" \
-            "$(_pad_to "$c5" "$w5")" "$c6"
+            "$p1" "$p2" "$p3" "$p4" "$p5" "$c6"
     done <<< "$rows"
 }
 

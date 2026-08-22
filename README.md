@@ -107,7 +107,7 @@ Ten commands, in bash and zsh, each with its own page in
 |---|---|---|
 | what is running | `dps` | `dcps` |
 | which build is running | `dver` | `dcver` |
-| images, and what is reclaimable | `di` | |
+| images, and what you could delete | `di` | |
 | bring up | | `dcup` |
 | logs | | `dclt` |
 | shell in, or run a command | | `dcx` |

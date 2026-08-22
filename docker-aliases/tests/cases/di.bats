@@ -122,15 +122,85 @@ load '../helpers/common'
 # It comes from `docker system df`, never from adding sizes up: images share
 # layers, so summing the dangling and unused ones on the author's machine gives
 # 10.32GB where the truth is 4.72GB.
+#
+# That call is also the single most expensive thing di can do — 333ms against
+# the ~130ms of the whole rest of the command — so it is behind -s. The tests
+# below check both halves of that: the figure appears when asked for, and the
+# call is NOT MADE when it is not. The second half needs the shim's call
+# counter; asserting only that the output lacks the figure would pass just as
+# happily if docker were invoked and the answer discarded.
 
-@test "di reports what is actually reclaimable" {
-    run in_dir "$WORK" 'di'
+# df_calls <command> → how many times the command reached `docker system df`
+df_calls() {
+    rm -f "$WORK/system-df-calls"
+    in_dir "$WORK" "$1" >/dev/null 2>&1
+    if [[ -f "$WORK/system-df-calls" ]]; then
+        wc -c < "$WORK/system-df-calls" | tr -d ' '
+    else
+        printf '0'
+    fi
+}
+
+@test "di -s reports what is actually reclaimable" {
+    run in_dir "$WORK" 'di -s'
     [[ "$output" == *"4.721GB"* ]]
 }
 
-@test "di labels the reclaimable figure" {
-    run in_dir "$WORK" 'di'
+@test "di -s labels the reclaimable figure" {
+    run in_dir "$WORK" 'di -s'
     [[ "$output" == *"reclaimable"* ]]
+}
+
+@test "di omits the reclaimable figure without -s" {
+    run in_dir "$WORK" 'di'
+    [[ "$output" != *"reclaimable"* ]]
+}
+
+@test "di still counts dangling and unused without -s" {
+    run in_dir "$WORK" 'di'
+    [[ "$output" == *"2 dangling"* ]]
+}
+
+@test "di does not reach docker system df without -s" {
+    run df_calls 'di'
+    [ "$output" = "0" ]
+}
+
+# The counterpart, so the test above cannot pass by the call being impossible.
+@test "di -s does reach docker system df" {
+    run df_calls 'di -s'
+    [ "$output" = "1" ]
+}
+
+@test "di -s asks for it only once" {
+    run df_calls 'di -s'
+    [ "$output" = "1" ]
+}
+
+# -s is about the footer, and the footer belongs to the unfiltered view only.
+@test "di -s on a filtered view skips the call too" {
+    run df_calls 'di -s nginx'
+    [ "$output" = "0" ]
+}
+
+@test "di -us skips the call, -u having removed the footer" {
+    run df_calls 'di -us'
+    [ "$output" = "0" ]
+}
+
+@test "di -s clusters with other short flags" {
+    run in_dir "$WORK" 'di -st'
+    [[ "$output" == *"4.721GB"* ]]
+}
+
+@test "di --help documents -s" {
+    run in_dir "$WORK" 'di --help'
+    [[ "$output" == *"-s"* ]]
+}
+
+@test "di --help says the reclaimable figure costs" {
+    run in_dir "$WORK" 'di --help'
+    [[ "$output" == *"300ms"* ]]
 }
 
 # A total that describes the machine, printed under rows that do not, reads as

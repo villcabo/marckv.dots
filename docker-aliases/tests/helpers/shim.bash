@@ -55,6 +55,11 @@ case "\$*" in
         printf 'nginx:alpine\npostgres:18-alpine\nquay.io/example/very-long-image-name:v1.0.0\n'
         exit 0 ;;
     *"system df"*)
+        # Recorded, not just answered. The point of -s is that this call does
+        # NOT happen without it, and a test can only prove that by watching for
+        # the call itself — checking that the figure is absent from the output
+        # would pass just as happily if it were made and thrown away.
+        printf 'x' >> "${WORK}/system-df-calls"
         printf 'Images\t4.721GB (37%%)\n'
         exit 0 ;;
 esac

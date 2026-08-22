@@ -145,6 +145,10 @@ dcps() {
 '
     local total=0 shown=0
     local service cid image cstatus since created_at raw_ports compacted when pat keep
+    # _DA_R carries the helpers' results back without a subshell. Declared
+    # local here so the _into calls below write into this function's scope
+    # and nothing leaks to the global namespace.
+    local _DA_R
 
     while IFS=$'\t' read -r service cid image cstatus since created_at raw_ports || [[ -n "$service" ]]; do
         [[ -z "$service" ]] && continue
@@ -158,13 +162,15 @@ dcps() {
             [[ "$keep" == false ]] && continue
         fi
 
-        compacted=$(_compact_ports "$raw_ports" "$show_exposed")
+        _compact_ports_into "$raw_ports" "$show_exposed"; compacted="$_DA_R"
         if [[ "$absolute" == true ]]; then
-            when=$(_short_timestamp "$created_at")
+            _short_timestamp_into "$created_at"
         else
-            when=$(_short_duration "$since")
+            _short_duration_into "$since"
         fi
-        rows+="${rows:+$nl}${cid}	${image}	${when}	$(_short_status "$cstatus")	${compacted:-—}	${service}"
+        when="$_DA_R"
+        _short_status_into "$cstatus"
+        rows+="${rows:+$nl}${cid}	${image}	${when}	${_DA_R}	${compacted:-—}	${service}"
         shown=$(( shown + 1 ))
     done <<< "$raw"
 

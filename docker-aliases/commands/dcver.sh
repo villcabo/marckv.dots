@@ -178,7 +178,7 @@ dcver() {
         local i=0 out svc_name
         for svc in "${matched[@]}"; do
             i=$(( i + 1 ))
-            out=$(cat "${tmp}/${i}.out" 2>/dev/null)
+            out=""; [[ -s "${tmp}/${i}.out" ]] && out=$(<"${tmp}/${i}.out")
             printf "${CB}${CMA}# %s${CR}\n" "$svc"
             if [[ -z "$out" ]]; then
                 printf "  ${CDIM}no git.properties found${CR}\n\n"
@@ -201,7 +201,7 @@ dcver() {
     local found=0 i=0 out props version commit branch dirty when flags
     for svc in "${matched[@]}"; do
         i=$(( i + 1 ))
-        out=$(cat "${tmp}/${i}.out" 2>/dev/null)
+        out=""; [[ -s "${tmp}/${i}.out" ]] && out=$(<"${tmp}/${i}.out")
 
         if [[ -z "$out" ]]; then
             rows+="${rows:+$nl}${svc}	—	—	—	—	no git.properties"
