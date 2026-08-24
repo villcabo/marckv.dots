@@ -44,6 +44,18 @@ done
 docker compose down
 ```
 
+`install-nvim.sh` has a scenario suite of its own, because what it gets wrong
+is distro-specific — which Neovim binary a given GLIBC can run, and whether
+what it leaves behind is reachable by anyone but root:
+
+```bash
+cd installer/tests
+./run.sh                       # six distros
+./run.sh debian11              # one — the GLIBC 2.31 case
+```
+
+It writes to `/opt` and `/etc/profile.d`, so it only ever runs in a container.
+
 Docker aliases — their own harness, which also carries `bats` and `zsh`:
 
 ```bash
