@@ -90,8 +90,8 @@ Colors must load first as other modules depend on them. The theme depends on fun
 ### Component layout
 - `bash/` — modules loaded by `bash/.bashrc` (see load order above)
 - `bash-extensions/` — optional add-ons sourced separately (e.g. `bash_gradle_functions.sh`)
-- `docker-aliases/` — docker/compose shortcuts for bash and zsh. Nine commands
-  (`dcup dclt dcdown dcx dcd dps dcps dcver dver`), one file each in `commands/`,
+- `docker-aliases/` — docker/compose shortcuts for bash and zsh. Eleven commands
+  (`dcup dclt dcdown dcx dcd dps dcps dcver dver di dlt`), one file each in `commands/`,
   a doc page each in `docs/`, a bats case file each in `tests/cases/`. Adding a
   command means adding those three; `init.sh` globs and needs no editing.
   **Read `docker-aliases/README.md` before changing anything there** — its

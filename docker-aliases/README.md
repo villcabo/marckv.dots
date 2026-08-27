@@ -1,6 +1,6 @@
 # docker-aliases
 
-Docker and Docker Compose shortcuts for bash and zsh. Nine commands, each one
+Docker and Docker Compose shortcuts for bash and zsh. Eleven commands, each one
 earning its place by being used daily.
 
 Every command previews what it is about to do — naming the exact command it will
@@ -102,6 +102,7 @@ the running shell, so it never needs editing.
 |---|---|---|
 | `dcup` | Bring compose services up | [docs/dcup.md](docs/dcup.md) |
 | `dclt` | Tail logs for services matched by regex | [docs/dclt.md](docs/dclt.md) |
+| `dlt` | Tail logs for containers matched by regex, host-wide | [docs/dlt.md](docs/dlt.md) |
 | `dcdown` | Stop and remove services | [docs/dcdown.md](docs/dcdown.md) |
 | `dcx` | Run a command or open a shell in a service | [docs/dcx.md](docs/dcx.md) |
 | `dcd` | Jump to a container's compose project directory | [docs/dcd.md](docs/dcd.md) |

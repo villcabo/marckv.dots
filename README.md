@@ -100,7 +100,7 @@ source ~/.bashrc
 
 ## Docker aliases
 
-Ten commands, in bash and zsh, each with its own page in
+Eleven commands, in bash and zsh, each with its own page in
 [`docker-aliases/docs/`](docker-aliases/docs/).
 
 | | Host-wide | This compose project |
@@ -109,7 +109,7 @@ Ten commands, in bash and zsh, each with its own page in
 | which build is running | `dver` | `dcver` |
 | images, and what you could delete | `di` | |
 | bring up | | `dcup` |
-| logs | | `dclt` |
+| logs | `dlt` | `dclt` |
 | shell in, or run a command | | `dcx` |
 | stop and remove | | `dcdown` |
 | jump to the project directory | `dcd` | |
