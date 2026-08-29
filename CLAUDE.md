@@ -56,6 +56,16 @@ cd installer/tests
 
 It writes to `/opt` and `/etc/profile.d`, so it only ever runs in a container.
 
+`nvim-lite` has one too, for the same reason — whether a parser can be built at
+all depends on the distro's GLIBC, in two different ways depending on the
+Neovim version:
+
+```bash
+cd nvim-lite/tests
+./run.sh                       # six distros
+./run.sh debian12              # one — the GLIBC 2.36 case, the awkward one
+```
+
 Docker aliases — their own harness, which also carries `bats` and `zsh`:
 
 ```bash

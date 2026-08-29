@@ -119,6 +119,88 @@ _install_fzf() {
     rm -f "$tmp_file"
 }
 
+# Install the tree-sitter CLI, pinned to a build this machine's GLIBC can run
+#
+# Only nvim-treesitter's `main` branch needs this — the `master` branch used on
+# Neovim 0.10 downloads pre-generated C sources and builds them with cc alone.
+# But `main` is what Neovim 0.11+ gets, and without a WORKING CLI it installs
+# exactly nothing: measured on Debian 12, `Installed 0/16 languages`, while the
+# file still looked coloured because Vim's legacy regex syntax takes over.
+#
+# LazyVim asks mason for the CLI and mason fetches the latest, which is built
+# against GLIBC 2.39 — newer than Debian 12 (2.36) or Ubuntu 22.04 (2.35), so
+# it cannot start. Those two sit in a gap: too new for the old branch, too old
+# for the current CLI.
+#
+# The floors below were read off the binaries with objdump, not guessed:
+#   v0.26.13 → GLIBC 2.39   (Debian 13, Ubuntu 24.04+)
+#   v0.25.10 → GLIBC 2.34   (Debian 12, Ubuntu 22.04)
+#   v0.24.7  → GLIBC 2.29   (Debian 11, Ubuntu 20.04)
+#
+# Installing it on PATH is enough: LazyVim checks `executable("tree-sitter")`
+# first and returns before it ever reaches mason.
+_install_tree_sitter_cli() {
+    local glibc major minor version arch url dest tmp
+    glibc=$(ldd --version 2>/dev/null | head -n1 | awk '{print $NF}')
+    major="${glibc%%.*}"
+    minor="${glibc##*.}"
+    [[ -z "$major" || -z "$minor" ]] && { error "Could not read the system GLIBC"; return 1; }
+
+    if [[ "$major" -gt 2 ]] || [[ "$major" -eq 2 && "$minor" -ge 39 ]]; then
+        version="0.26.13"
+    elif [[ "$major" -eq 2 && "$minor" -ge 34 ]]; then
+        version="0.25.10"
+    elif [[ "$major" -eq 2 && "$minor" -ge 29 ]]; then
+        version="0.24.7"
+    else
+        # Debian 10 and older. Every tree-sitter CLI release ever published,
+        # back to v0.20.9, needs GLIBC 2.29 — there is no build to fall back
+        # to. It does not matter: a GLIBC that old only runs Neovim 0.9/0.10,
+        # which uses nvim-treesitter's `master` branch, and that one builds
+        # pre-generated C sources with cc and never asks for a CLI.
+        info "GLIBC ${BOLD}${glibc}${NC} — no tree-sitter CLI build runs here, and none is needed"
+        info "Neovim 0.9/0.10 uses nvim-treesitter's ${BOLD}master${NC} branch, which only needs a C compiler"
+        return 2
+    fi
+
+    arch=$(uname -m)
+    case "$arch" in
+        x86_64)  arch="x64" ;;
+        aarch64) arch="arm64" ;;
+        *) error "Unsupported architecture for tree-sitter CLI: $arch"; return 1 ;;
+    esac
+    url="https://github.com/tree-sitter/tree-sitter/releases/download/v${version}/tree-sitter-linux-${arch}.gz"
+
+    dest="$HOME/.local/bin"
+    if [[ "$PRIV_MODE" == "root" ]]; then
+        dest="/usr/local/bin"
+    else
+        mkdir -p "$dest"
+    fi
+
+    info "GLIBC ${BOLD}${glibc}${NC} — installing tree-sitter CLI ${BOLD}v${version}${NC} (${arch})"
+    info "URL: ${url}"
+    tmp=$(mktemp /tmp/tree-sitter-XXXXXX.gz)
+    curl -fSL "$url" -o "$tmp" || { error "Failed to download the tree-sitter CLI"; rm -f "$tmp"; return 1; }
+    gunzip -c "$tmp" > "${tmp}.bin" || { error "Failed to unpack the tree-sitter CLI"; rm -f "$tmp" "${tmp}.bin"; return 1; }
+    rm -f "$tmp"
+    chmod 755 "${tmp}.bin"
+
+    # Run it before installing it. The whole reason this function exists is a
+    # binary that downloads and unpacks perfectly and then cannot start, and an
+    # executable bit says nothing about that.
+    if ! "${tmp}.bin" --version >/dev/null 2>&1; then
+        error "The tree-sitter CLI v${version} cannot run on this system:"
+        "${tmp}.bin" --version 2>&1 | head -n2 | sed 's/^/  /'
+        rm -f "${tmp}.bin"
+        return 1
+    fi
+
+    _run mv "${tmp}.bin" "${dest}/tree-sitter" || { rm -f "${tmp}.bin"; return 1; }
+    _run chmod 755 "${dest}/tree-sitter"
+    return 0
+}
+
 # Deps mode: check and install system dependencies
 if [[ "$use_deps" == true ]]; then
     bold "=== nvim-lite dependencies ==="
@@ -188,6 +270,26 @@ if [[ "$use_deps" == true ]]; then
         warn "fzf not found"
         info "Installing latest fzf from GitHub..."
         _install_fzf && success "fzf installed: $(fzf --version 2>&1 | head -1)" || error "Failed to install fzf"
+    fi
+
+    # tree-sitter CLI: only nvim-treesitter's `main` branch needs it, but that
+    # is what Neovim 0.11+ gets, and without it no parser is ever built.
+    echo ""
+    if command -v tree-sitter &>/dev/null && tree-sitter --version &>/dev/null; then
+        success "tree-sitter CLI found: $(tree-sitter --version 2>&1 | head -1)"
+    else
+        if command -v tree-sitter &>/dev/null; then
+            warn "tree-sitter CLI found but it cannot run here:"
+            tree-sitter --version 2>&1 | head -n2 | sed 's/^/  /'
+        else
+            warn "tree-sitter CLI not found"
+        fi
+        _install_tree_sitter_cli
+        case $? in
+            0) success "tree-sitter CLI installed: $(tree-sitter --version 2>&1 | head -1)" ;;
+            2) success "tree-sitter CLI not required on this system" ;;
+            *) error "Failed to install the tree-sitter CLI" ;;
+        esac
     fi
 
     echo ""

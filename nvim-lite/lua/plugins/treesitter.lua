@@ -1,37 +1,41 @@
 -- Treesitter config for nvim-lite (server-focused)
 --
--- Strategy: if a C compiler is available, enable auto_install and
--- ensure common server parsers are installed. Otherwise, fall back
--- to Neovim's built-in bundled parsers only (no compilation needed).
+-- Strategy: if this machine can build parsers, install the ones a server
+-- actually opens. If it cannot, fall back to the parsers bundled with the
+-- Neovim binary and leave it at that — these dotfiles land on hosts with no
+-- toolchain, and a config that errors on every startup there is worse than one
+-- with plainer colours.
 --
--- Built-in parsers (shipped with the Neovim binary, always available):
---   bash, c, lua, markdown, markdown_inline, python, query, vim, vimdoc
+-- Bundled parsers, MEASURED on the v0.10.3 tarball rather than assumed:
+--   c, lua, markdown, markdown_inline, query, vim, vimdoc
+-- Note what is NOT in that list: bash and python. An earlier version of this
+-- comment claimed both, which mattered, because on a server-focused config
+-- shell scripts are the most common thing you open.
 
-local has_compiler = vim.fn.executable("cc") == 1 or vim.fn.executable("gcc") == 1
-
--- Check if the bundled tree-sitter CLI actually works on this system.
--- Neovim's latest builds bundle a tree-sitter binary compiled against GLIBC 2.39,
--- which fails on older systems like Debian 12 (GLIBC 2.36).
-local function has_working_treesitter()
-  if not has_compiler then
-    return false
-  end
-  local ts_path = vim.fn.exepath("tree-sitter")
-  if ts_path == "" then
-    -- Try the bundled one inside Neovim's install path
-    local nvim_path = vim.fn.exepath("nvim")
-    if nvim_path ~= "" then
-      ts_path = vim.fn.fnamemodify(nvim_path, ":h") .. "/tree-sitter"
-    end
-  end
-  if ts_path == "" or vim.fn.executable(ts_path) ~= 1 then
-    return false
-  end
-  local result = vim.fn.system(ts_path .. " --version 2>&1")
-  return vim.v.shell_error == 0
+-- Whether parsers can be BUILT here.
+--
+-- This used to ask for the `tree-sitter` CLI, and that was the wrong question.
+-- nvim-treesitter downloads pre-generated C sources and compiles them with a C
+-- compiler; the CLI is only needed for the grammars marked
+-- `requires_generate_from_grammar`, which are latex, rust, scala, svelte,
+-- swift, ocaml, mermaid, typst and the like — 27 of them, and not one is in
+-- the list below.
+--
+-- The CLI ships with neither Neovim's release tarball nor any distro package
+-- here, so that check returned false on every server: `ensure_installed` came
+-- out empty and NOTHING was installed — not yaml, not json, not dockerfile.
+-- It went unnoticed because Vim's legacy regex syntax takes over and the file
+-- still looks coloured; it just stops understanding the structure.
+--
+-- Verified on Debian 11 with no CLI present and gcc available: yaml downloads,
+-- compiles and installs.
+local function can_build_parsers()
+  return vim.fn.executable("cc") == 1
+    or vim.fn.executable("gcc") == 1
+    or vim.fn.executable("clang") == 1
 end
 
-local can_compile = has_working_treesitter()
+local can_compile = can_build_parsers()
 
 -- Parsers commonly needed on servers
 local server_parsers = {
