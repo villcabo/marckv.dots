@@ -1,0 +1,40 @@
+# A compose file with the shapes that separate a real parser from regex syntax:
+# anchors, aliases, block scalars, flow collections and ${VAR:-default}.
+name: ${STACK_PREFIX:-prometheus}_stack
+
+x-common: &common
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "3" }
+
+networks:
+  metrics_router:
+    external: true
+    name: ${METRICS_NETWORK:-metrics_router}
+  prometheus:
+    driver: bridge
+    driver_opts:
+      com.docker.network.driver.mtu: ${NETWORK_MTU:-1500}
+
+volumes:
+  prometheus_data: {}
+
+services:
+  prometheus:
+    <<: *common
+    image: prom/prometheus:v3.1.0
+    user: "65534:65534"
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --web.enable-lifecycle
+    entrypoint: |
+      sh -c '
+        echo "block scalar, quotes and $VARS inside"
+        exec /bin/prometheus "$@"
+      '
+    ports: ["9090:9090"]
+    networks: [prometheus, metrics_router]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9090/-/healthy"]
+      interval: 30s

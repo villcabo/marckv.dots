@@ -49,10 +49,39 @@ sudo apt install fd-find
 | `gcc`, `make`, `libc6-dev` | Treesitter compiles parsers for syntax highlighting |
 | `git` | Lazy.nvim and plugin manager clone plugins |
 | `ripgrep` | fzf-lua live grep (`<leader>sg`) |
-| `fzf` (v0.40+) | Fuzzy finder for file/grep picker (`<leader>ff`, `<leader>sg`) — install from [GitHub](https://github.com/junegunn/fzf#installation), apt version is too old |
+| `fzf` (v0.40+) | Fuzzy finder for file/grep picker (`<leader>ff`, `<leader>sg`) — apt's version is too old |
+| `tree-sitter` CLI | Only on Neovim 0.11+, where nvim-treesitter needs it to build any parser at all — see below |
 | `fd-find` | Faster file finder for fzf-lua — optional, falls back to `find` |
 
-> Without `gcc`/`make`/`libc6-dev`, nvim-lite falls back to Neovim's built-in parsers (bash, lua, python, markdown, vim). You still get syntax highlighting, just for fewer languages.
+The last two are downloaded rather than installed from apt, so let the installer
+do it:
+
+```bash
+./04-install-nvim-lite.sh --deps
+```
+
+It matters most for the `tree-sitter` CLI. On Neovim 0.11+ nvim-treesitter
+cannot build a single parser without one, LazyVim asks mason for it, and mason
+fetches a build that needs **GLIBC 2.39** — newer than Debian 12 (2.36) or
+Ubuntu 22.04 (2.35), where it simply refuses to start and every install reports
+`Installed 0/16 languages`. `--deps` pins a version that runs here and checks it
+by running it:
+
+| GLIBC | CLI version |
+|---|---|
+| 2.39+ | v0.26.13 |
+| 2.34+ | v0.25.10 |
+| older | v0.24.7 |
+
+On Neovim 0.10 (Debian 11, Ubuntu 20.04) none of that applies: nvim-treesitter
+uses its `master` branch there, which builds pre-generated C sources with `cc`
+alone — verified, 16 of 16 parsers.
+
+> With no C compiler at all, nvim-lite falls back to the parsers bundled with
+> the Neovim binary — `c, lua, markdown, markdown_inline, query, vim, vimdoc`,
+> measured on the v0.10.3 tarball. Note that `bash` and `python` are **not**
+> among them: everything else drops to Vim's legacy regex syntax, which still
+> looks coloured but no longer understands the structure.
 
 ### 3. Install components
 
