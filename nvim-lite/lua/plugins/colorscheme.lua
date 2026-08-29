@@ -1,56 +1,16 @@
--- Colorschemes for nvim-lite
--- Switch with: <leader>uC (snacks picker) or :colorscheme <name>
+-- Colorscheme for nvim-lite
 --
--- Available themes and variants:
---   catppuccin-latte, catppuccin-frappe, catppuccin-macchiato, catppuccin-mocha
---   tokyonight-night, tokyonight-storm, tokyonight-day, tokyonight-moon
---   kanagawa-wave, kanagawa-dragon, kanagawa-lotus
---   gruvbox-dark, gruvbox-light (via background=dark/light)
---   rose-pine-main, rose-pine-moon, rose-pine-dawn
+-- ONE theme, not six. This shipped with catppuccin, tokyonight, kanagawa,
+-- gruvbox and rose-pine installed alongside the one actually in use — 16 MB of
+-- git checkouts on every server so that `<leader>uC` could offer alternatives
+-- nobody switches to over SSH. The full set stays in `nvim/`, which runs on a
+-- workstation where that is worth having.
+--
+-- gentleman-kanagawa-blur is self-contained: it carries its own palette and
+-- highlights and does NOT require kanagawa.nvim, which is why removing that
+-- one does not take the theme with it.
 
 return {
-  -- Catppuccin
-  {
-    "catppuccin/nvim",
-    name = "catppuccin",
-    lazy = true,
-    opts = {
-      flavour = "mocha",
-      transparent_background = true,
-      term_colors = true,
-    },
-  },
-
-  -- TokyoNight
-  {
-    "folke/tokyonight.nvim",
-    lazy = true,
-    opts = {
-      style = "night",
-      transparent = true,
-      terminal_colors = true,
-    },
-  },
-
-  -- Kanagawa
-  {
-    "rebelot/kanagawa.nvim",
-    lazy = true,
-    opts = {
-      transparent = true,
-      theme = "wave",
-      terminal_colors = true,
-      overrides = function(colors)
-        return {
-          NormalFloat = { bg = "none" },
-          FloatBorder = { bg = "none" },
-          WhichKeyFloat = { bg = "none" },
-        }
-      end,
-    },
-  },
-
-  -- Gentleman Kanagawa Blur
   {
     "Gentleman-Programming/gentleman-kanagawa-blur",
     lazy = false,
@@ -65,33 +25,15 @@ return {
     end,
   },
 
-  -- Gruvbox
-  {
-    "ellisonleao/gruvbox.nvim",
-    lazy = true,
-    opts = {
-      transparent_mode = true,
-      terminal_colors = true,
-      contrast = "hard",
-    },
-  },
-
-  -- Rosé Pine
-  {
-    "rose-pine/neovim",
-    name = "rose-pine",
-    lazy = true,
-    opts = {
-      variant = "main",
-      disable_background = true,
-    },
-  },
-
-  -- Default colorscheme
   {
     "LazyVim/LazyVim",
     opts = {
       colorscheme = "gentleman-kanagawa-blur",
     },
   },
+
+  -- LazyVim pulls tokyonight and catppuccin in as its own defaults, so they
+  -- come back unless they are turned off explicitly.
+  { "folke/tokyonight.nvim", enabled = false },
+  { "catppuccin/nvim", enabled = false },
 }
