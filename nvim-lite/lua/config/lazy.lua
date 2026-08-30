@@ -39,11 +39,14 @@ if nvim_ver.major == 0 and nvim_ver.minor < 11 then
   -- v14.15.1 is the last v14.x release compatible with Neovim 0.10.x.
   lazyvim_spec.tag = "v14.15.1"
   lazyvim_spec.pin = true
-  vim.notify(
-    "nvim-lite: detected Neovim " .. nvim_ver.major .. "." .. nvim_ver.minor ..
-    " — pinning LazyVim to v14.15.1 for compatibility",
-    vim.log.levels.WARN
-  )
+  -- Deliberately silent.
+  --
+  -- This used to call vim.notify. Where snacks is absent — which is exactly
+  -- the case this branch handles — notify falls back to Neovim's message area,
+  -- and a line this long triggers "Press ENTER or type command to continue" on
+  -- EVERY start. An informational notice nobody acts on turned into a keypress
+  -- before every file. `:messages` is where a startup note belongs.
+  vim.g.nvim_lite_lazyvim_pin = "v14.15.1"
 end
 
 -- Setup lazy.nvim
@@ -54,11 +57,26 @@ require("lazy").setup({
     { import = "lazyvim.plugins.extras.coding.mini-surround" },
     { import = "plugins" },
   },
+  -- The lockfile goes to the state directory, not next to the config.
+  --
+  -- lazy.nvim writes lazy-lock.json into the config directory by default, and
+  -- this config is installed as a SYMLINK into the repository. That means
+  -- every Neovim start rewrites a tracked file: `git status` comes back dirty
+  -- on every server, and a `git pull` can end in a conflict over a lockfile
+  -- nobody edited.
+  --
+  -- It also fails outright where the repo is not writable — which is how this
+  -- surfaced, as an assert inside lazy/manage/lock.lua on a read-only mount.
+  --
+  -- Per-host is the right place for it anyway: these machines run four
+  -- different Neovim versions across two LazyVim generations, and one shared
+  -- lockfile could not describe all of them.
+  lockfile = vim.fn.stdpath("state") .. "/lazy-lock.json",
   defaults = {
     lazy = true,
     version = false,
   },
-  install = { colorscheme = { "catppuccin", "habamax" } },
+  install = { colorscheme = { "gentleman-kanagawa-blur", "habamax" } },
   checker = { enabled = false },
   performance = {
     rtp = {

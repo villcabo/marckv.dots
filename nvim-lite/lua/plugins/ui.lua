@@ -89,10 +89,39 @@ return {
   },
 
   -- snacks: dashboard with personal branding
+  --
+  -- On Neovim 0.9 only its WINDOWS are turned off, not the plugin.
+  --
+  -- snacks calls nvim_get_hl with the `create` option that Neovim 0.10
+  -- introduced, and on 0.9 every window it opens ends in
+  --     snacks/util/init.lua:73: invalid key: create
+  -- flooding the screen. There is no older snacks to pin to: its first commit
+  -- is from November 2024, six months after 0.10.
+  --
+  -- Disabling the whole plugin was the first attempt and it broke something
+  -- else: LazyVim v14 sets
+  --     opt.statuscolumn = [[%!v:lua.require'snacks.statuscolumn'.get()]]
+  -- (config/options.lua:102), so the number column then failed to render on
+  -- every redraw — an error a headless test never sees, because headless draws
+  -- nothing. Keeping the library and closing only the window-opening parts
+  -- leaves statuscolumn working and the screen quiet.
   {
     "folke/snacks.nvim",
     opts = {
+      -- Only the two that OPEN WINDOWS are turned off on 0.9. The plugin
+      -- itself stays, and that is not a compromise — it is the only thing that
+      -- works.
+      --
+      -- Removing snacks entirely was tried and abandoned. LazyVim v14 reaches
+      -- for the `Snacks` global 127 times: 53 Snacks.picker, 28 Snacks.toggle,
+      -- 9 Snacks.words, 8 each of util and terminal, and on down. Every fix
+      -- uncovered the next call site — statuscolumn, then news.lua, then
+      -- gitsigns' own config at editor.lua:183 — and there was no end to it.
+      --
+      -- Keeping the library costs 33 MB on Debian 10. Correct beats smaller.
+      notifier = { enabled = vim.fn.has("nvim-0.10") == 1 },
       dashboard = {
+        enabled = vim.fn.has("nvim-0.10") == 1,
         sections = {
           { section = "header" },
           { icon = " ", title = "Keymaps", section = "keys", indent = 2, padding = 1 },
@@ -132,18 +161,4 @@ return {
     },
   },
 
-  -- zen-mode
-  {
-    "folke/zen-mode.nvim",
-    cmd = "ZenMode",
-    opts = {
-      plugins = {
-        gitsigns = true,
-        tmux = true,
-        kitty = { enabled = false, font = "+2" },
-        twilight = { enabled = true },
-      },
-    },
-    keys = { { "<leader>z", "<cmd>ZenMode<cr>", desc = "Zen Mode" } },
-  },
 }

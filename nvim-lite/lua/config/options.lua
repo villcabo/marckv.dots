@@ -7,3 +7,4 @@ vim.g.autoformat = false
 -- Global statusline always at the bottom
 vim.o.laststatus = 3
 vim.o.cmdheight = 0
+
