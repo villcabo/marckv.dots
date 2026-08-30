@@ -14,10 +14,16 @@ return {
   { "akinsho/bufferline.nvim", enabled = false },
   { "folke/noice.nvim", enabled = false },
   { "rcarriga/nvim-notify", enabled = false },
-  -- On 0.10+ snacks.dashboard covers this. On 0.9 snacks keeps running but its
-  -- windows are closed (see ui.lua), so LazyVim v14's own dashboard is what is
-  -- left there.
-  { "nvimdev/dashboard-nvim", enabled = vim.fn.has("nvim-0.10") == 0 },
+  -- Off everywhere, including Neovim 0.9.
+  --
+  -- It used to be kept on 0.9 under the reasoning that snacks.dashboard is
+  -- closed there (see ui.lua) so LazyVim v14's own dashboard was "what is left".
+  -- It was not: `lazy.plugins()` reported it as installed and never loaded, so
+  -- 664K sat on Debian 10 drawing nothing.
+  --
+  -- config/branding.lua covers that case now, writing the same banner into the
+  -- start buffer with no plugin behind it.
+  { "nvimdev/dashboard-nvim", enabled = false },
   { "b0o/incline.nvim", enabled = false },
   { "willothy/veil.nvim", enabled = false },
 
@@ -68,4 +74,22 @@ return {
   { "folke/persistence.nvim", enabled = false },   -- restores sessions; you open one file
   { "windwp/nvim-ts-autotag", enabled = false },   -- closes JSX/HTML tags
   { "folke/zen-mode.nvim", enabled = false },      -- distraction-free, over SSH
+
+  -- --- deleting the spec is not the same as disabling the plugin -----------
+  --
+  -- These three were reported as removed and were not. The spec for neo-tree
+  -- was deleted from plugins/editor.lua, which felt like removal and is not:
+  -- LazyVim imports neo-tree itself, so deleting a local spec only drops the
+  -- OVERRIDE and leaves LazyVim's own definition standing. `lazy.plugins()`
+  -- listed all three as active while a comment in editor.lua said neo-tree was
+  -- "no longer installed".
+  --
+  -- The same mistake as the oil keymap: absence of a declaration read as
+  -- absence of the thing. Only `enabled = false` removes a plugin LazyVim
+  -- brings in on its own.
+  --
+  -- 6.8 MB between them, on a config whose reason to exist is not being heavy.
+  { "nvim-neo-tree/neo-tree.nvim", enabled = false },  -- oil covers this, and is the one in use
+  { "MunifTanjim/nui.nvim", enabled = false },         -- only neo-tree wanted it
+  { "nvim-treesitter/nvim-treesitter-textobjects", enabled = false },  -- af/if motions, unused here
 }

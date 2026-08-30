@@ -18,9 +18,10 @@ return {
     keys = {
       { "-", "<CMD>Oil<CR>", desc = "Open Oil (parent dir)" },
       { "<leader>E", "<CMD>Oil --float<CR>", desc = "Open Oil (floating)" },
-      -- Inherited from neo-tree, which is no longer installed. Pointing the
-      -- key at oil means dropping that plugin costs nothing in muscle memory:
-      -- <leader>e still opens a file explorer, just the one already in use.
+      -- Inherited from neo-tree, which is disabled in plugins/disabled.lua.
+      -- Pointing the key at oil means dropping that plugin costs nothing in
+      -- muscle memory: <leader>e still opens a file explorer, just the one
+      -- already in use.
       { "<leader>e", "<CMD>Oil<CR>", desc = "Explorer (Oil)" },
     },
     opts = {
