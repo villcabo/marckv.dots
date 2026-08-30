@@ -138,9 +138,17 @@ autocmd("FileType", {
 -- unsaved changes. :e refuses in that case and :e! would throw the edits away.
 vim.api.nvim_create_autocmd({ "FocusGained", "BufEnter", "TermClose", "TermLeave" }, {
   callback = function()
-    -- Skip while a command line is open: there checktime is postponed anyway
-    -- and only litters the message area.
-    if vim.fn.mode() ~= "c" then
+    -- Two different things have to be skipped, and only one of them is a mode.
+    --
+    -- mode() == "c" is the command line itself, where checktime is postponed
+    -- anyway and only litters the message area.
+    --
+    -- getcmdwintype() is the command-line WINDOW (q: and q/), and that one is
+    -- an ordinary buffer in normal mode — mode() returns "n" there, so the
+    -- first check sails right past it and checktime raises
+    --     E11: Invalid in command-line window
+    -- on every BufEnter. Opening q: was enough to hit it.
+    if vim.fn.mode() ~= "c" and vim.fn.getcmdwintype() == "" then
       vim.cmd.checktime()
     end
   end,
