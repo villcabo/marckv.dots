@@ -52,7 +52,7 @@ return {
         lualine_a = {
           {
             "mode",
-            icon = "󱗞",
+            icon = "\u{f15de}", -- escaped for the same reason as the dashboard icons above
           },
         },
       },
@@ -124,37 +124,33 @@ return {
         enabled = vim.fn.has("nvim-0.10") == 1,
         sections = {
           { section = "header" },
-          { icon = " ", title = "Keymaps", section = "keys", indent = 2, padding = 1 },
-          { icon = " ", title = "Recent Files", section = "recent_files", indent = 2, padding = 1 },
+          { icon = "\u{f11c} ", title = "Keymaps", section = "keys", indent = 2, padding = 1 },
+          { icon = "\u{f0c5} ", title = "Recent Files", section = "recent_files", indent = 2, padding = 1 },
           { section = "startup" },
         },
         preset = {
-          header = [[
-                  ░░
-                ░░░░░░
-              ░░░░░░░░░░
-            ░░░░░░▒▒░░░░░░
-          ░░░░░░▒▒▒▒▒▒░░░░░░
-        ░░░░░░▒▒▒▒▒▒▒▒▒▒░░░░░░
-      ░░░░░░▒▒▒▒▒▒░░▒▒▒▒▒▒░░░░░░
-    ░░░░░░▒▒▒▒▒▒░░░░░░▒▒▒▒▒▒░░░░░░
-  ░░░░░░▒▒▒▒▒▒░░░░▒▒░░░░▒▒▒▒▒▒░░░░░░
-  ░░░░▒▒▒▒▒▒░░░░▒▒▒▒▒▒░░░░▒▒▒▒▒▒░░░░
-  ░░▒▒▒▒▒▒░░░░▒▒▒▒▒▒▒▒▒▒░░░░▒▒▒▒▒▒░░
-  ▒▒▒▒▒▒░░░░▒▒▒▒▒▒▒▒▒▒▒▒▒▒░░░░▒▒▒▒▒▒
-  ██████████████████████████████████
-  ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
-
-        B V   A R C H - C O D E]],
+          -- The banner lives in config/branding.lua, not inline here, because
+          -- Neovim 0.9 needs the same thing drawn WITHOUT snacks (this whole
+          -- dashboard is off there) and two copies of an ASCII logo drift.
+          header = require("config.branding").header(),
+          -- Icons as \u{} escapes, not literal glyphs.
+          --
+          -- Every one of these except Lazy's was a bare space in the file:
+          -- eight Nerd Font glyphs silently emptied at some point, and a blank
+          -- icon looks exactly like one the terminal cannot draw, so the
+          -- dashboard had been shipping like that unnoticed. The codepoints
+          -- are snacks' own, read out of its dashboard.lua rather than
+          -- guessed. Verified on Neovim 0.9.5: LuaJIT handles \u{} fine.
           -- stylua: ignore
           ---@type snacks.dashboard.Item[]
           keys = {
-            { icon = " ", key = "f", desc = "Find File", action = ":lua Snacks.dashboard.pick('files')" },
-            { icon = " ", key = "n", desc = "New File", action = ":ene | startinsert" },
-            { icon = " ", key = "g", desc = "Find Text", action = ":lua Snacks.dashboard.pick('live_grep')" },
-            { icon = " ", key = "r", desc = "Recent Files", action = ":lua Snacks.dashboard.pick('oldfiles')" },
-            { icon = "󰒲 ", key = "l", desc = "Lazy", action = ":Lazy" },
-            { icon = " ", key = "q", desc = "Quit", action = ":qa" },
+            { icon = "\u{f002} ", key = "f", desc = "Find File", action = ":lua Snacks.dashboard.pick('files')" },
+            { icon = "\u{f15b} ", key = "n", desc = "New File", action = ":ene | startinsert" },
+            { icon = "\u{f07b} ", key = "e", desc = "File Explorer", action = ":Oil" },
+            { icon = "\u{f022} ", key = "g", desc = "Find Text", action = ":lua Snacks.dashboard.pick('live_grep')" },
+            { icon = "\u{f0c5} ", key = "r", desc = "Recent Files", action = ":lua Snacks.dashboard.pick('oldfiles')" },
+            { icon = "\u{f04b2} ", key = "l", desc = "Lazy", action = ":Lazy" },
+            { icon = "\u{f426} ", key = "q", desc = "Quit", action = ":qa" },
           },
         },
       },
