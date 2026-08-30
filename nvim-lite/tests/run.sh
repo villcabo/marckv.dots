@@ -63,7 +63,7 @@ fingerprint() {
     {
         cat "$REPO_DIR"/nvim-lite/lua/config/*.lua
         cat "$REPO_DIR"/nvim-lite/lua/plugins/*.lua
-        cat "$REPO_DIR"/nvim-lite/init.lua "$REPO_DIR"/nvim-lite/lazyvim.json
+        cat "$REPO_DIR"/nvim-lite/init.lua "$REPO_DIR"/nvim-lite/lazyvim.json "$REPO_DIR"/nvim-lite/VERSION
         cat "$REPO_DIR"/installer/04-install-nvim-lite.sh "$REPO_DIR"/installer/install-nvim.sh
     } 2>/dev/null | sha256sum | cut -c1-16
 }

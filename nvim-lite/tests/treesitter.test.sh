@@ -84,73 +84,24 @@ fi
 # the plugin directory, the main branch writes them to the site directory. A
 # check against only one of them passes or fails depending on the distro rather
 # than on whether anything worked.
-printf '\nS2  a headless start installs the yaml parser\n'
-timeout 900 nvim --headless "+Lazy! sync" +qa >/tmp/lazy.log 2>&1
-# No sleep here.
+printf '\nS2  the installer builds the declared parsers\n'
+# The suite calls the INSTALLER, instead of installing parsers itself.
 #
-# This line used to end in `-c 'sleep 60'`, from when parser installation was
-# asynchronous and there was no way to know when it had finished. It was
-# replaced by the synchronous install below and the sleep was left behind: 60 s
-# per distro, every run, waiting for something that had already completed.
-# It was 60 of the 71 s the assertions cost.
-timeout 900 nvim --headless \
-    -c 'lua require("lazy").load({ plugins = { "nvim-treesitter" } })' \
-    -c 'qa' >/tmp/tsload.log 2>&1
-
-# Then install them SYNCHRONOUSLY and wait for it to finish.
+# It used to do the work here: read the language list out of the config, then
+# require('nvim-treesitter').install(missing):wait(). That passed on all eight
+# distros while the installer shipped
+#     nvim --headless "+lua pcall(function() vim.cmd('TSUpdateSync') end)"
+# under a comment claiming Lazy sync had already installed the parsers. Both
+# halves were false on nvim-treesitter's `main` branch — TSUpdateSync does not
+# exist there, and main installs lazily when a matching file is opened — and
+# the pcall swallowed it. A real `--reinstall` on Debian 13 left 16 of 24, with
+# yaml, bash, python and markdown among the missing.
 #
-# Polling until the parser count stops changing was the previous attempt and it
-# is wrong in a way that looks right: while a parser is compiling, its .so does
-# not exist yet, so the count sits still and the poll calls that "settled".
-# terraform takes longer than the others and was declared finished twelve
-# seconds before it landed — which came out as main.tf falling back to regex on
-# one distro and a different fixture on the next run.
-#
-# Both branches offer a synchronous form, so no heuristic is needed:
-#   main   → require("nvim-treesitter").install(langs):wait(...)
-#   master → :TSInstallSync
-#
-# The language list is read out of the config rather than written here, so that
-# dropping a parser from nvim-lite still shows up as a failure in S7 instead of
-# being quietly reinstalled by its own test.
-LANGS=$(sed -n '/^local server_parsers/,/^}/p' "$REPO/nvim-lite/lua/plugins/treesitter.lua" \
-        | grep -oE '"[a-z_]+"' | tr -d '"' | tr '\n' ' ')
-printf '       requested: %s\n' "$(printf '%s' "$LANGS" | wc -w) parsers"
-
-timeout 900 nvim --headless -c "lua
-  require('lazy').load({ plugins = { 'nvim-treesitter' } })
-  local langs = vim.split('$LANGS', ' +', { trimempty = true })
-
-  -- Only what is MISSING.
-  --
-  -- This used to install the whole list every run. On the master branch that
-  -- means TSInstallSync recompiling all 24 grammars from source whether or not
-  -- they are already on disk — around 900 s per run, hitting the timeout.
-  --
-  -- It was also the reason every other optimisation looked worthless: reusing
-  -- prepared containers, dropping a stray sleep 60, running eight distros at
-  -- once — each of those saved real time and none of it showed, because one
-  -- distro was recompiling everything anyway and the clock follows the slowest.
-  -- 1, 2 and 4 in parallel all came out at 908 s, which is what a fixed cost
-  -- looks like when you are hunting for contention.
-  local missing = {}
-  for _, lang in ipairs(langs) do
-    if #vim.api.nvim_get_runtime_file('parser/' .. lang .. '.so', false) == 0 then
-      missing[#missing + 1] = lang
-    end
-  end
-  print('missing=' .. #missing)
-  if #missing == 0 then return end
-
-  local ts = require('nvim-treesitter')
-  if type(ts.install) == 'function' then
-    local h = ts.install(missing)
-    if type(h) == 'table' and h.wait then h:wait(600000) end
-  else
-    vim.cmd('TSInstallSync ' .. table.concat(missing, ' '))
-  end
-" -c 'qa' >/tmp/tsinstall.log 2>&1
-printf '       to build: %s\n' "$(grep -oE 'missing=[0-9]+' /tmp/tsinstall.log | head -1 | cut -d= -f2)"
+# The suite could never have caught that, because it was testing its own copy
+# of the logic and doing the installer's job before measuring. So the duplicate
+# is gone and this drives the real thing: if step_sync regresses, S2 goes red.
+timeout 900 bash "$REPO/installer/04-install-nvim-lite.sh" -s >/tmp/tsinstall.log 2>&1
+printf '       %s\n' "$(grep -aoE '(all [0-9]+ treesitter parsers built|[0-9]+ of [0-9]+ parsers built — missing: .*)' /tmp/tsinstall.log | head -1 | sed 's/\x1b\[[0-9;]*m//g')"
 printf '       installed: %s parsers\n' "$(find ~/.local/share/nvim -name '*.so' -path '*parser*' 2>/dev/null | wc -l)"
 
 YAML_SO=$(find ~/.local/share/nvim -name 'yaml.so' -path '*parser*' 2>/dev/null | head -1)
@@ -257,8 +208,21 @@ fi
 
 # The half that matters more: dropping things must not take LazyVim with it.
 # These are named on purpose — they are the identity of the editor, and a list
-# derived from the config could not tell that losing them was a problem.
-KEPT="fzf-lua neo-tree.nvim nvim-treesitter which-key.nvim lualine.nvim gitsigns.nvim flash.nvim mini.ai mini.surround todo-comments.nvim oil.nvim"
+# derived from the config could not tell that losing them was a problem. That
+# is also why this half is allowed to go stale and the other is not: when a
+# plugin moves from kept to dropped, someone has to say so here.
+#
+# neo-tree was on this list and is not any more: oil is the explorer in use and
+# <leader>e points at it. LazyVim imports neo-tree itself, so it took an
+# explicit `enabled = false` to actually remove it — deleting the local spec
+# only dropped the override, and left it installed while a comment claimed
+# otherwise. This assertion is what caught that the two had diverged.
+#
+# snacks and LazyVim are on it for the opposite reason: losing either is the
+# expensive failure. Removing snacks was tried and abandoned — LazyVim v14
+# reaches for the `Snacks` global 127 times — so it stays, deliberately, and a
+# future trim that takes it out should turn this red.
+KEPT="LazyVim snacks.nvim fzf-lua nvim-treesitter which-key.nvim lualine.nvim gitsigns.nvim flash.nvim mini.ai mini.surround todo-comments.nvim oil.nvim"
 missing=""
 for p in $KEPT; do
     [ -d "$LAZY/$p" ] || missing="$missing $p"
@@ -476,6 +440,60 @@ else
     bad "the buffer becomes an oil buffer" "filetype is '${OILFT:-nothing}'"
 fi
 printf '       oil branch: %s\n' "$(git -C ~/.local/share/nvim/lazy/oil.nvim rev-parse --abbrev-ref HEAD 2>/dev/null)"
+
+# --- S10: the config says what it is -----------------------------------------
+#
+# This is a LazyVim distribution but it is NOT stock LazyVim, and on a server
+# you should be able to tell which one you just opened, and which revision.
+#
+# The interesting half is Neovim 0.9. snacks.dashboard is switched off there
+# (it cannot open a window without flooding the screen — see plugins/ui.lua),
+# so the branding would exist on seven distros and silently not on Debian 10,
+# which is the machine where you are least sure what you are looking at.
+# config/branding.lua draws the same banner into the start buffer instead.
+#
+# So the check is deliberately blind to WHICH path drew it: open nvim with no
+# arguments in a pty, and require the name and the version to be on the screen.
+# One assertion, both branches, and it fails on whichever one breaks.
+printf '\nS10 the banner names the config and its version\n'
+WANT_VER=$(cat "$REPO/nvim-lite/VERSION" 2>/dev/null | tr -d '[:space:]')
+
+GOT_VER=$(nvim --headless -c 'LiteVersion' -c 'qa' 2>&1 | tr -d '\r')
+case "$GOT_VER" in
+    *"nvim-lite v$WANT_VER"*) ok ":LiteVersion reports v$WANT_VER" ;;
+    *) bad ":LiteVersion reports v$WANT_VER" "said: ${GOT_VER:-nothing}" ;;
+esac
+
+if ! command -v script >/dev/null 2>&1; then
+    bad "script(1) is available for the banner test" "install util-linux"
+else
+    BANLOG=/tmp/banner.log
+    rm -f "$BANLOG"
+    # No file argument on purpose: that is the only way either start screen is
+    # drawn at all.
+    printf ':qa!\r' | timeout 45 script -qec "nvim" /dev/null > "$BANLOG" 2>&1
+    BAN=$(sed -e 's/\x1b\[[0-9;?]*[a-zA-Z]//g' -e 's/\x1b\][^\x07]*\x07//g' "$BANLOG" 2>/dev/null)
+
+    case "$BAN" in
+        *"n v i m - l i t e"*) ok "the start screen names nvim-lite" ;;
+        *) bad "the start screen names nvim-lite" "not on screen" ;;
+    esac
+
+    case "$BAN" in
+        *"v$WANT_VER"*) ok "the start screen shows v$WANT_VER" ;;
+        *) bad "the start screen shows v$WANT_VER" "not on screen" ;;
+    esac
+
+    # The 0.9 fallback writes into a buffer rather than calling vim.notify, and
+    # this is the assertion that keeps it that way. A banner this tall sent
+    # through the message area triggers "Press ENTER or type command to
+    # continue" before every single start — the same trap that config/lazy.lua
+    # already carries a comment about, one floor down.
+    case "$BAN" in
+        *"Press ENTER"*) bad "the banner does not force a keypress" "screen said Press ENTER" ;;
+        *) ok "the banner does not force a keypress" ;;
+    esac
+fi
 
 printf '\n---- %s: %d ok, %d failed ----\n' "$(. /etc/os-release; echo "$ID$VERSION_ID")" "$PASS" "$FAIL"
 [ $FAIL -eq 0 ]
