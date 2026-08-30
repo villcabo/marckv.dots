@@ -1,11 +1,27 @@
 return {
   -- Oil.nvim: Edit your filesystem like a buffer
+  --
+  -- Pinned to the nvim-0.9 branch on Neovim 0.9. Master's setup() starts with
+  --     if vim.fn.has("nvim-0.10") == 0 then ... return end
+  -- so on Debian 10 it prints an error and NEVER INITIALISES. The `-` keymap
+  -- still shows up under :map, because this spec defines it — but there is no
+  -- :Oil behind it. Checking that the mapping exists says nothing about
+  -- whether the plugin does.
+  --
+  -- The error it prints names the wrong plugin ("aerial is deprecated"),
+  -- shared boilerplate from the same author, which is why it took a while to
+  -- trace back here.
   {
     "stevearc/oil.nvim",
+    branch = vim.fn.has("nvim-0.10") == 0 and "nvim-0.9" or nil,
     lazy = false,
     keys = {
       { "-", "<CMD>Oil<CR>", desc = "Open Oil (parent dir)" },
       { "<leader>E", "<CMD>Oil --float<CR>", desc = "Open Oil (floating)" },
+      -- Inherited from neo-tree, which is no longer installed. Pointing the
+      -- key at oil means dropping that plugin costs nothing in muscle memory:
+      -- <leader>e still opens a file explorer, just the one already in use.
+      { "<leader>e", "<CMD>Oil<CR>", desc = "Explorer (Oil)" },
     },
     opts = {
       default_file_explorer = true,
@@ -80,60 +96,5 @@ return {
     end,
   },
 
-  -- Neo-tree: sidebar file tree
-  {
-    "nvim-neo-tree/neo-tree.nvim",
-    keys = {
-      { "<leader>e", "<leader>fe", desc = "Explorer (root)", remap = true },
-      { "<leader>E", "<leader>fE", desc = "Explorer (cwd)",  remap = true },
-    },
-    opts = {
-      close_if_last_window = true,
-      window = {
-        position = "left",
-        width = 30,
-        mappings = {
-          ["<space>"] = "none", -- avoid conflict with leader
-          ["<CR>"]    = "open",
-          ["l"]       = "open",
-          ["h"]       = "close_node",
-          ["v"]       = "open_vsplit",
-          ["s"]       = "open_split",
-          ["q"]       = "close_window",
-          ["R"]       = "refresh",
-          ["a"]       = "add",
-          ["d"]       = "delete",
-          ["r"]       = "rename",
-          ["y"]       = "copy_to_clipboard",
-          ["x"]       = "cut_to_clipboard",
-          ["p"]       = "paste_from_clipboard",
-          ["."]       = "toggle_hidden",
-        },
-      },
-      filesystem = {
-        filtered_items = {
-          visible = false,
-          hide_dotfiles = false,
-          hide_gitignored = true,
-        },
-        follow_current_file = { enabled = true },
-        use_libuv_file_watcher = true,
-      },
-      default_component_configs = {
-        indent = { with_expanders = true },
-      },
-    },
-  },
 
-  -- Git.nvim: Git blame and browse
-  {
-    "dinhhuy258/git.nvim",
-    event = "BufReadPre",
-    opts = {
-      keymaps = {
-        blame = "<Leader>gb",
-        browse = "<Leader>go",
-      },
-    },
-  },
 }
