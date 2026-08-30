@@ -19,12 +19,27 @@ Core installers — numbered prefixes define execution order. Each supports `ins
 ./04-install-nvim-lite.sh [--copy]      # Server-focused Neovim config (symlink, or copy)
 ```
 
+`04-install-nvim-lite.sh` also orchestrates the whole Neovim stack, because the
+four scripts that used to do it separately left the user as the orchestrator:
+
+```bash
+./04-install-nvim-lite.sh --reinstall   # clean, deps, nvim, config, sync — in that order
+./04-install-nvim-lite.sh -d -s         # any subset; the flags compose
+./04-install-nvim-lite.sh status
+```
+
+`deps` runs before `nvim` and `sync` on purpose: `gcc` has to exist before the
+sync step compiles treesitter parsers. Add `-y` to skip every confirmation.
+
+It delegates rather than duplicating — `install-nvim.sh` for the binary (it
+needs root; this one does not) and `clean-nvim-data.sh` for the data dirs.
+
 Helpers (not part of the numbered lifecycle):
 
 ```bash
-sudo ./install-nvim.sh                  # Neovim binary, system-wide
+sudo ./install-nvim.sh [-y]             # Neovim binary, system-wide
 ./install-bash-extensions-gradle-functions.sh   # Adds bash-extensions/bash_gradle_functions.sh
-./clean-nvim-data.sh                    # Wipe ~/.local/share/nvim, ~/.cache/nvim, etc.
+./clean-nvim-data.sh [-y]               # Wipe ~/.local/share/nvim, ~/.cache/nvim, etc.
 ```
 
 ### Testing (always use Docker, never test on host)
@@ -109,6 +124,12 @@ Colors must load first as other modules depend on them. The theme depends on fun
   blast radius, resolve files and profiles exactly as docker does) are the
   reason it exists in that shape.
 - `nvim/` vs `nvim-lite/` — full LazyVim setup vs. minimal server profile; both have their own `stylua.toml`
+- `nvim-lite/VERSION` — plain text, semver over the CONFIG (not over Neovim).
+  Bump it in the same commit as the change it describes: major when something
+  in use is gone or a keymap moved, minor for new plugins/parsers/filetypes,
+  patch for fixes. Plain text and not Lua because both the installer
+  (`$(<VERSION)`) and `lua/config/branding.lua` read it, and one source beats
+  parsing Lua from shell. It shows on the start screen and in `:LiteVersion`
 - `kitty/`, `tmux/` — terminal/multiplexer configs
 
 ### Docker test environments
