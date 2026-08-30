@@ -1,0 +1,10 @@
+[user]
+	name = Bismarck Villca
+	email = villcabo@example.com
+	signingkey = F1B80106ED306F8A
+[commit]
+	gpgsign = true
+[core]
+	hooksPath = ~/.marckv.ai/git/hooks
+[alias]
+	lg = log --graph --format='%C(yellow)%h%Creset %s'

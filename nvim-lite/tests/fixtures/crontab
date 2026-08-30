@@ -1,0 +1,7 @@
+SHELL=/bin/bash
+MAILTO=ops@example.internal
+
+# m   h  dom mon dow   command
+  0   3   *   *   *    /usr/local/bin/backup.sh gpgw >> /var/log/backup.log 2>&1
+  */5 *   *   *   *    /usr/local/bin/healthcheck.sh
+  0   0   *   *   0    find /var/log -name '*.gz' -mtime +30 -delete

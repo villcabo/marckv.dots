@@ -1,0 +1,3 @@
+# The custom filetype nvim-lite's own filetypes.lua registers
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIB1kJ9example bismarck@workstation
+restrict,command="/usr/local/bin/backup-only" ssh-rsa AAAAB3NzaC1yc2Eexample deploy@ci

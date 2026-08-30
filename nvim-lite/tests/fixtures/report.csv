@@ -1,0 +1,5 @@
+date,service,requests,p95_ms,errors
+2026-08-01,gateway,184220,412,17
+2026-08-02,gateway,201883,455,9
+2026-08-01,paymentms,88104,1203,142
+2026-08-02,paymentms,91002,1188,131

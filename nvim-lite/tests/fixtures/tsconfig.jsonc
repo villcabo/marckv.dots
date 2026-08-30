@@ -1,0 +1,9 @@
+{
+  // JSON with comments — tsconfig, devcontainer, VS Code settings
+  "compilerOptions": {
+    "target": "ES2022",
+    "strict": true /* the only setting that matters */,
+    "paths": { "@app/*": ["src/app/*"] }
+  },
+  "exclude": ["node_modules", "dist"]
+}
