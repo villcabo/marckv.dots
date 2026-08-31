@@ -34,6 +34,7 @@ end
 -- pin LazyVim to the last v14.x tag which supports Neovim 0.10.x.
 local nvim_ver = vim.version()
 local lazyvim_spec = { "LazyVim/LazyVim", import = "lazyvim.plugins" }
+
 if nvim_ver.major == 0 and nvim_ver.minor < 11 then
   -- Use explicit tag and pin=true to prevent lazy.nvim from auto-updating.
   -- v14.15.1 is the last v14.x release compatible with Neovim 0.10.x.

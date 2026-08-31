@@ -25,6 +25,24 @@ local mode = {
 }
 
 return {
+  -- LazyVim's changelog does not get to be the first thing a server shows.
+  --
+  -- `news.lazyvim` defaults to true and drops NEWS.md into a markdown buffer
+  -- whenever the file changes — which, on a fresh install, is always. Measured
+  -- on Debian 11 and Ubuntu 20.04 (LazyVim v14): the very first `nvim` after
+  -- installing opened the changelog ON TOP of the dashboard, on exactly the
+  -- machines where you are least sure the install worked at all.
+  --
+  -- It has to live HERE and not next to the LazyVim spec in config/lazy.lua,
+  -- which is where it was first tried and silently did nothing: LazyVim
+  -- declares its own `{ "LazyVim/LazyVim", opts = {} }` inside
+  -- lazyvim/plugins/init.lua, and `import = "lazyvim.plugins"` pulls that in
+  -- after ours, overwriting it. `{ import = "plugins" }` is resolved last, so
+  -- an override here is the one that wins.
+  --
+  -- Found by S11 asking what filetype the start buffer had. It said "markdown".
+  { "LazyVim/LazyVim", opts = { news = { lazyvim = false, neovim = false } } },
+
   -- todo-comments
   { "folke/todo-comments.nvim", version = "*" },
 
@@ -127,8 +145,31 @@ return {
           -- highlight group for the whole string and the bolt's gradient is
           -- the logo. See config/branding.lua.
           { text = require("config.branding").snacks_text(), align = "center", padding = 1 },
-          { icon = "\u{f11c} ", title = "Keymaps", section = "keys", indent = 2, padding = 1 },
+          -- Projects, then files, then keys: the same shape the full nvim
+          -- config uses, reordered so the coarsest choice comes first. A
+          -- project is a place to go; a file is a thing to open; a keymap is
+          -- what you fall back to when neither list has it.
+          -- Entering a project opens the project.
+          --
+          -- snacks' default action is `chdir` followed by M.pick(), which
+          -- drops you into a fuzzy file finder over the whole repo — 268
+          -- entries on this one — before you have said what you are looking
+          -- for. Picking a project is already an answer; being asked a second
+          -- question is not what it meant.
+          --
+          -- This does what the Neovim 0.9 path does: change directory, then
+          -- show the directory. `session = false` because persistence is
+          -- disabled in this config, so there is never a session to restore.
+          {
+            icon = "\u{f024b} ", title = "Projects", section = "projects",
+            indent = 2, padding = 1, session = false,
+            action = function(dir)
+              vim.fn.chdir(dir)
+              vim.cmd.edit(vim.fn.fnameescape(dir))
+            end,
+          },
           { icon = "\u{f0c5} ", title = "Recent Files", section = "recent_files", indent = 2, padding = 1 },
+          { icon = "\u{f030c} ", title = "Keymaps", section = "keys", indent = 2, padding = 1 },
           { section = "startup" },
         },
         preset = {
