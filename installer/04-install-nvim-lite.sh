@@ -558,9 +558,24 @@ step_sync() {
         end
         local ts = require('nvim-treesitter')
         local previous = #langs + 1
-        for _ = 1, 4 do
+        -- One barren pass is forgiven, two ends it.
+        --
+        -- Cutting on the first pass that adds nothing was too strict: a single
+        -- download failing on the network left that grammar out for good.
+        -- Measured on Ubuntu 22.04, which came back missing dockerfile on one
+        -- run and had it on the next, from an identical tree. A grammar that
+        -- cannot exist on this branch (jsonc) still ends the loop, just two
+        -- passes later instead of one.
+        local barren = 0
+        for _ = 1, 5 do
           local missing = missing_now()
-          if #missing == 0 or #missing >= previous then break end
+          if #missing == 0 then break end
+          if #missing >= previous then
+            barren = barren + 1
+            if barren >= 2 then break end
+          else
+            barren = 0
+          end
           previous = #missing
           if type(ts.install) == 'function' then
             local h = ts.install(missing)
