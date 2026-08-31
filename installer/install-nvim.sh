@@ -41,8 +41,24 @@ else
 fi
 
 # Paths
-NVIM_PATH="/opt/nvim"
-PROFILE_PATH="/etc/profile.d/nvim.sh"
+# Where Neovim goes depends on who is running this.
+#
+# As root it goes system-wide, and a profile.d script puts it on everyone's
+# PATH. As an ordinary user neither of those paths is writable, so it goes
+# under $HOME and reaches the PATH through ~/.local/bin — the same place this
+# repo already installs fzf and the tree-sitter CLI when there is no root.
+#
+# The user install is not a lesser mode: it is the one that matters on a shared
+# box where you have an account and nothing else.
+if [ "$EUID" -eq 0 ]; then
+    NVIM_PATH="/opt/nvim"
+    PROFILE_PATH="/etc/profile.d/nvim.sh"
+    INSTALL_SCOPE="system"
+else
+    NVIM_PATH="$HOME/.local/nvim"
+    PROFILE_PATH="$HOME/.local/bin/nvim"   # a symlink, not a script
+    INSTALL_SCOPE="user"
+fi
 
 # Version to install (empty = latest). Can be set via --version flag.
 NVIM_VERSION=""
@@ -63,8 +79,8 @@ while [[ $# -gt 0 ]]; do
         -h|--help)
             bold "marckv.dots Neovim installer"
             echo ""
-            echo -e "Installs Neovim system-wide to ${ORANGE}$NVIM_PATH${NC}."
-            echo -e "Requires ${ORANGE}root/sudo${NC}."
+            echo -e "Installs Neovim to ${ORANGE}$NVIM_PATH${NC} (${ORANGE}${INSTALL_SCOPE}${NC} scope)."
+            echo -e "With ${ORANGE}root/sudo${NC} it goes system-wide; without it, for this user only."
             echo ""
             echo -e "${BLUE}Usage:${NC} sudo $0 [--version <tag>]"
             echo ""
@@ -197,11 +213,12 @@ list_remote_versions() {
 # Handle --ls-remote before root check (listing doesn't need root)
 [[ "${LS_REMOTE:-false}" == true ]] && list_remote_versions
 
-# Verify root
-if [ "$EUID" -ne 0 ]; then
-    error "This script must be run as root or with sudo"
-    info "Usage: ${BOLD}sudo $0${NC}"
-    exit 1
+# No root? Install for this user instead of refusing.
+#
+# Refusing was the old behaviour and it made `--reinstall` abort outright on
+# any account without sudo — which is most accounts on a machine you share.
+if [ "$INSTALL_SCOPE" = "user" ]; then
+    info "No root: installing for ${BOLD}$(id -un)${NC} only, under ${BOLD}$NVIM_PATH${NC}"
 fi
 
 # ---------------------------------------------------------------------------
@@ -249,10 +266,33 @@ repair_existing_install
 build_urls "$NVIM_VERSION"
 [[ -n "$NVIM_VERSION" ]] && info "Requested version: ${BOLD}$NVIM_VERSION${NC}"
 
+# The newest release this script knows about without asking anyone.
+#
+# The GitHub API rate-limits at 60 requests an hour for anonymous callers, and
+# the whole test matrix shares one address: the suite installs on eight distros
+# and the ones on GLIBC 2.34+ each ask for "latest", so a few runs in a row is
+# all it takes. It surfaces as
+#     [ERROR] Failed to fetch latest version from GitHub
+# on some distros and not others, which reads like a distro bug and is not one.
+#
+# This repo's own convention says installers pin versions and never call the
+# API. Asking is still worth it — it is how a new Neovim ever gets picked up —
+# so the API is tried first and this is what it falls back to. Bump it when a
+# release worth having comes out.
+NVIM_FALLBACK_VERSION="v0.12.5"
+
 # Get the latest Neovim release tag
 get_latest_version() {
-    curl -s https://api.github.com/repos/neovim/neovim/releases/latest \
-        | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/'
+    local tag
+    tag=$(curl -s --max-time 10 https://api.github.com/repos/neovim/neovim/releases/latest \
+        | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+    if [ -n "$tag" ]; then
+        printf '%s' "$tag"
+        return 0
+    fi
+    warn "GitHub did not answer (rate limit, or no network)" >&2
+    info "Falling back to the pinned ${BOLD}$NVIM_FALLBACK_VERSION${NC}" >&2
+    printf '%s' "$NVIM_FALLBACK_VERSION"
 }
 
 # Get currently installed version
@@ -394,7 +434,14 @@ fi
 # for the release being installed, that traded a working editor for a broken
 # one — the exact case this repo targets, since Debian 11 and Ubuntu 20.04 are
 # supported and both sit on GLIBC 2.31.
-stage="/opt/.nvim-stage.$$"
+# Staged beside the destination, not in /opt.
+#
+# This was hardcoded and it is what broke the very first user-scope install:
+# the download and the version checks all succeeded, and then `mkdir` hit
+# Permission denied on a directory the account was never going to own. Staging
+# next to the target also keeps the final move on one filesystem, so it stays
+# atomic.
+stage="$(dirname "$NVIM_PATH")/.nvim-stage.$$"
 trap 'rm -rf "$stage"' EXIT INT TERM
 rm -rf "$stage"
 mkdir -p "$stage"
@@ -444,12 +491,25 @@ rm -rf "$NVIM_PATH.prev"
 mv "$stage" "$NVIM_PATH"
 trap - EXIT INT TERM
 rm -rf "$NVIM_PATH.prev"
-[ -d "/opt/nvim-linux-x86_64" ] && rm -rf "/opt/nvim-linux-x86_64"
-[ -d "/opt/nvim-linux64" ] && rm -rf "/opt/nvim-linux64"
+# Leftovers from older layouts of this script, under the system prefix.
+#
+# Guarded on scope: these are absolute /opt paths, and a user-scope run has no
+# business deleting anything there. On a box where the account happens to have
+# write access to /opt, an unguarded `rm -rf` would remove a system install
+# that this run neither made nor replaced.
+if [ "$INSTALL_SCOPE" = "system" ]; then
+    [ -d "/opt/nvim-linux-x86_64" ] && rm -rf "/opt/nvim-linux-x86_64"
+    [ -d "/opt/nvim-linux64" ] && rm -rf "/opt/nvim-linux64"
+fi
 
 # Configure PATH
-echo "export PATH=\"\$PATH:$NVIM_PATH/bin\"" > "$PROFILE_PATH"
-chmod 644 "$PROFILE_PATH"
+if [ "$INSTALL_SCOPE" = "system" ]; then
+    echo "export PATH=\"\$PATH:$NVIM_PATH/bin\"" > "$PROFILE_PATH"
+    chmod 644 "$PROFILE_PATH"
+else
+    mkdir -p "$(dirname "$PROFILE_PATH")"
+    ln -sfn "$NVIM_PATH/bin/nvim" "$PROFILE_PATH"
+fi
 
 success "Neovim installed: $("$NVIM_PATH/bin/nvim" --version | head -n1)"
 info "Location: $NVIM_PATH/bin/nvim"
@@ -457,7 +517,19 @@ info "Location: $NVIM_PATH/bin/nvim"
 echo ""
 info "To use Neovim in new terminal sessions:"
 echo -e "  ${YELLOW}${BOLD}1.${NC} Environment variables are already configured globally"
-echo -e "  ${YELLOW}${BOLD}2.${NC} Restart your terminal, or run: ${YELLOW}${BOLD}source $PROFILE_PATH${NC}"
+if [ "$INSTALL_SCOPE" = "system" ]; then
+    echo -e "  ${YELLOW}${BOLD}2.${NC} Restart your terminal, or run: ${YELLOW}${BOLD}source $PROFILE_PATH${NC}"
+else
+    echo -e "  ${YELLOW}${BOLD}2.${NC} Linked at ${YELLOW}${BOLD}$PROFILE_PATH${NC}"
+    case ":$PATH:" in
+        *":$HOME/.local/bin:"*) ;;
+        *)
+            warn "$HOME/.local/bin is not on your PATH, so \`nvim\` will not resolve yet"
+            info "Add this to your ~/.bashrc or ~/.profile:"
+            echo -e "      ${YELLOW}${BOLD}export PATH=\"\$HOME/.local/bin:\$PATH\"${NC}"
+            ;;
+    esac
+fi
 echo -e "  ${YELLOW}${BOLD}3.${NC} Verify with: ${YELLOW}${BOLD}nvim --version${NC}"
 echo ""
 success "Installation complete!"

@@ -231,8 +231,23 @@ _install_tree_sitter_cli() {
         return 1
     fi
 
-    _run mv "${tmp}.bin" "${dest}/tree-sitter" || { rm -f "${tmp}.bin"; return 1; }
-    _run chmod 755 "${dest}/tree-sitter"
+    # Privileges only where the destination needs them.
+    #
+    # This used `_run` unconditionally, which refuses everything when there is
+    # no root — including a move into the user's OWN ~/.local/bin. On an
+    # account without sudo the CLI never installed, and on Neovim 0.11+ that
+    # means nvim-treesitter builds nothing at all: measured as "0 of 24 parsers
+    # built", with every file silently falling back to Vim's regex syntax.
+    #
+    # _install_fzf writes to the same directory and always did it directly.
+    # Same function, two different rules, and only one of them was right.
+    if [[ "$dest" == "$HOME"/* ]]; then
+        mv "${tmp}.bin" "${dest}/tree-sitter" || { rm -f "${tmp}.bin"; return 1; }
+        chmod 755 "${dest}/tree-sitter"
+    else
+        _run mv "${tmp}.bin" "${dest}/tree-sitter" || { rm -f "${tmp}.bin"; return 1; }
+        _run chmod 755 "${dest}/tree-sitter"
+    fi
     return 0
 }
 
@@ -348,21 +363,33 @@ step_deps() {
 # we point the user at it and treat "nvim already installed" as good enough to
 # let the rest of the sequence (config, sync) proceed.
 step_nvim() {
+    local nvim_args=()
+    [[ "$assume_yes" == true ]] && nvim_args+=(--yes)
+
+    # A working `nvim` on PATH is the answer, whoever put it there.
+    #
+    # Without root this is the whole decision: if the command runs, Neovim is
+    # installed system-wide by someone else and there is nothing to do — adding
+    # a second copy under $HOME would only shadow it and drift out of date.
+    #
+    # `nvim --version`, not `command -v nvim`. A leftover binary built for a
+    # newer GLIBC sits on the PATH, answers `command -v` perfectly and dies the
+    # moment it is executed; the tests hit exactly that on Ubuntu 20.04, and
+    # this check used to be the weak one.
     if [[ "$PRIV_MODE" == "user" ]]; then
-        warn "No root or sudo access — cannot install Neovim automatically."
-        info "Run manually: ${BOLD}sudo $SCRIPT_DIR/install-nvim.sh${NC}"
-        if command -v nvim &>/dev/null; then
-            info "Neovim is already installed: $(nvim --version | head -n1)"
+        if nvim --version >/dev/null 2>&1; then
+            success "Neovim already available: $(nvim --version | head -n1)"
+            info "Installed outside this account — nothing to do"
             return 0
         fi
-        error "Neovim is not installed."
-        return 1
+        warn "No root or sudo, and no working ${BOLD}nvim${NC} on PATH"
+        info "Installing for ${BOLD}$(id -un)${NC} only, under ${BOLD}$HOME/.local${NC}"
+        "$SCRIPT_DIR/install-nvim.sh" "${nvim_args[@]}"
+        return $?
     fi
 
     # install-nvim.sh short-circuits on its own when the target version is
     # already installed, so this is a verify as much as an install.
-    local nvim_args=()
-    [[ "$assume_yes" == true ]] && nvim_args+=(--yes)
     _run "$SCRIPT_DIR/install-nvim.sh" "${nvim_args[@]}"
 }
 
