@@ -366,20 +366,37 @@ step_nvim() {
     local nvim_args=()
     [[ "$assume_yes" == true ]] && nvim_args+=(--yes)
 
-    # A working `nvim` on PATH is the answer, whoever put it there.
+    # Decide BEFORE escalating.
     #
-    # Without root this is the whole decision: if the command runs, Neovim is
-    # installed system-wide by someone else and there is nothing to do — adding
-    # a second copy under $HOME would only shadow it and drift out of date.
+    # This used to hand the whole thing to `_run`, which means sudo, and let
+    # install-nvim.sh work out that nothing needed doing. It does work that out
+    # — after asking for a password. On a machine where Neovim is already
+    # current, that prompt was the only thing that happened, and it turns an
+    # unattended `--reinstall -y` into one that stops and waits for a human.
     #
     # `nvim --version`, not `command -v nvim`. A leftover binary built for a
     # newer GLIBC sits on the PATH, answers `command -v` perfectly and dies the
-    # moment it is executed; the tests hit exactly that on Ubuntu 20.04, and
-    # this check used to be the weak one.
+    # moment it runs; the suite caught exactly that on Ubuntu 20.04.
+    local current="" target=""
+    if nvim --version >/dev/null 2>&1; then
+        current=$(nvim --version 2>/dev/null | head -n1 | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+')
+        target=$("$SCRIPT_DIR/install-nvim.sh" --print-target 2>/dev/null | tail -n1)
+
+        if [[ -n "$current" && "$current" == "$target" ]]; then
+            success "Neovim $current is already the version this system should have"
+            info "Nothing to install — no privileges needed"
+            return 0
+        fi
+        if [[ -n "$current" && -n "$target" ]]; then
+            info "Neovim ${BOLD}$current${NC} installed, ${BOLD}$target${NC} is available"
+        fi
+    fi
+
+    # From here something has to be written, so privileges matter.
     if [[ "$PRIV_MODE" == "user" ]]; then
-        if nvim --version >/dev/null 2>&1; then
-            success "Neovim already available: $(nvim --version | head -n1)"
-            info "Installed outside this account — nothing to do"
+        if [[ -n "$current" ]]; then
+            warn "A newer Neovim ($target) exists, but updating it needs root"
+            info "Keeping the system-wide ${BOLD}$current${NC} — a copy under \$HOME would only shadow it"
             return 0
         fi
         warn "No root or sudo, and no working ${BOLD}nvim${NC} on PATH"
@@ -388,8 +405,6 @@ step_nvim() {
         return $?
     fi
 
-    # install-nvim.sh short-circuits on its own when the target version is
-    # already installed, so this is a verify as much as an install.
     _run "$SCRIPT_DIR/install-nvim.sh" "${nvim_args[@]}"
 }
 
