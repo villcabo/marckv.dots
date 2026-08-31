@@ -495,5 +495,83 @@ else
     esac
 fi
 
+# --- S12: picking a project opens the project --------------------------------
+#
+# snacks' default action for its projects section is `chdir` followed by
+# M.pick(), which drops you into a fuzzy finder over the whole repo — 268
+# entries on this one — before you have said what you are looking for. Picking
+# a project is already an answer; being asked a second question is not what it
+# meant. It also disagreed with the Neovim 0.9 path, which changes directory
+# and shows the directory.
+#
+# Key `1` is the first project on both generations: snacks assigns it via
+# autokey, and the 0.9 screen numbers its own entries the same way.
+printf '\nS12 picking a project changes directory and opens it\n'
+rm -f /tmp/after.txt /tmp/keys
+printf '1' > /tmp/keys
+printf ':lua vim.defer_fn(function() local f=io.open("/tmp/after.txt","w") f:write(vim.fn.getcwd().."|"..vim.bo.filetype) f:close() vim.cmd("qa!") end, 900)\r' >> /tmp/keys
+timeout 60 script -qec "nvim" /dev/null < /tmp/keys >/dev/null 2>&1
+AFTER=$(cat /tmp/after.txt 2>/dev/null)
+CWD=${AFTER%%|*}
+FT=${AFTER##*|}
+if [ "$CWD" = "$REPO" ]; then
+    ok "the working directory follows the project"
+else
+    bad "the working directory follows the project" "cwd is '${CWD:-nothing}', expected $REPO"
+fi
+case "$FT" in
+    oil) ok "it lands in the project, not in a picker" ;;
+    *)   bad "it lands in the project, not in a picker" "filetype is '${FT:-nothing}'" ;;
+esac
+
+# --- S11: there is a way back ------------------------------------------------
+#
+# The start buffer is `bufhidden = wipe`, so opening a file destroys it. That
+# is deliberate — a stale dashboard in the buffer list is worse than none — but
+# it left no way back, and nothing said so: the screen simply never returned
+# and you would not think to look for a command that had never existed.
+#
+# Driven through a pty because on 0.10+ snacks does not open its dashboard
+# headless at all, so a headless check would pass by drawing nothing and
+# finding nothing missing.
+printf '\nS11 you can leave the start screen and come back\n'
+cat > /tmp/rt.lua <<'LUA'
+local function home()
+  local ft = vim.bo.filetype
+  return ft == "nvimlite_start" or ft == "snacks_dashboard"
+end
+local log = {}
+vim.defer_fn(function()
+  -- vim.wait on the condition, not a fixed delay. A 900 ms defer passed on six
+  -- distros and failed on the two running Neovim 0.10.3, where snacks takes
+  -- longer to open its window: the check was racing the thing it measured.
+  local got = vim.wait(8000, home, 100)
+  log[#log + 1] = "start=" .. tostring(got) .. "[" .. vim.bo.filetype .. "]"
+  vim.cmd.edit(vim.fn.stdpath("config") .. "/VERSION")
+  log[#log + 1] = "left=" .. tostring(home())
+  pcall(require("config.branding").open)
+  log[#log + 1] = "back=" .. tostring(vim.wait(8000, home, 100))
+  local fh = io.open("/tmp/rt.txt", "w")
+  fh:write(table.concat(log, " "))
+  fh:close()
+  vim.cmd("qa!")
+end, 300)
+LUA
+rm -f /tmp/rt.txt
+timeout 60 script -qec "nvim -c 'luafile /tmp/rt.lua'" /dev/null >/dev/null 2>&1
+RT=$(cat /tmp/rt.txt 2>/dev/null)
+case "$RT" in
+    *"start=true"*) ok "the start screen comes up" ;;
+    *) bad "the start screen comes up" "got: ${RT:-nothing}" ;;
+esac
+case "$RT" in
+    *"left=false"*) ok "opening a file leaves it" ;;
+    *) bad "opening a file leaves it" "got: ${RT:-nothing}" ;;
+esac
+case "$RT" in
+    *"back=true"*) ok "you can come back to it" ;;
+    *) bad "you can come back to it" "got: ${RT:-nothing}" ;;
+esac
+
 printf '\n---- %s: %d ok, %d failed ----\n' "$(. /etc/os-release; echo "$ID$VERSION_ID")" "$PASS" "$FAIL"
 [ $FAIL -eq 0 ]
