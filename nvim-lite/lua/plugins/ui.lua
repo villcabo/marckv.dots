@@ -123,16 +123,15 @@ return {
       dashboard = {
         enabled = vim.fn.has("nvim-0.10") == 1,
         sections = {
-          { section = "header" },
+          -- A `text` section rather than `header`, because header takes one
+          -- highlight group for the whole string and the bolt's gradient is
+          -- the logo. See config/branding.lua.
+          { text = require("config.branding").snacks_text(), align = "center", padding = 1 },
           { icon = "\u{f11c} ", title = "Keymaps", section = "keys", indent = 2, padding = 1 },
           { icon = "\u{f0c5} ", title = "Recent Files", section = "recent_files", indent = 2, padding = 1 },
           { section = "startup" },
         },
         preset = {
-          -- The banner lives in config/branding.lua, not inline here, because
-          -- Neovim 0.9 needs the same thing drawn WITHOUT snacks (this whole
-          -- dashboard is off there) and two copies of an ASCII logo drift.
-          header = require("config.branding").header(),
           -- Icons as \u{} escapes, not literal glyphs.
           --
           -- Every one of these except Lazy's was a bare space in the file:
