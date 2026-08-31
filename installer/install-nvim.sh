@@ -72,6 +72,7 @@ bold()    { echo -e "${BOLD}$1${NC}"; }
 die() { error "$1"; exit 1; }
 
 ASSUME_YES=false
+PRINT_TARGET=false
 
 # Parse flags
 while [[ $# -gt 0 ]]; do
@@ -88,6 +89,7 @@ while [[ $# -gt 0 ]]; do
             echo -e "  ${YELLOW}--version <tag>${NC}   Install a specific version (e.g. v0.10.3)"
             echo -e "  ${YELLOW}--ls-remote${NC}       List installable versions with distro compatibility"
             echo -e "  ${YELLOW}-y, --yes${NC}         Skip the confirmation prompt (for scripted installs)"
+            echo -e "  ${YELLOW}--print-target${NC}    Print the version this system would get, and exit"
             echo -e "  ${YELLOW}-h, --help${NC}        Show this help"
             echo ""
             echo -e "${BLUE}GLIBC:${NC}"
@@ -116,6 +118,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         -y|--yes)
             ASSUME_YES=true
+            shift
+            ;;
+        --print-target)
+            PRINT_TARGET=true
             shift
             ;;
         *)
@@ -353,6 +359,18 @@ else
         target_version=$(get_latest_version)
         [[ -z "$target_version" ]] && die "Failed to fetch latest version from GitHub"
     fi
+fi
+
+# Answer and leave, without writing anything and without needing root.
+#
+# This exists so the caller can decide whether an install is needed BEFORE it
+# escalates. `04-install-nvim-lite.sh` used to run this whole script under sudo
+# and let the short-circuit below sort it out — which is correct, and asks for
+# a password first. On a machine where Neovim is already current, that password
+# prompt is the only thing that happens.
+if [[ "$PRINT_TARGET" == true ]]; then
+    printf '%s\n' "$target_version"
+    exit 0
 fi
 
 # Rebuild URLs now that we know the target version
