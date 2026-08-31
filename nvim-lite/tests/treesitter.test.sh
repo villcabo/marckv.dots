@@ -573,5 +573,58 @@ case "$RT" in
     *) bad "you can come back to it" "got: ${RT:-nothing}" ;;
 esac
 
+# --- S13: an account without root ---------------------------------------------
+#
+# The scenario the installer never had: someone with an account and nothing
+# else. Two cases, and the second one used to abort.
+#
+#   nvim already on PATH  -> install nothing. It is there system-wide, and a
+#                            second copy under $HOME would only shadow it and
+#                            drift out of date.
+#   nvim absent           -> install for that user, under ~/.local, without
+#                            touching one file the account does not own.
+#
+# The old code answered the first with `command -v nvim` — the weak check this
+# suite already caught being wrong on Ubuntu 20.04, where a leftover binary
+# resolves and then dies on exec — and answered the second with `error` and a
+# non-zero return, which took the whole --reinstall down with it.
+printf '\nS13 an account without root\n'
+id -u nrtest >/dev/null 2>&1 || useradd -m -s /bin/bash nrtest >/dev/null 2>&1
+NRHOME=$(getent passwd nrtest | cut -d: -f6)
+rm -rf "$NRHOME/dots" "$NRHOME/.local/nvim" "$NRHOME/.local/bin/nvim"
+mkdir -p "$NRHOME/dots"
+cp -r "$REPO/installer" "$REPO/nvim-lite" "$NRHOME/dots/" 2>/dev/null
+chown -R nrtest:nrtest "$NRHOME/dots"
+
+# Case 1: a working nvim is already on PATH.
+NVDIR=$(dirname "$(command -v nvim)")
+OUT=$(su - nrtest -c "export PATH=$NVDIR:/usr/bin:/bin; cd ~/dots/installer && ./04-install-nvim-lite.sh --nvim -y 2>&1" 2>&1)
+case "$OUT" in
+    *"nothing to do"*) ok "a system-wide nvim is left alone" ;;
+    *) bad "a system-wide nvim is left alone" "$(printf '%s' "$OUT" | tail -2 | tr '\n' ' ')" ;;
+esac
+if [ -d "$NRHOME/.local/nvim" ]; then
+    bad "no second copy is installed under \$HOME" "$NRHOME/.local/nvim exists"
+else
+    ok "no second copy is installed under \$HOME"
+fi
+
+# Case 2: nothing on PATH. Uses the archive this container already cached, so
+# the check costs an unpack rather than a download.
+SYSSTAMP=$(stat -c '%Y' /etc/profile.d/nvim.sh 2>/dev/null || echo none)
+su - nrtest -c "export PATH=/usr/bin:/bin; cd ~/dots/installer && timeout 300 ./install-nvim.sh -y" >/tmp/nr.log 2>&1
+if su - nrtest -c "\$HOME/.local/bin/nvim --version" >/dev/null 2>&1; then
+    ok "it installs into \$HOME when nvim is missing"
+    printf '       %s\n' "$(su - nrtest -c '$HOME/.local/bin/nvim --version' 2>/dev/null | head -1)"
+else
+    bad "it installs into \$HOME when nvim is missing" "$(tail -3 /tmp/nr.log)"
+fi
+NOWSTAMP=$(stat -c '%Y' /etc/profile.d/nvim.sh 2>/dev/null || echo none)
+if [ "$SYSSTAMP" = "$NOWSTAMP" ]; then
+    ok "the system install is left untouched"
+else
+    bad "the system install is left untouched" "/etc/profile.d/nvim.sh changed"
+fi
+
 printf '\n---- %s: %d ok, %d failed ----\n' "$(. /etc/os-release; echo "$ID$VERSION_ID")" "$PASS" "$FAIL"
 [ $FAIL -eq 0 ]
