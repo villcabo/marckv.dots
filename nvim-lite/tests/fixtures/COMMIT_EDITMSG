@@ -1,0 +1,10 @@
+fix(nvim-lite): build treesitter parsers on every supported distro
+
+The gate asked for the tree-sitter CLI, which the master branch never uses.
+
+# Please enter the commit message for your changes. Lines starting
+# with '#' will be ignored, and an empty message aborts the commit.
+#
+# On branch fix/nvim-lite-treesitter-parsers
+# Changes to be committed:
+#	modified:   nvim-lite/lua/plugins/treesitter.lua

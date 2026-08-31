@@ -1,0 +1,5 @@
+2026-08-29T12:04:11.884Z INFO  [gateway]    started in 4.21s, listening on :8080
+2026-08-29T12:04:19.002Z WARN  [paymentms]  slow query 1203ms: SELECT * FROM payment_attempt
+2026-08-29T12:05:02.771Z ERROR [paymentms]  java.sql.SQLException: connection timed out
+	at org.postgresql.Driver.connect(Driver.java:264)
+2026-08-29T12:05:03.114Z INFO  [paymentms]  retrying in 5s (attempt 2/5)

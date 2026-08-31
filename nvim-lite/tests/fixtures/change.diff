@@ -1,0 +1,11 @@
+diff --git a/installer/install-nvim.sh b/installer/install-nvim.sh
+index cac8140..fa07b74 100755
+--- a/installer/install-nvim.sh
++++ b/installer/install-nvim.sh
+@@ -5,7 +5,9 @@
+ set -e
+ 
+-GREEN=$(tput setaf 114)
++if tput setaf 1 &> /dev/null; then
++    GREEN=$(tput setaf 114)
++fi

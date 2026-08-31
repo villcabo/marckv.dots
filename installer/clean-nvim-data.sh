@@ -65,16 +65,19 @@ print_dir_entry() {
 
 main() {
     local include_config=false
+    local assume_yes=false
 
     for arg in "$@"; do
         case "$arg" in
             -c|--config) include_config=true ;;
+            -y|--yes) assume_yes=true ;;
             -h|--help)
-                bold "Usage: $0 [--config]"
+                bold "Usage: $0 [--config] [--yes]"
                 echo "  Cleans Neovim data dirs: share, state, cache (for NVIM_APPNAME=$APPNAME)."
                 echo ""
                 echo -e "  ${BOLD}-c, --config${NC}   Also remove the config dir ($CONFIG_DIR)."
                 echo "                 If it's a symlink, only the link is removed."
+                echo -e "  ${BOLD}-y, --yes${NC}      Skip the confirmation prompt. The preview is still printed."
                 exit 0
                 ;;
             *)
@@ -135,12 +138,17 @@ main() {
 
     warn "This action is irreversible. Run the installer again after this to set up a fresh config."
     echo ""
-    read -p "Delete all listed directories? (y/N): " -n 1 -r
-    echo ""
 
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        info "Aborted. Nothing was deleted."
-        exit 0
+    if [[ "$assume_yes" == true ]]; then
+        info "Skipping confirmation (--yes)."
+    else
+        read -p "Delete all listed directories? (y/N): " -n 1 -r
+        echo ""
+
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            info "Aborted. Nothing was deleted."
+            exit 0
+        fi
     fi
 
     echo ""

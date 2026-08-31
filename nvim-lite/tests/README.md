@@ -9,6 +9,19 @@ cd nvim-lite/tests
 Runs only in containers. Every scenario installs Neovim into `/opt`, replaces
 `~/.config/nvim` and clones the whole plugin set.
 
+
+## No edites el repo mientras corre la suite
+
+Los contenedores montan el repo **en vivo** (read-only, pero en vivo). Un archivo
+Lua guardado a medias mientras un distro lo está leyendo produce una cascada de
+fallos que parecen del código y son del editor: en una corrida, Ubuntu 20.04
+reportó 9 errores — `starts`, `lazy reports what the config disables`, `the
+LazyVim core is intact` — todos a la vez, que es la firma de un archivo
+incompleto y no la de un bug.
+
+Si tenés que cambiar algo, esperá a que termine, o corré primero el distro que
+te interesa (`./run.sh debian10`) y editá después.
+
 ## Why this suite exists
 
 `nvim-lite` shipped for months without a single treesitter parser on any

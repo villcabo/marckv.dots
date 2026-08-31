@@ -1,0 +1,10 @@
+{
+  "name": "gpgw-paymentms",
+  "replicas": 3,
+  "resources": { "limits": { "cpu": "2", "memory": "2Gi" } },
+  "env": [
+    { "name": "SPRING_PROFILES_ACTIVE", "value": "production" },
+    { "name": "JAVA_OPTS", "value": "-XX:MaxRAMPercentage=75" }
+  ],
+  "healthcheck": { "path": "/actuator/health", "intervalSeconds": 30 }
+}

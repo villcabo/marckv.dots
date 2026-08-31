@@ -1,0 +1,15 @@
+Host *
+    ServerAliveInterval 60
+    ServerAliveCountMax 3
+    HashKnownHosts yes
+
+Host bastion
+    HostName bastion.example.internal
+    User admin
+    IdentityFile ~/.ssh/id_ed25519
+    Port 2222
+
+Host prod-*
+    ProxyJump bastion
+    StrictHostKeyChecking yes
+    ForwardAgent no

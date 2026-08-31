@@ -1,0 +1,5 @@
+127.0.0.1       localhost
+::1             localhost ip6-localhost ip6-loopback
+
+192.168.226.170 db-sql-billing.internal db-sql-billing
+10.0.3.14       bastion.example.internal bastion

@@ -55,6 +55,8 @@ bold()    { echo -e "${BOLD}$1${NC}"; }
 
 die() { error "$1"; exit 1; }
 
+ASSUME_YES=false
+
 # Parse flags
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -69,6 +71,7 @@ while [[ $# -gt 0 ]]; do
             echo -e "${BLUE}Flags:${NC}"
             echo -e "  ${YELLOW}--version <tag>${NC}   Install a specific version (e.g. v0.10.3)"
             echo -e "  ${YELLOW}--ls-remote${NC}       List installable versions with distro compatibility"
+            echo -e "  ${YELLOW}-y, --yes${NC}         Skip the confirmation prompt (for scripted installs)"
             echo -e "  ${YELLOW}-h, --help${NC}        Show this help"
             echo ""
             echo -e "${BLUE}GLIBC:${NC}"
@@ -93,6 +96,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --ls-remote)
             LS_REMOTE=true
+            shift
+            ;;
+        -y|--yes)
+            ASSUME_YES=true
             shift
             ;;
         *)
@@ -312,13 +319,26 @@ fi
 build_urls "$target_version"
 
 # Detect currently installed version (if any)
+#
+# Read the version whenever the binary is there, and track the profile script
+# separately. Those two used to be one condition, and it reported
+#     Currently installed:  none
+# on a machine running v0.12.5 — because the binary had been installed some
+# other way and $PROFILE_PATH was absent. The preview is the record of what is
+# about to happen to a server; it has to say what is actually there.
 installed_version=""
-if [ -d "$NVIM_PATH" ] && [ -f "$PROFILE_PATH" ]; then
+profile_missing=false
+if [ -d "$NVIM_PATH" ]; then
     installed_version=$(get_installed_version)
+    [ -f "$PROFILE_PATH" ] || profile_missing=true
 fi
 
-# Short-circuit if already on target version (unless user forced --version)
-if [[ -z "$NVIM_VERSION" && -n "$installed_version" && "$installed_version" == "$target_version" ]]; then
+# Short-circuit if already on target version (unless user forced --version).
+#
+# A missing profile script is still work to do, so it does not short-circuit:
+# without it the binary is on disk and not on anyone's PATH, which is the exact
+# failure this repo already fixed once (PR #10).
+if [[ -z "$NVIM_VERSION" && -n "$installed_version" && "$installed_version" == "$target_version" && "$profile_missing" == false ]]; then
     success "✅ Already on the latest version ($installed_version)"
     exit 0
 fi
@@ -329,6 +349,9 @@ bold "=== INSTALLATION PREVIEW ==="
 echo -e "${BLUE}Target version:${NC}       ${YELLOW}${BOLD}$target_version${NC}"
 if [[ -n "$installed_version" ]]; then
     echo -e "${BLUE}Currently installed:${NC}  ${ORANGE}$installed_version${NC}"
+    if [[ "$profile_missing" == true ]]; then
+        echo -e "${BLUE}Reinstalling because:${NC} ${ORANGE}$PROFILE_PATH is missing${NC}"
+    fi
 else
     echo -e "${BLUE}Currently installed:${NC}  ${ORANGE}none${NC}"
 fi
@@ -338,11 +361,17 @@ echo -e "${BLUE}Profile script:${NC}       ${ORANGE}$PROFILE_PATH${NC}"
 echo -e "${BLUE}Download URL:${NC}         ${ORANGE}$NVIM_URL${NC}"
 echo ""
 
-read -p "Type '${YELLOW}${BOLD}yes${NC}' to confirm installation: " -r
-echo
-if [[ "$REPLY" != "yes" ]]; then
-    info "Cancelled."
-    exit 0
+# The preview above still prints under --yes: on a remote server the record of
+# WHAT was installed is worth more than the keystroke it saves.
+if [[ "$ASSUME_YES" == true ]]; then
+    info "Proceeding without confirmation (--yes)"
+else
+    read -p "Type '${YELLOW}${BOLD}yes${NC}' to confirm installation: " -r
+    echo
+    if [[ "$REPLY" != "yes" ]]; then
+        info "Cancelled."
+        exit 0
+    fi
 fi
 
 echo ""

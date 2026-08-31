@@ -1,0 +1,12 @@
+# Build output
+/target/
+/dist/
+*.class
+
+# Local state, never committed
+.env
+*.local
+.DS_Store
+
+# Except this one
+!.env.example

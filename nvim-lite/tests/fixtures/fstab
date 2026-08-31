@@ -1,0 +1,4 @@
+# <file system>  <mount point>  <type>  <options>              <dump> <pass>
+UUID=8f3a-11c2   /              ext4    errors=remount-ro       0      1
+UUID=1a2b-3c4d   /var/lib/docker xfs    defaults,pquota         0      2
+tmpfs            /tmp           tmpfs   defaults,noatime,size=2G 0     0

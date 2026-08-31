@@ -29,6 +29,17 @@ return {
     "LazyVim/LazyVim",
     opts = {
       colorscheme = "gentleman-kanagawa-blur",
+
+      -- LazyVim's NEWS popup, off where snacks is not installed.
+      --
+      -- util/news.lua reaches for the `Snacks` global without checking it, so
+      -- on Neovim 0.9 — where snacks cannot run at all — opening any file ends
+      -- in "attempt to index global 'Snacks' (a nil value)" and a Press ENTER
+      -- prompt. It fires on every start rather than once, because LazyVim
+      -- records "already seen" in lazyvim.json inside the CONFIG directory,
+      -- and that directory is a symlink into the repo.
+      news = vim.fn.has("nvim-0.10") == 1 and { lazyvim = true, neovim = true }
+        or { lazyvim = false, neovim = false },
     },
   },
 
