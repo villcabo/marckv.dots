@@ -600,7 +600,7 @@ chown -R nrtest:nrtest "$NRHOME/dots"
 NVDIR=$(dirname "$(command -v nvim)")
 OUT=$(su - nrtest -c "export PATH=$NVDIR:/usr/bin:/bin; cd ~/dots/installer && ./04-install-nvim-lite.sh --nvim -y 2>&1" 2>&1)
 case "$OUT" in
-    *"nothing to do"*) ok "a system-wide nvim is left alone" ;;
+    *"no privileges needed"*) ok "a system-wide nvim is left alone" ;;
     *) bad "a system-wide nvim is left alone" "$(printf '%s' "$OUT" | tail -2 | tr '\n' ' ')" ;;
 esac
 if [ -d "$NRHOME/.local/nvim" ]; then
@@ -624,6 +624,28 @@ if [ "$SYSSTAMP" = "$NOWSTAMP" ]; then
     ok "the system install is left untouched"
 else
     bad "the system install is left untouched" "/etc/profile.d/nvim.sh changed"
+fi
+
+# Case 3: an account WITH sudo, and Neovim already current.
+#
+# The version check has to happen BEFORE anything escalates. This step used to
+# hand the whole install-nvim.sh to `_run` — that is, to sudo — and let the
+# short-circuit inside it work out that nothing needed doing. It does work that
+# out, after asking for a password. On a server where Neovim was already
+# current, that prompt was the only thing that happened, and it turned an
+# unattended `--reinstall -y` into one that sits waiting for a human.
+#
+# Run with stdin closed on purpose: if it tries to escalate, there is nobody to
+# answer and the step cannot quietly pass.
+if command -v sudo >/dev/null 2>&1; then
+    OUT3=$(su - nrtest -c "export PATH=$NVDIR:/usr/bin:/bin; cd ~/dots/installer && timeout 120 ./04-install-nvim-lite.sh --nvim -y" </dev/null 2>&1)
+    case "$OUT3" in
+        *"no privileges needed"*) ok "a current Neovim is not reinstalled, and never asks for a password" ;;
+        *"password"*)             bad "a current Neovim is not reinstalled, and never asks for a password" "it asked for a password" ;;
+        *)                        bad "a current Neovim is not reinstalled, and never asks for a password" "$(printf '%s' "$OUT3" | tail -2 | tr '\n' ' ')" ;;
+    esac
+else
+    ok "sudo is absent here, so there is no escalation to avoid"
 fi
 
 printf '\n---- %s: %d ok, %d failed ----\n' "$(. /etc/os-release; echo "$ID$VERSION_ID")" "$PASS" "$FAIL"
