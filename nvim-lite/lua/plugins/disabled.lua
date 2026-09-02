@@ -68,6 +68,22 @@ return {
   { "folke/lazydev.nvim", enabled = false },  -- Lua LSP helper, pointless with no LSP
   { "folke/neodev.nvim", enabled = false },  -- the same thing under LazyVim v14
 
+  -- ts-comments: needs Neovim 0.11, and LazyVim v14 asks for it unguarded.
+  --
+  -- It calls nvim_get_option_info2 with both `scope` and `buf`, which 0.9 and
+  -- 0.10 reject outright — measured: 0.9.5 and 0.10.3 error, 0.12.5 accepts.
+  -- LazyVim v14.15.1's coding.lua lists it with no version condition, so on
+  -- Neovim 0.10 (Debian 11, Ubuntu 20.04) every `gcc` ends in
+  --     E5108 ... cannot use both 'scope' and 'buf'
+  --
+  -- Third time the same shape: the LazyVim tag pin does not cover what LazyVim
+  -- pulls in. snacks and the completion stack were the first two.
+  --
+  -- Losing it costs little. Neovim 0.10 comments natively — vim._comment is
+  -- there, `gcc` keeps working. What goes is treesitter-aware commentstring
+  -- for embedded languages, e.g. commenting JS inside an .html.
+  { "folke/ts-comments.nvim", enabled = vim.fn.has("nvim-0.11") == 1 },
+
   -- --- editing niceties that a server session never reaches for ------------
   { "MagicDuck/grug-far.nvim", enabled = false },  -- :%s, sed and rg already do this
   { "folke/trouble.nvim", enabled = false },       -- a diagnostics list, with no diagnostics
