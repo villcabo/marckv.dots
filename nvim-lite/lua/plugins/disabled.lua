@@ -59,10 +59,15 @@ return {
   -- the newest, which needs GLIBC 2.39 and cannot start on Debian 12 or
   -- Ubuntu 22.04. On Neovim 0.11+ that step is no longer optional.
   { "neovim/nvim-lspconfig", enabled = false },
+  -- Only the current names. Listing the old `williamboman/*` ones as well
+  -- looked like cheap insurance across LazyVim generations and was not: both
+  -- v14.15.1 and v15 already declare mason as `mason-org/*`, so the legacy
+  -- entries disabled nothing — they only tripped LazyVim's rename check, which
+  -- hooks every spec added and warns regardless of `enabled = false`:
+  --     Plugin `williamboman/mason.nvim` was renamed to `mason-org/mason.nvim`
+  -- two notifications on the start screen, on every launch.
   { "mason-org/mason.nvim", enabled = false },
   { "mason-org/mason-lspconfig.nvim", enabled = false },
-  { "williamboman/mason.nvim", enabled = false },
-  { "williamboman/mason-lspconfig.nvim", enabled = false },
   { "stevearc/conform.nvim", enabled = false },
   { "mfussenegger/nvim-lint", enabled = false },
   { "folke/lazydev.nvim", enabled = false },  -- Lua LSP helper, pointless with no LSP

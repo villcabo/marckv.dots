@@ -648,5 +648,43 @@ else
     ok "sudo is absent here, so there is no escalation to avoid"
 fi
 
+# --- S14: the start screen comes up with nothing to complain about -----------
+#
+# Not the same check as S8, and the difference is what made this class of bug
+# invisible for weeks:
+#
+#   * no file argument — these land on the DASHBOARD, which is what anyone sees
+#     when they type `nvim` with no arguments
+#   * a real wait before quitting — the notifications are scheduled, so a
+#     session that opens and immediately quits reports a clean screen on a
+#     machine that shows two warnings. That is exactly what happened: the first
+#     scan sent `:qa!` at once and found nothing, on a config that was warning
+#     about `williamboman/mason.nvim` on every launch
+#   * fragments, not phrases — snacks draws notifications in a float, so the
+#     text arrives broken up by cursor-positioning escapes and a grep for the
+#     whole sentence matches nothing
+printf '\nS14 the start screen has no warnings\n'
+if ! command -v script >/dev/null 2>&1; then
+    bad "script(1) is available" "install util-linux"
+else
+    DASH=/tmp/dash.log
+    rm -f "$DASH"
+    { sleep 6; printf ':qa!\r'; sleep 1; } \
+        | timeout 60 script -qec "stty cols 170 rows 45; nvim" /dev/null > "$DASH" 2>&1
+    seen=""
+    for frag in "was renamed" "Please update your config" "deprecated" "E5108" \
+                "Error executing" "attempt to index" "attempt to call"; do
+        grep -q "$frag" "$DASH" 2>/dev/null && seen="$seen [$frag]"
+    done
+    if [ -z "$seen" ]; then
+        ok "no warnings on the start screen"
+    else
+        bad "no warnings on the start screen" "saw:$seen"
+        sed -e 's/\x1b\[[0-9;?]*[a-zA-Z]//g' "$DASH" 2>/dev/null \
+            | grep -oE "Plugin [^ ]+ was renamed to [^ ]+|E[0-9]{3,4}:[^|]{0,70}" \
+            | sort -u | head -4 | sed 's/^/         /'
+    fi
+fi
+
 printf '\n---- %s: %d ok, %d failed ----\n' "$(. /etc/os-release; echo "$ID$VERSION_ID")" "$PASS" "$FAIL"
 [ $FAIL -eq 0 ]
