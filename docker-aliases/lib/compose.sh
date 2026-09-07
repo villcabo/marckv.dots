@@ -488,11 +488,22 @@ _DAV2_PROP_PATHS='/app/resources/git.properties
 # The hit is prefixed with @@PATH@@<path> so the caller can say WHERE it came
 # from — which is the quick way to learn where your image actually puts it.
 # DOCKER_ALIASES_GIT_PROPS entries are searched first.
-_git_props_probe() {
+# _git_props_paths → the paths the probe will look in, one per line
+#
+# Split out so the "not found" message and the probe cannot drift apart. They
+# did: the message said "no git.properties" and named nothing, so the only way
+# to learn where it had looked was to read the source.
+_git_props_paths() {
     local paths="$_DAV2_PROP_PATHS"
     [[ -n "${DOCKER_ALIASES_GIT_PROPS:-}" ]] && \
         paths="$(_split_on ':' "$DOCKER_ALIASES_GIT_PROPS")
 $paths"
+    printf '%s\n' "$paths"
+}
+
+_git_props_probe() {
+    local paths
+    paths=$(_git_props_paths)
 
     local probe='for f in' item
     while IFS= read -r item; do

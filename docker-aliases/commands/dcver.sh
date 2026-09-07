@@ -163,15 +163,29 @@ dcver() {
     local tmp
     tmp=$(mktemp -d) || { _err dcver "could not create a temp directory"; return 1; }
 
-    local idx=0
-    for svc in "${matched[@]}"; do
-        idx=$(( idx + 1 ))
-        {
-            "${base[@]}" exec -T "$svc" sh -c "$probe" 2>/dev/null > "${tmp}/${idx}.out"
-            printf '%s' "$svc" > "${tmp}/${idx}.svc"
-        } &
-    done
-    wait
+    # The whole fan-out runs in a subshell, and every probe reads from
+    # /dev/null. Both halves are needed, and both were missing:
+    #
+    #   * an interactive shell has job control on, so each `&` announced itself
+    #     as "[1] 4042334" and again as "[1] Exit 1 docker exec ..." — the
+    #     internals of this function printed over its own output. A subshell is
+    #     not interactive, so monitor mode is off inside it and nothing is
+    #     announced.
+    #   * `docker compose exec` reads stdin even with -T. A background process
+    #     that reads the terminal gets SIGTTIN and is STOPPED, which surfaced as
+    #     "-bash: wait: warning: job 1[1565092] stopped" and a hung-looking
+    #     command. Redirecting stdin is what stops it from ever asking.
+    (
+        idx=0
+        for svc in "${matched[@]}"; do
+            idx=$(( idx + 1 ))
+            {
+                "${base[@]}" exec -T "$svc" sh -c "$probe" </dev/null 2>/dev/null > "${tmp}/${idx}.out"
+                printf '%s' "$svc" > "${tmp}/${idx}.svc"
+            } &
+        done
+        wait
+    )
 
     # --- raw mode -----------------------------------------------------------
     if [[ "$raw" == true ]]; then
@@ -222,6 +236,12 @@ dcver() {
     _render_container_table "compose versions" "$found" "${#matched[@]}" "${patterns[*]}" \
         "SERVICE" "VERSION" "COMMIT" "BRANCH" "BUILT" "" "$rows" \
         "white,cyan,dim,blue,dim,red"
+
+    # Only when nothing was found at all. With some hits the paths clearly
+    # work and listing them is noise; with none, it is the only thing that says
+    # what to try next.
+    (( found == 0 )) && _git_props_missing_note "${#matched[@]}"
+    return 0
 }
 
 # Completion source: service names, honouring any -P already typed.

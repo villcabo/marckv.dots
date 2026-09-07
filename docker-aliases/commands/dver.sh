@@ -138,12 +138,20 @@ dver() {
     local tmp
     tmp=$(mktemp -d) || { _err dver "could not create a temp directory"; return 1; }
 
+    # Subshell, and stdin from /dev/null — same two reasons as dcver.
+    #
+    # An interactive shell has job control on, so every `&` printed "[1] 4042334"
+    # and then "[1] Exit 1 docker exec ..." straight over the table this command
+    # exists to draw. And a background process that reads the terminal gets
+    # SIGTTIN and stops, which reads as the command hanging.
     local idx=0 entry
-    for entry in "${entries[@]}"; do
-        idx=$(( idx + 1 ))
-        docker exec "${entry%%	*}" sh -c "$probe" 2>/dev/null > "${tmp}/${idx}.out" &
-    done
-    wait
+    (
+        for entry in "${entries[@]}"; do
+            idx=$(( idx + 1 ))
+            docker exec "${entry%%	*}" sh -c "$probe" </dev/null 2>/dev/null > "${tmp}/${idx}.out" &
+        done
+        wait
+    )
 
     # $(<file) rather than $(cat file): bash and zsh both special-case this
     # form and read the file inline, with no subshell and no /bin/cat at all.
@@ -221,6 +229,12 @@ dver() {
         printf "  ${CDIM}%s %d with no git.properties (%s)  ${CR}${CDIM}-a to show${CR}\n" \
             "$(_icon dir)" "$hidden" "$shortlist"
     fi
+
+    # Where it looked, only when nothing at all was found. With some hits the
+    # list is noise — the paths clearly work, that image just does not ship the
+    # file. With none, it is the only thing that tells you what to try next.
+    (( found == 0 )) && _git_props_missing_note "$total"
+    return 0
 }
 
 # Completion source: container names across the host.
