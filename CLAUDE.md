@@ -65,11 +65,23 @@ what it leaves behind is reachable by anyone but root:
 
 ```bash
 cd installer/tests
-./run.sh                       # six distros
+./run.sh                       # six distros, both scenario files
 ./run.sh debian11              # one — the GLIBC 2.31 case
 ```
 
 It writes to `/opt` and `/etc/profile.d`, so it only ever runs in a container.
+
+`lifecycle.test.sh` runs alongside it and tests the *shape* rather than the
+outcome: that every installer answers `--help`, exits 1 on an unknown flag,
+never hangs on a closed stdin, survives install → status → uninstall, and that
+a delete refuses to happen unattended. It is what keeps `lib/common.sh` a
+contract instead of a comment.
+
+**Answer a prompt with `script(1)`, never with a pipe.** `printf 'no\n' | ...`
+does not say no: `confirm` sees a non-terminal stdin and assumes yes, so the
+pipe silently became a yes and one scenario went on passing while testing
+nothing. `answer n "bash $I --version v0.10.3"` in `install-nvim.test.sh` gives
+it a pty, and an assertion checks the reply was actually read.
 
 `nvim-lite` has one too, for the same reason — whether a parser can be built at
 all depends on the distro's GLIBC, in two different ways depending on the
@@ -105,9 +117,26 @@ No symlinks. Installers append `source` lines to `~/.bashrc` and `~/.bash_aliase
 Colors must load first as other modules depend on them. The theme depends on functions from `colors.sh` and `functions.sh`.
 
 ### Installer conventions
-- Numbered prefixes (`01-` … `04-`) on core installers define execution order
+- **`installer/lib/common.sh` is the shared ground — source it, do not re-implement it.**
+  It carries colors, `info`/`success`/`warn`/`error`/`die`, `INSTALLER_DIR` /
+  `MARCKV_DOTS_DIR`, `PRIV_MODE` + `_run`, the preview helpers, the two
+  confirmations, and `installer_main`. It exists because eight scripts had
+  copy-pasted versions of all of it, which is exactly why they had drifted into
+  three different palettes, two prompt styles, and five without a preview.
+- A script with flags of its own extends the shared parser instead of replacing
+  it: override `installer_flag` (return 0 when the argument is consumed) and,
+  if the help needs more than the three verbs, `installer_usage`
+- Numbered prefixes (`01-` … `05-`) on core installers define execution order
 - Every core installer supports the `install` / `status` / `uninstall` lifecycle — keep parity when adding new ones
-- Destructive operations require preview + explicit confirmation
+- **Every installer previews before it acts, and takes `-y`.** The preview goes
+  to *stdout*, unlike docker-aliases which puts it on stderr: an installer's
+  output is the record, and `./01-install-bash.sh | tee install.log` should
+  capture what it was about to do
+- **Two confirmations, and the difference is not stylistic.** `confirm` treats a
+  non-terminal stdin as a yes, so `ssh host ./install-nvim.sh` installs instead
+  of dying at a prompt nobody can answer. `confirm_destructive` refuses (exit
+  **2**, so a caller can tell "declined" from "could not ask") because a delete
+  has no uninstall. Deleting anything the user did not put there uses the second
 - Architecture detection (x86_64/aarch64) for binary downloads
 - User privilege detection: root → direct install, sudo user → sudo install, regular user → `~/.local/bin`
 - `04-install-nvim-lite.sh` defaults to a symlink (live edits from repo); `--copy` snapshots the dir so the host no longer depends on the repo path
