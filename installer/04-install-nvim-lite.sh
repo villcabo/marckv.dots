@@ -6,112 +6,70 @@
 
 set -e
 
-# Colors for output
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-YELLOW='\033[1;33m'
-RED='\033[0;31m'
-BOLD='\033[1m'
-NC='\033[0m' # No Color
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/common.sh"
 
-info()    { echo -e "${BLUE}[INFO]${NC} $1"; }
-success() { echo -e "${GREEN}[OK]${NC} $1"; }
-warn()    { echo -e "${YELLOW}[WARN]${NC} $1"; }
-error()   { echo -e "${RED}[ERROR]${NC} $1"; }
-bold()    { echo -e "${BOLD}$1${NC}"; }
+INSTALLER_NAME="04-install-nvim-lite.sh"
+INSTALLER_ABOUT="Installs the nvim-lite config, and orchestrates the whole Neovim stack."
 
-# Resolve repository root based on this script location
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-MARCKV_DOTS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 SOURCE_NVIM_LITE="$MARCKV_DOTS_DIR/nvim-lite"
 TARGET_NVIM_LITE="$HOME/.config/nvim"
 
-# Parse command + flags
-command=""
 use_copy=false
 use_sync=false
 use_deps=false
 use_clean=false
 use_nvim=false
 use_reinstall=false
-assume_yes=false
 
-for arg in "$@"; do
-    case "$arg" in
-        status|uninstall)
-            command="$arg"
-            ;;
-        -c|--copy) use_copy=true ;;
-        -s|--sync) use_sync=true ;;
-        -d|--deps) use_deps=true ;;
-        --clean) use_clean=true ;;
-        --nvim) use_nvim=true ;;
+# This script has more flags than the shared parser knows about, so it extends
+# it rather than keeping a parser of its own. Returning 0 means "consumed".
+installer_flag() {
+    case "$1" in
+        -c|--copy)   use_copy=true ;;
+        -s|--sync)   use_sync=true ;;
+        -d|--deps)   use_deps=true ;;
+        --clean)     use_clean=true ;;
+        --nvim)      use_nvim=true ;;
         --reinstall) use_reinstall=true ;;
-        -y|--yes) assume_yes=true ;;
-        -h|--help)
-            bold "marckv.dots nvim-lite installer"
-            echo ""
-            echo -e "${BLUE}Usage:${NC} $0 [command] [options]"
-            echo ""
-            echo -e "${BLUE}Commands:${NC}"
-            echo -e "  ${YELLOW}(none)${NC}        Install the config (symlink by default)."
-            echo -e "  ${YELLOW}status${NC}        Report what is installed."
-            echo -e "  ${YELLOW}uninstall${NC}     Remove the config (and optionally its data)."
-            echo ""
-            echo -e "${BLUE}Options:${NC}"
-            echo -e "  ${YELLOW}-c, --copy${NC}       Copy the config directory instead of creating a symlink."
-            echo -e "                    Useful for remote servers where the repo won't be available."
-            echo ""
-            echo -e "  ${YELLOW}-d, --deps${NC}       Install system dependencies (gcc, make, ripgrep, fzf, fd,"
-            echo -e "                    tree-sitter CLI). Requires root or sudo."
-            echo ""
-            echo -e "  ${YELLOW}-s, --sync${NC}       Install plugins and treesitter parsers headlessly."
-            echo -e "                    Run this after install to avoid waiting on first launch."
-            echo ""
-            echo -e "  ${YELLOW}--clean${NC}          Remove Neovim's data dirs (share, state, cache) first."
-            echo ""
-            echo -e "  ${YELLOW}--nvim${NC}           Install or verify the Neovim binary itself."
-            echo ""
-            echo -e "  ${YELLOW}--reinstall${NC}      Everything, in order: clean, deps, nvim, config, sync."
-            echo ""
-            echo -e "  ${YELLOW}-y, --yes${NC}        Do not ask for confirmation."
-            echo ""
-            echo -e "  ${YELLOW}-h, --help${NC}       Show this help."
-            echo ""
-            echo -e "By default (no options), only the config is installed — a symlink so changes"
-            echo -e "in the repo reflect immediately. Passing any of -d/-s/--clean/--nvim runs ONLY"
-            echo -e "the steps requested; the config step is skipped unless --reinstall is used."
-            echo ""
-            exit 0
-            ;;
-        *)
-            error "Unknown argument: $arg (use --help)"
-            exit 1
-            ;;
+        *) return 1 ;;
     esac
-done
+    return 0
+}
 
-# Detect privilege level once: root / sudo / user
-# Sets PRIV_MODE to: "root", "sudo", or "user"
-if [[ $EUID -eq 0 ]]; then
-    PRIV_MODE="root"
-elif command -v sudo &>/dev/null; then
-    PRIV_MODE="sudo"
-else
-    PRIV_MODE="user"
-fi
-
-# Run a command with appropriate privileges
-_run() {
-    case "$PRIV_MODE" in
-        root) "$@" ;;
-        sudo) sudo "$@" ;;
-        user)
-            error "Cannot run: $*"
-            info "No root or sudo access. Run manually with: ${BOLD}sudo $*${NC}"
-            return 1
-            ;;
-    esac
+installer_usage() {
+    bold "marckv.dots nvim-lite installer"
+    echo ""
+    echo -e "${BLUE}Usage:${NC} $0 [command] [options]"
+    echo ""
+    echo -e "${BLUE}Commands:${NC}"
+    echo -e "  ${YELLOW}(none)${NC}        Install the config (symlink by default)."
+    echo -e "  ${YELLOW}status${NC}        Report what is installed."
+    echo -e "  ${YELLOW}uninstall${NC}     Remove the config (and optionally its data)."
+    echo ""
+    echo -e "${BLUE}Options:${NC}"
+    echo -e "  ${YELLOW}-c, --copy${NC}       Copy the config directory instead of creating a symlink."
+    echo -e "                    Useful for remote servers where the repo won't be available."
+    echo ""
+    echo -e "  ${YELLOW}-d, --deps${NC}       Install system dependencies (gcc, make, ripgrep, fzf, fd,"
+    echo -e "                    tree-sitter CLI). Requires root or sudo."
+    echo ""
+    echo -e "  ${YELLOW}-s, --sync${NC}       Install plugins and treesitter parsers headlessly."
+    echo -e "                    Run this after install to avoid waiting on first launch."
+    echo ""
+    echo -e "  ${YELLOW}--clean${NC}          Remove Neovim's data dirs (share, state, cache) first."
+    echo ""
+    echo -e "  ${YELLOW}--nvim${NC}           Install or verify the Neovim binary itself."
+    echo ""
+    echo -e "  ${YELLOW}--reinstall${NC}      Everything, in order: clean, deps, nvim, config, sync."
+    echo ""
+    echo -e "  ${YELLOW}-y, --yes${NC}        Do not ask for confirmation."
+    echo ""
+    echo -e "  ${YELLOW}-h, --help${NC}       Show this help."
+    echo ""
+    echo -e "By default (no options), only the config is installed — a symlink so changes"
+    echo -e "in the repo reflect immediately. Passing any of -d/-s/--clean/--nvim runs ONLY"
+    echo -e "the steps requested; the config step is skipped unless --reinstall is used."
+    echo ""
 }
 
 # Helper: install packages via apt
@@ -123,14 +81,17 @@ _apt_install() {
 }
 
 # Install fzf from GitHub (apt version is too old for fzf-lua)
+FZF_FALLBACK_VERSION="0.65.2"
 _install_fzf() {
     local fzf_version arch fzf_url
     info "Fetching latest fzf version from GitHub API..."
-    fzf_version=$(curl -s https://api.github.com/repos/junegunn/fzf/releases/latest | grep '"tag_name":' | sed -E 's/.*"v([^"]+)".*/\1/')
+    fzf_version=$(curl -s --max-time 10 https://api.github.com/repos/junegunn/fzf/releases/latest | grep '"tag_name":' | sed -E 's/.*"v([^"]+)".*/\1/')
+    # A rate-limited API is not a reason to fail the deps step: 60 requests an
+    # hour is easy to exhaust, and fzf-lua needs a recent fzf, not the newest.
     if [[ -z "$fzf_version" ]]; then
-        error "Failed to fetch fzf version from GitHub API"
-        info "Run manually: ${BOLD}curl -s https://api.github.com/repos/junegunn/fzf/releases/latest${NC}"
-        return 1
+        warn "GitHub did not answer (rate limit, or no network)"
+        info "Falling back to the pinned ${BOLD}v${FZF_FALLBACK_VERSION}${NC}"
+        fzf_version="$FZF_FALLBACK_VERSION"
     fi
     arch=$(uname -m)
     case "$arch" in
@@ -257,8 +218,8 @@ _install_tree_sitter_cli() {
 # logic step_config already has for an existing ~/.config/nvim.
 step_clean() {
     local clean_args=()
-    [[ "$assume_yes" == true ]] && clean_args+=(--yes)
-    "$SCRIPT_DIR/clean-nvim-data.sh" "${clean_args[@]}"
+    [[ "$ASSUME_YES" == true ]] && clean_args+=(--yes)
+    "$INSTALLER_DIR/clean-nvim-data.sh" "${clean_args[@]}"
 }
 
 # --- step: deps --------------------------------------------------------------
@@ -364,7 +325,7 @@ step_deps() {
 # let the rest of the sequence (config, sync) proceed.
 step_nvim() {
     local nvim_args=()
-    [[ "$assume_yes" == true ]] && nvim_args+=(--yes)
+    [[ "$ASSUME_YES" == true ]] && nvim_args+=(--yes)
 
     # Decide BEFORE escalating.
     #
@@ -380,7 +341,7 @@ step_nvim() {
     local current="" target=""
     if nvim --version >/dev/null 2>&1; then
         current=$(nvim --version 2>/dev/null | head -n1 | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+')
-        target=$("$SCRIPT_DIR/install-nvim.sh" --print-target 2>/dev/null | tail -n1)
+        target=$("$INSTALLER_DIR/install-nvim.sh" --print-target 2>/dev/null | tail -n1)
 
         if [[ -n "$current" && "$current" == "$target" ]]; then
             success "Neovim $current is already the version this system should have"
@@ -401,11 +362,11 @@ step_nvim() {
         fi
         warn "No root or sudo, and no working ${BOLD}nvim${NC} on PATH"
         info "Installing for ${BOLD}$(id -un)${NC} only, under ${BOLD}$HOME/.local${NC}"
-        "$SCRIPT_DIR/install-nvim.sh" "${nvim_args[@]}"
+        "$INSTALLER_DIR/install-nvim.sh" "${nvim_args[@]}"
         return $?
     fi
 
-    _run "$SCRIPT_DIR/install-nvim.sh" "${nvim_args[@]}"
+    _run "$INSTALLER_DIR/install-nvim.sh" "${nvim_args[@]}"
 }
 
 # --- step: config --------------------------------------------------------------
@@ -670,7 +631,7 @@ step_sync() {
 
 # --- command: status ---------------------------------------------------------
 # Read-only: never modifies anything, always exits 0.
-cmd_status() {
+do_status() {
     bold "=== nvim-lite status ==="
     echo ""
 
@@ -781,7 +742,7 @@ cmd_status() {
 }
 
 # --- command: uninstall -------------------------------------------------------
-cmd_uninstall() {
+do_uninstall() {
     bold "=== nvim-lite uninstall ==="
     echo ""
 
@@ -796,14 +757,8 @@ cmd_uninstall() {
         fi
         echo ""
 
-        if [[ "$assume_yes" != true ]]; then
-            read -p "Proceed? (y/N): " -n 1 -r
-            echo ""
-            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-                info "Aborted. Nothing was removed."
-                return 0
-            fi
-        fi
+        # Reversible: the config is a symlink, or gets a timestamped backup.
+        confirm "Remove it?" || { info "Nothing was removed."; return 0; }
 
         if [[ -L "$TARGET_NVIM_LITE" ]]; then
             rm "$TARGET_NVIM_LITE"
@@ -816,17 +771,11 @@ cmd_uninstall() {
     fi
 
     echo ""
-    if [[ "$assume_yes" == true ]]; then
-        info "Removing data dirs too (--yes)..."
-        "$SCRIPT_DIR/clean-nvim-data.sh" --yes
+    # Not reversible, so a pipe is a no here — unlike the question above.
+    if confirm_destructive "Also remove Neovim's data dirs (share, state, cache)?"; then
+        "$INSTALLER_DIR/clean-nvim-data.sh" --yes
     else
-        read -p "Also remove Neovim's data dirs (share, state, cache)? (y/N): " -n 1 -r
-        echo ""
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            "$SCRIPT_DIR/clean-nvim-data.sh" --yes
-        else
-            info "Data dirs left untouched."
-        fi
+        info "Data dirs left untouched."
     fi
 
     echo ""
@@ -834,64 +783,57 @@ cmd_uninstall() {
     return 0
 }
 
-# --- dispatcher --------------------------------------------------------------
-if [[ "$command" == "status" ]]; then
-    cmd_status
-    exit $?
-fi
-
-if [[ "$command" == "uninstall" ]]; then
-    cmd_uninstall
-    exit $?
-fi
-
-if [[ "$use_reinstall" == true ]]; then
-    use_clean=true
-    use_deps=true
-    use_nvim=true
-    use_sync=true
-fi
-
-any_step_requested=false
-if [[ "$use_clean" == true || "$use_deps" == true || "$use_nvim" == true || "$use_sync" == true || "$use_reinstall" == true ]]; then
-    any_step_requested=true
-fi
-
-if [[ "$any_step_requested" == false ]]; then
-    # Default behaviour: just install the config, same as before this refactor.
-    step_config
-    exit $?
-fi
-
-# Canonical execution order: clean -> deps -> nvim -> config -> sync.
-#
-# deps has to run before nvim and sync: gcc must exist before step_sync, which
-# compiles treesitter parsers, and installing nvim itself doesn't depend on
-# these deps but grouping deps early keeps the sequence linear and predictable.
-steps=()
-[[ "$use_clean" == true ]] && steps+=("clean")
-[[ "$use_deps" == true ]] && steps+=("deps")
-[[ "$use_nvim" == true ]] && steps+=("nvim")
-# step_config only runs here as part of an explicit --reinstall — requesting
-# -d/-s/--clean/--nvim on their own must NOT also install the config, to keep
-# today's usage (e.g. `-d -s` alone) working the same way it always has.
-[[ "$use_reinstall" == true ]] && steps+=("config")
-[[ "$use_sync" == true ]] && steps+=("sync")
-
-total_steps=${#steps[@]}
-step_num=0
-for step in "${steps[@]}"; do
-    step_num=$((step_num + 1))
-    echo ""
-    bold "=== [${step_num}/${total_steps}] ${step} ==="
-    # Called indirectly: the alternative was a five-arm case whose arms were
-    # identical apart from the name, and every future step would have added a
-    # sixth. `steps` is built above from our own flags, never from user input.
-    if ! "step_${step}"; then
-        error "Step '${step}' failed. Remaining steps did not run: ${steps[*]:${step_num}}"
-        exit 1
+do_install() {
+    if [[ "$use_reinstall" == true ]]; then
+        use_clean=true
+        use_deps=true
+        use_nvim=true
+        use_sync=true
     fi
-done
 
-echo ""
-success "All requested steps completed."
+    local any_step_requested=false
+    if [[ "$use_clean" == true || "$use_deps" == true || "$use_nvim" == true || "$use_sync" == true || "$use_reinstall" == true ]]; then
+        any_step_requested=true
+    fi
+
+    if [[ "$any_step_requested" == false ]]; then
+        # Default behaviour: just install the config, same as before this refactor.
+        step_config
+        return $?
+    fi
+
+    # Canonical execution order: clean -> deps -> nvim -> config -> sync.
+    #
+    # deps has to run before nvim and sync: gcc must exist before step_sync, which
+    # compiles treesitter parsers, and installing nvim itself doesn't depend on
+    # these deps but grouping deps early keeps the sequence linear and predictable.
+    local steps=()
+    [[ "$use_clean" == true ]] && steps+=("clean")
+    [[ "$use_deps" == true ]] && steps+=("deps")
+    [[ "$use_nvim" == true ]] && steps+=("nvim")
+    # step_config only runs here as part of an explicit --reinstall — requesting
+    # -d/-s/--clean/--nvim on their own must NOT also install the config, to keep
+    # today's usage (e.g. `-d -s` alone) working the same way it always has.
+    [[ "$use_reinstall" == true ]] && steps+=("config")
+    [[ "$use_sync" == true ]] && steps+=("sync")
+
+    local total_steps=${#steps[@]}
+    local step_num=0 step
+    for step in "${steps[@]}"; do
+        step_num=$((step_num + 1))
+        echo ""
+        bold "=== [${step_num}/${total_steps}] ${step} ==="
+        # Called indirectly: the alternative was a five-arm case whose arms were
+        # identical apart from the name, and every future step would have added a
+        # sixth. `steps` is built above from our own flags, never from user input.
+        if ! "step_${step}"; then
+            error "Step '${step}' failed. Remaining steps did not run: ${steps[*]:${step_num}}"
+            return 1
+        fi
+    done
+
+    echo ""
+    success "All requested steps completed."
+}
+
+installer_main "$@"
