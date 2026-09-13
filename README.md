@@ -93,6 +93,7 @@ Each script is independent — install only what you need.
 ./03-install-tmux.sh                    # Tmux config (symlink) + TPM plugin manager
 ./04-install-nvim-lite.sh               # Neovim config — server-focused, minimal (symlink)
 ./04-install-nvim-lite.sh --copy        # Same but copies the directory (no repo dependency)
+./05-install-atuin.sh                   # Shell history with Ctrl+R search (sync off)
 ```
 
 Helper scripts:
@@ -102,6 +103,22 @@ sudo ./install-nvim.sh                          # Neovim binary (latest stable, 
 ./install-bash-extensions-gradle-functions.sh   # Gradle helper functions
 ./clean-nvim-data.sh                            # Wipe ~/.local/share/nvim, ~/.cache/nvim, etc.
 ```
+
+**They all behave the same way.** Every script shows a preview of what it is
+about to do before it does it, asks once, and takes `-y` to answer in advance.
+`-h` explains it, an unknown flag exits 1, and none of them ever waits for an
+answer that cannot arrive — so `ssh server './01-install-bash.sh'` works.
+
+```bash
+./03-install-tmux.sh                    # preview, then ask
+./03-install-tmux.sh -y                 # preview, then go
+./03-install-tmux.sh status             # is it installed, and where
+./03-install-tmux.sh uninstall          # undo exactly what install did
+```
+
+One deliberate asymmetry: with no terminal to ask, **installing** goes ahead
+(it has an uninstall) while **deleting** refuses and exits 2 (it does not).
+`./clean-nvim-data.sh < /dev/null` will not wipe anything — say it with `-y`.
 
 ### 4. Apply
 
@@ -122,7 +139,7 @@ source ~/.bashrc
 ├── nvim-lite/              # Minimal Neovim config for servers (LazyVim)
 ├── kitty/                  # Kitty terminal config
 ├── tmux/                   # Tmux config
-└── installer/              # Installation scripts
+└── installer/              # Installation scripts (lib/common.sh is their shared base)
 ```
 
 ---

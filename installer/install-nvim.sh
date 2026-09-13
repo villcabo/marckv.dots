@@ -14,31 +14,15 @@ set -e
 # gets "command not found" while $PATH points straight at it.
 umask 022
 
-# Colors — tput when the terminal supports it, ANSI otherwise.
-#
-# The guard is not cosmetic. These were bare `$(tput …)` assignments, and with
-# `set -e` a tput that fails takes the whole script with it: with no $TERM,
-# tput exits 2 and the installer died on line 9, before printing anything but
-# "No value for $TERM and no -T specified". That is every non-interactive
-# context — cron, CI, `ssh host './install-nvim.sh'`, `docker exec -T` — so the
-# script could not be tested in a container at all. Same shape as bash/colors.sh.
-if tput setaf 1 &> /dev/null; then
-    GREEN=$(tput setaf 114)
-    ORANGE=$(tput setaf 208)
-    BLUE=$(tput setaf 75)
-    YELLOW=$(tput setaf 221)
-    RED=$(tput setaf 196)
-    BOLD=$(tput bold)
-    NC=$(tput sgr0)
-else
-    GREEN='\033[0;32m'
-    ORANGE='\033[0;33m'
-    BLUE='\033[0;34m'
-    YELLOW='\033[1;33m'
-    RED='\033[0;31m'
-    BOLD='\033[1m'
-    NC='\033[0m'
-fi
+# Colors, logging and confirmation come from the shared lib. The palette there
+# is deliberately the 8-colour one: this file used `tput setaf 114` guarded by
+# `tput setaf 1`, and that guard does not check for 256 colours — on TERM=xterm
+# (8 colours, what a plain ssh to an older box gives you) setaf 114 emits
+# ESC[3114m, an invalid SGR sequence, not a colour.
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/common.sh"
+
+INSTALLER_NAME="install-nvim.sh"
+INSTALLER_ABOUT="Installs the Neovim binary, system-wide as root or per-user otherwise."
 
 # Paths
 # Where Neovim goes depends on who is running this.
@@ -63,15 +47,6 @@ fi
 # Version to install (empty = latest). Can be set via --version flag.
 NVIM_VERSION=""
 
-info()    { echo -e "${BLUE}[INFO]${NC} $1"; }
-success() { echo -e "${GREEN}[OK]${NC} $1"; }
-error()   { echo -e "${RED}[ERROR]${NC} $1"; }
-warn()    { echo -e "${ORANGE}[WARN]${NC} $1"; }
-bold()    { echo -e "${BOLD}$1${NC}"; }
-
-die() { error "$1"; exit 1; }
-
-ASSUME_YES=false
 PRINT_TARGET=false
 
 # Parse flags
@@ -80,8 +55,8 @@ while [[ $# -gt 0 ]]; do
         -h|--help)
             bold "marckv.dots Neovim installer"
             echo ""
-            echo -e "Installs Neovim to ${ORANGE}$NVIM_PATH${NC} (${ORANGE}${INSTALL_SCOPE}${NC} scope)."
-            echo -e "With ${ORANGE}root/sudo${NC} it goes system-wide; without it, for this user only."
+            echo -e "Installs Neovim to ${YELLOW}$NVIM_PATH${NC} (${YELLOW}${INSTALL_SCOPE}${NC} scope)."
+            echo -e "With ${YELLOW}root/sudo${NC} it goes system-wide; without it, for this user only."
             echo ""
             echo -e "${BLUE}Usage:${NC} sudo $0 [--version <tag>]"
             echo ""
@@ -97,9 +72,9 @@ while [[ $# -gt 0 ]]; do
             echo -e "  distros this repo supports do not have one. With no ${YELLOW}--version${NC},"
             echo -e "  the newest release this system can actually run is chosen:"
             echo ""
-            echo -e "    ${ORANGE}GLIBC 2.34+${NC} ${BOLD}→${NC} latest      ${ORANGE}(Debian 12+, Ubuntu 22.04+)${NC}"
-            echo -e "    ${ORANGE}GLIBC 2.31+${NC} ${BOLD}→${NC} v0.10.3    ${ORANGE}(Debian 11, Ubuntu 20.04)${NC}"
-            echo -e "    ${ORANGE}older${NC}       ${BOLD}→${NC} v0.9.5"
+            echo -e "    ${YELLOW}GLIBC 2.34+${NC} ${BOLD}→${NC} latest      ${YELLOW}(Debian 12+, Ubuntu 22.04+)${NC}"
+            echo -e "    ${YELLOW}GLIBC 2.31+${NC} ${BOLD}→${NC} v0.10.3    ${YELLOW}(Debian 11, Ubuntu 20.04)${NC}"
+            echo -e "    ${YELLOW}older${NC}       ${BOLD}→${NC} v0.9.5"
             echo ""
             echo -e "  ${YELLOW}--version${NC} overrides that. Whatever is chosen, the binary is run"
             echo -e "  before anything is installed: if it cannot start, the install is"
@@ -406,41 +381,61 @@ echo ""
 bold "=== INSTALLATION PREVIEW ==="
 echo -e "${BLUE}Target version:${NC}       ${YELLOW}${BOLD}$target_version${NC}"
 if [[ -n "$installed_version" ]]; then
-    echo -e "${BLUE}Currently installed:${NC}  ${ORANGE}$installed_version${NC}"
+    echo -e "${BLUE}Currently installed:${NC}  ${YELLOW}$installed_version${NC}"
     if [[ "$profile_missing" == true ]]; then
-        echo -e "${BLUE}Reinstalling because:${NC} ${ORANGE}$PROFILE_PATH is missing${NC}"
+        echo -e "${BLUE}Reinstalling because:${NC} ${YELLOW}$PROFILE_PATH is missing${NC}"
     fi
 else
-    echo -e "${BLUE}Currently installed:${NC}  ${ORANGE}none${NC}"
+    echo -e "${BLUE}Currently installed:${NC}  ${YELLOW}none${NC}"
 fi
 echo -e "${BLUE}Supported distros:${NC}    $(version_compat "$target_version")"
-echo -e "${BLUE}Install path:${NC}         ${ORANGE}$NVIM_PATH${NC}"
-echo -e "${BLUE}Profile script:${NC}       ${ORANGE}$PROFILE_PATH${NC}"
-echo -e "${BLUE}Download URL:${NC}         ${ORANGE}$NVIM_URL${NC}"
+echo -e "${BLUE}Install path:${NC}         ${YELLOW}$NVIM_PATH${NC}"
+echo -e "${BLUE}Profile script:${NC}       ${YELLOW}$PROFILE_PATH${NC}"
+echo -e "${BLUE}Download URL:${NC}         ${YELLOW}$NVIM_URL${NC}"
 echo ""
 
 # The preview above still prints under --yes: on a remote server the record of
 # WHAT was installed is worth more than the keystroke it saves.
-if [[ "$ASSUME_YES" == true ]]; then
-    info "Proceeding without confirmation (--yes)"
-else
-    read -p "Type '${YELLOW}${BOLD}yes${NC}' to confirm installation: " -r
-    echo
-    if [[ "$REPLY" != "yes" ]]; then
-        info "Cancelled."
-        exit 0
-    fi
-fi
+#
+# The prompt used to demand the literal word "yes", which had this backwards
+# twice over. clean-nvim-data.sh deletes irreversibly and asks for y/N, while
+# this — reversible, and it refuses to replace a working install with a binary
+# that will not start — asked for more. And under `set -e` a read with no
+# terminal simply killed the script: `ssh host ./install-nvim.sh` printed the
+# preview, died with status 1, and explained nothing.
+confirm "Install it?" || { info "Cancelled."; exit 0; }
 
 echo ""
 
 # Download
+#
+# -f matters, and its absence poisoned the cache. Without it curl writes the
+# server's error page to the file and still exits 0, so a bad tag produced a
+# 9-byte "Not Found" saved as nvim-v99.99.99-nvim-linux-x86_64.tar.gz. The
+# script then believed the download had worked and handed the HTML to tar:
+#
+#     gzip: stdin: not in gzip format
+#     tar: Child returned status 1
+#
+# And it stayed broken: the next run found a non-empty file, said "Using cached
+# archive", and failed the same way without ever retrying. Removing the partial
+# file is the other half — a cache entry is only worth keeping once it is whole.
+# atuin and fzf already used -f; this was the one that did not.
 if [ -f "$NVIM_TAR" ] && [ -s "$NVIM_TAR" ]; then
     info "Using cached archive: $NVIM_TAR"
 else
     info "Downloading Neovim from GitHub..."
-    curl -L -o "$NVIM_TAR" "$NVIM_URL" || die "Failed to download Neovim"
+    curl -fL -o "$NVIM_TAR" "$NVIM_URL" || {
+        rm -f "$NVIM_TAR"
+        die "Could not download $NVIM_URL — check the tag with ${BOLD}--ls-remote${NC}"
+    }
 fi
+
+# A tarball that is not a tarball never reaches tar, whatever put it there.
+gzip -t "$NVIM_TAR" 2>/dev/null || {
+    rm -f "$NVIM_TAR"
+    die "Downloaded file is not a gzip archive — removed it, run again"
+}
 
 # Extract into a staging directory NEXT TO the destination
 #

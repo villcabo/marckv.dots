@@ -17,6 +17,20 @@ ok()  { printf '  \033[32mok\033[0m   %s\n' "$1"; PASS=$((PASS + 1)); }
 bad() { printf '  \033[31mFAIL\033[0m %s\n' "$1"; [ -n "$2" ] && printf '       %s\n' "$2"; FAIL=$((FAIL + 1)); }
 wipe() { rm -rf /opt/nvim /opt/nvim.prev /opt/.nvim-stage.* /etc/profile.d/nvim.sh; }
 
+# Answer the prompt for real.
+#
+# `printf 'no\n' | bash "$I"` used to do this and silently stopped: confirm()
+# in lib/common.sh reads a non-terminal stdin as a yes, on purpose, so that
+# `ssh host ./install-nvim.sh` installs instead of dying at the prompt. The
+# pipe therefore became a YES, S4 reinstalled, the staging chmod fixed the mode
+# it was supposed to be measuring, and the scenario stayed green while testing
+# nothing — exactly what its own comment warned would happen. script(1) gives
+# the installer a pty, so the answer is read.
+answer() {
+    local reply="$1"; shift
+    script -qec "$*" /dev/null < <(printf '%s\n' "$reply")
+}
+
 GLIBC=$(ldd --version | head -1 | awk '{print $NF}')
 printf '\n=== %s  (GLIBC %s) ===\n' "$(. /etc/os-release; echo "$PRETTY_NAME")" "$GLIBC"
 
@@ -28,7 +42,7 @@ printf '\n=== %s  (GLIBC %s) ===\n' "$(. /etc/os-release; echo "$PRETTY_NAME")" 
 # — which used to make /opt/nvim 0750 and lock every other user out.
 printf '\nS1  clean install under umask 027\n'
 wipe
-( umask 027; printf 'yes\n' | bash "$I" ) > /tmp/s1.log 2>&1
+( umask 027; bash "$I" -y ) > /tmp/s1.log 2>&1
 rc=$?
 [ $rc -eq 0 ] && ok "succeeds" || bad "succeeds" "rc=$rc; $(tail -3 /tmp/s1.log)"
 mode=$(stat -c '%a' /opt/nvim 2>/dev/null)
@@ -48,7 +62,7 @@ su - testuser -c 'nvim --version >/dev/null 2>&1' && ok "can execute it" || bad 
 # --- S3: an incompatible release must not destroy a working one -------------
 printf '\nS3  incompatible release: fails without breaking what works\n'
 before=$(/opt/nvim/bin/nvim --version 2>/dev/null | head -1)
-printf 'yes\n' | bash "$I" --version v0.12.5 > /tmp/s3.log 2>&1
+bash "$I" -y --version v0.12.5 > /tmp/s3.log 2>&1
 rc=$?
 if [ "$GLIBC" = "2.31" ]; then
     [ $rc -ne 0 ] && ok "exits non-zero" || bad "exits non-zero" "rc=$rc"
@@ -68,7 +82,8 @@ chmod 750 /opt/nvim
 # Answered "no" so NOTHING is reinstalled and only the repair path can have
 # run. Answering "yes" would have the staging chmod fix the mode anyway, and
 # the test would pass with the repair deleted.
-printf 'no\n' | bash "$I" --version v0.10.3 > /tmp/s4.log 2>&1
+answer n "bash $I --version v0.10.3" > /tmp/s4.log 2>&1
+grep -q "Cancelled" /tmp/s4.log && ok "the answer was read (not assumed)" || bad "the answer was read" "no 'Cancelled' in the log — the prompt was skipped"
 grep -q "Permissions repaired" /tmp/s4.log && ok "detects and reports it" || bad "detects and reports it" "$(grep -i perm /tmp/s4.log | head -2)"
 [ "$(stat -c '%a' /opt/nvim)" = "755" ] && ok "leaves it 755 WITHOUT reinstalling" || bad "leaves it 755 without reinstalling" "got $(stat -c '%a' /opt/nvim)"
 su - testuser -c 'nvim --version >/dev/null 2>&1' && ok "the user can run it now" || bad "the user can run it now"
@@ -77,7 +92,7 @@ su - testuser -c 'nvim --version >/dev/null 2>&1' && ok "the user can run it now
 printf '\nS5  removes the old unversioned cache\n'
 : > /tmp/nvim-linux-x86_64.tar.gz
 : > /tmp/nvim-linux64.tar.gz
-printf 'no\n' | bash "$I" --version v0.10.3 > /tmp/s5.log 2>&1
+answer n "bash $I --version v0.10.3" > /tmp/s5.log 2>&1
 grep -q "stale unversioned cache" /tmp/s5.log && ok "reports the removal" || bad "reports the removal"
 [ ! -f /tmp/nvim-linux-x86_64.tar.gz ] && [ ! -f /tmp/nvim-linux64.tar.gz ] && ok "they are gone" || bad "they are gone"
 
@@ -97,12 +112,20 @@ tagged=$(ls /tmp/nvim-v*-*.tar.gz 2>/dev/null | wc -l)
 # other failure path, and it behaves the same on every distro.
 printf '\nS7  a nonexistent version fails without touching the install\n'
 before=$(/opt/nvim/bin/nvim --version 2>/dev/null | head -1)
-printf 'yes\n' | bash "$I" --version v99.99.99 > /tmp/s7.log 2>&1
+bash "$I" -y --version v99.99.99 > /tmp/s7.log 2>&1
 rc=$?
 [ $rc -ne 0 ] && ok "exits non-zero" || bad "exits non-zero" "rc=$rc"
 after=$(/opt/nvim/bin/nvim --version 2>/dev/null | head -1)
 [ "$before" = "$after" ] && [ -n "$after" ] && ok "install intact ($after)" || bad "install intact" "before=$before after=$after"
 ls -d /opt/.nvim-stage.* >/dev/null 2>&1 && bad "leaves no staging dir" "$(ls -d /opt/.nvim-stage.* 2>/dev/null)" || ok "leaves no staging dir"
+# The one that was missing, and it cost a real server a permanently broken tag:
+# curl without -f saved GitHub's 404 page as the tarball and exited 0, so the
+# next run found a non-empty cache entry, announced "Using cached archive", and
+# failed identically forever. A failed download must leave nothing behind.
+[ -e /tmp/nvim-v99.99.99-nvim-linux-x86_64.tar.gz ] || [ -e /tmp/nvim-v99.99.99-nvim-linux64.tar.gz ] \
+    && bad "leaves no poisoned cache" "$(ls -l /tmp/nvim-v99.99.99-* 2>/dev/null)" \
+    || ok "leaves no poisoned cache"
+grep -q "not in gzip format" /tmp/s7.log && bad "fails with a readable message" "tar's noise reached the user" || ok "fails with a readable message"
 
 printf '\n---- %s: %d ok, %d failed ----\n' "$(. /etc/os-release; echo "$ID$VERSION_ID")" "$PASS" "$FAIL"
 [ $FAIL -eq 0 ]

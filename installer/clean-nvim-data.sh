@@ -1,28 +1,22 @@
 #!/bin/bash
-
-# Script to clean Neovim data directories before a fresh install
-# By default only data is removed (share/state/cache); pass --config to also
-# remove the config dir. Shows a preview of what will be deleted and asks for confirmation.
+#
+# Wipes Neovim's data dirs (share/state/cache) so the next install starts from
+# nothing. --config also removes the config dir; a symlinked config only loses
+# the link, never what it points at.
+#
+# It shares lib/common.sh for colors, logging, preview and confirmation, but
+# deliberately keeps its own argument parser instead of installer_main: this is
+# a helper, not one of the numbered installers, and "install a cleaner" means
+# nothing. Alignment is about the shared behaviour, not about forcing three
+# verbs onto a script that only does one thing.
 
 set -e
 
-# Colors for output
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-YELLOW='\033[1;33m'
-RED='\033[0;31m'
-BOLD='\033[1m'
-NC='\033[0m' # No Color
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/common.sh"
 
-info()    { echo -e "${BLUE}[INFO]${NC} $1"; }
-success() { echo -e "${GREEN}[OK]${NC} $1"; }
-warn()    { echo -e "${YELLOW}[WARN]${NC} $1"; }
-error()   { echo -e "${RED}[ERROR]${NC} $1"; }
-bold()    { echo -e "${BOLD}$1${NC}"; }
+INSTALLER_NAME="clean-nvim-data.sh"
 
-# Directories to clean (default nvim appname)
 APPNAME="${NVIM_APPNAME:-nvim}"
-
 CONFIG_DIR="$HOME/.config/$APPNAME"
 
 DATA_DIRS=(
@@ -31,129 +25,104 @@ DATA_DIRS=(
     "$HOME/.cache/$APPNAME"
 )
 
-# Human-readable size of a directory
-dir_size() {
-    du -sh "$1" 2>/dev/null | cut -f1
+usage() {
+    bold "marckv.dots — ${INSTALLER_NAME}"
+    echo
+    echo -e "  Removes Neovim's data dirs (share, state, cache) for NVIM_APPNAME=${BOLD}${APPNAME}${NC}."
+    echo
+    echo -e "${BLUE}Usage:${NC} ./${INSTALLER_NAME} [--config] [-y]"
+    echo
+    echo -e "  ${YELLOW}-c, --config${NC}   Also remove ${CONFIG_DIR}."
+    echo -e "                 A symlink there loses the link only, not the target."
+    echo -e "  ${YELLOW}-y, --yes${NC}      Skip the confirmation. The preview is still printed."
+    echo
 }
 
-# Count files in a directory
-dir_count() {
-    find "$1" -type f 2>/dev/null | wc -l | tr -d ' '
-}
+dir_size()  { du -sh "$1" 2>/dev/null | cut -f1; }
+dir_count() { find "$1" -type f 2>/dev/null | wc -l | tr -d ' '; }
 
-# Print directory entry with subdirs
+# One preview entry: the dir, its weight, and what is inside it. Richer than
+# preview_line on purpose — the size is the number that changes the answer.
 print_dir_entry() {
     local dir="$1"
-    local size count
-    size=$(dir_size "$dir")
-    count=$(dir_count "$dir")
     echo -e "  ${RED}${BOLD}${dir}${NC}"
-    echo -e "    Size: ${YELLOW}${size}${NC}   Files: ${YELLOW}${count}${NC}"
+    echo -e "    Size: ${YELLOW}$(dir_size "$dir")${NC}   Files: ${YELLOW}$(dir_count "$dir")${NC}"
 
     local subdirs
     subdirs=$(find "$dir" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sort)
     if [[ -n "$subdirs" ]]; then
         while IFS= read -r subdir; do
-            local subname subsize
-            subname=$(basename "$subdir")
-            subsize=$(dir_size "$subdir")
-            echo -e "    ${BLUE}├─${NC} ${subname}/ ${BLUE}(${subsize})${NC}"
+            echo -e "    ${BLUE}├─${NC} $(basename "$subdir")/ ${BLUE}($(dir_size "$subdir"))${NC}"
         done <<< "$subdirs"
     fi
-    echo ""
+    echo
 }
 
 main() {
     local include_config=false
-    local assume_yes=false
-
+    local arg
     for arg in "$@"; do
         case "$arg" in
-            -c|--config) include_config=true ;;
-            -y|--yes) assume_yes=true ;;
-            -h|--help)
-                bold "Usage: $0 [--config] [--yes]"
-                echo "  Cleans Neovim data dirs: share, state, cache (for NVIM_APPNAME=$APPNAME)."
-                echo ""
-                echo -e "  ${BOLD}-c, --config${NC}   Also remove the config dir ($CONFIG_DIR)."
-                echo "                 If it's a symlink, only the link is removed."
-                echo -e "  ${BOLD}-y, --yes${NC}      Skip the confirmation prompt. The preview is still printed."
-                exit 0
-                ;;
+            -c|--config)     include_config=true ;;
+            -y|--yes)        ASSUME_YES=true ;;
+            -h|--help|help)  usage; exit 0 ;;
             *)
-                error "Unknown argument: $arg (use --help)"
-                exit 1
+                error "Unknown argument: $arg"; echo; usage; exit 1
                 ;;
         esac
     done
 
-    bold "=== Neovim cleaner ==="
-    info "Scanning directories for NVIM_APPNAME=${BOLD}$APPNAME${NC}..."
-    [[ "$include_config" == false ]] && info "Config dir preserved (pass ${BOLD}--config${NC} to also remove it)."
-    echo ""
-
-    local has_config=false
-    local config_is_symlink=false
+    local has_config=false config_is_symlink=false
     local found_data=()
 
-    # Check config directory (only when --config is passed)
     if [[ "$include_config" == true ]]; then
         if [[ -L "$CONFIG_DIR" ]]; then
-            has_config=true
-            config_is_symlink=true
+            has_config=true; config_is_symlink=true
         elif [[ -d "$CONFIG_DIR" ]]; then
             has_config=true
         fi
     fi
 
-    # Check data directories
+    local dir
     for dir in "${DATA_DIRS[@]}"; do
         [[ -d "$dir" ]] && found_data+=("$dir")
     done
 
     if [[ "$has_config" == false && ${#found_data[@]} -eq 0 ]]; then
-        success "Nothing to clean — no Neovim directories found."
+        success "Nothing to clean — no Neovim directories found for ${BOLD}${APPNAME}${NC}"
         exit 0
     fi
 
-    bold "Directories to be deleted:"
-    echo ""
+    preview_open "Delete Neovim data for ${APPNAME}"
 
-    # Show config directory
     if [[ "$has_config" == true ]]; then
         if [[ "$config_is_symlink" == true ]]; then
-            local symlink_target
-            symlink_target=$(readlink "$CONFIG_DIR")
-            echo -e "  ${RED}${BOLD}${CONFIG_DIR}${NC}  ${BLUE}(symlink → ${symlink_target})${NC}"
-            echo ""
+            echo -e "  ${RED}${BOLD}${CONFIG_DIR}${NC}  ${BLUE}(symlink -> $(readlink "$CONFIG_DIR"))${NC}"
+            echo -e "    Only the link goes. What it points at is untouched."
+            echo
         else
             print_dir_entry "$CONFIG_DIR"
         fi
     fi
 
-    # Show data directories
     for dir in "${found_data[@]}"; do
         print_dir_entry "$dir"
     done
 
-    warn "This action is irreversible. Run the installer again after this to set up a fresh config."
-    echo ""
+    [[ "$include_config" == false ]] && preview_line "KEEPS" "$CONFIG_DIR  (pass --config to remove it too)"
+    warn "Irreversible. Plugins and parsers are downloaded again on the next start."
+    preview_close
 
-    if [[ "$assume_yes" == true ]]; then
-        info "Skipping confirmation (--yes)."
-    else
-        read -p "Delete all listed directories? (y/N): " -n 1 -r
-        echo ""
-
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            info "Aborted. Nothing was deleted."
-            exit 0
-        fi
+    # Captured, not tested inline: inside `if ! cmd`, $? is the negation's.
+    local answer=0
+    confirm_destructive "Delete all of it?" || answer=$?
+    if (( answer != 0 )); then
+        (( answer == 2 )) && exit 2
+        info "Nothing was deleted."
+        exit 0
     fi
 
-    echo ""
-
-    # Delete config
+    echo
     if [[ "$has_config" == true ]]; then
         if [[ "$config_is_symlink" == true ]]; then
             rm "$CONFIG_DIR"
@@ -164,14 +133,13 @@ main() {
         fi
     fi
 
-    # Delete data directories
     for dir in "${found_data[@]}"; do
         rm -rf "$dir"
         success "Deleted: $dir"
     done
 
-    echo ""
-    success "Done. Run the installer and then nvim to install plugins from scratch."
+    echo
+    success "Done. Start nvim to rebuild plugins from scratch."
     info "Installer: ${BOLD}./04-install-nvim-lite.sh${NC}"
 }
 
