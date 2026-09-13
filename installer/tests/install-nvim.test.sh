@@ -118,6 +118,14 @@ rc=$?
 after=$(/opt/nvim/bin/nvim --version 2>/dev/null | head -1)
 [ "$before" = "$after" ] && [ -n "$after" ] && ok "install intact ($after)" || bad "install intact" "before=$before after=$after"
 ls -d /opt/.nvim-stage.* >/dev/null 2>&1 && bad "leaves no staging dir" "$(ls -d /opt/.nvim-stage.* 2>/dev/null)" || ok "leaves no staging dir"
+# The one that was missing, and it cost a real server a permanently broken tag:
+# curl without -f saved GitHub's 404 page as the tarball and exited 0, so the
+# next run found a non-empty cache entry, announced "Using cached archive", and
+# failed identically forever. A failed download must leave nothing behind.
+[ -e /tmp/nvim-v99.99.99-nvim-linux-x86_64.tar.gz ] || [ -e /tmp/nvim-v99.99.99-nvim-linux64.tar.gz ] \
+    && bad "leaves no poisoned cache" "$(ls -l /tmp/nvim-v99.99.99-* 2>/dev/null)" \
+    || ok "leaves no poisoned cache"
+grep -q "not in gzip format" /tmp/s7.log && bad "fails with a readable message" "tar's noise reached the user" || ok "fails with a readable message"
 
 printf '\n---- %s: %d ok, %d failed ----\n' "$(. /etc/os-release; echo "$ID$VERSION_ID")" "$PASS" "$FAIL"
 [ $FAIL -eq 0 ]

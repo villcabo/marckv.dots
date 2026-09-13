@@ -408,12 +408,34 @@ confirm "Install it?" || { info "Cancelled."; exit 0; }
 echo ""
 
 # Download
+#
+# -f matters, and its absence poisoned the cache. Without it curl writes the
+# server's error page to the file and still exits 0, so a bad tag produced a
+# 9-byte "Not Found" saved as nvim-v99.99.99-nvim-linux-x86_64.tar.gz. The
+# script then believed the download had worked and handed the HTML to tar:
+#
+#     gzip: stdin: not in gzip format
+#     tar: Child returned status 1
+#
+# And it stayed broken: the next run found a non-empty file, said "Using cached
+# archive", and failed the same way without ever retrying. Removing the partial
+# file is the other half — a cache entry is only worth keeping once it is whole.
+# atuin and fzf already used -f; this was the one that did not.
 if [ -f "$NVIM_TAR" ] && [ -s "$NVIM_TAR" ]; then
     info "Using cached archive: $NVIM_TAR"
 else
     info "Downloading Neovim from GitHub..."
-    curl -L -o "$NVIM_TAR" "$NVIM_URL" || die "Failed to download Neovim"
+    curl -fL -o "$NVIM_TAR" "$NVIM_URL" || {
+        rm -f "$NVIM_TAR"
+        die "Could not download $NVIM_URL — check the tag with ${BOLD}--ls-remote${NC}"
+    }
 fi
+
+# A tarball that is not a tarball never reaches tar, whatever put it there.
+gzip -t "$NVIM_TAR" 2>/dev/null || {
+    rm -f "$NVIM_TAR"
+    die "Downloaded file is not a gzip archive — removed it, run again"
+}
 
 # Extract into a staging directory NEXT TO the destination
 #
