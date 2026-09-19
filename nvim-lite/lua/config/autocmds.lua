@@ -8,6 +8,58 @@ local autocmd = vim.api.nvim_create_autocmd
 local augroup = vim.api.nvim_create_augroup("nvim-lite", { clear = true })
 
 -- ---------------------------------------------------------------------------
+-- Window matches, added once and taken back.
+--
+-- matchadd() attaches to the WINDOW, not the buffer, and nothing ever clears
+-- it: the FileType autocmds below fire again for every log opened in the same
+-- split, so each visit stacks another full set of patterns on top of the last.
+-- They all keep being evaluated on every redraw, and they outlive the buffer
+-- that justified them — a window that moved on to a Lua file is still matching
+-- log timestamps.
+--
+-- Measured on a proxy host: an `nvim --embed` left open for 24 days over a
+-- directory of .conf and .log files reached 2.5 GB RSS, all of it heap.
+--
+-- So the ids are kept per window, under a key per rule set, and the previous
+-- set is dropped before a new one goes in. `pcall` because a match id is gone
+-- once its window closes, and matchdelete() throws on an id it cannot find.
+-- ---------------------------------------------------------------------------
+local MATCH_KEYS = { "log", "authorized_keys" }
+
+local function clear_window_matches(key)
+  local var = "nvim_lite_matches_" .. key
+  for _, id in ipairs(vim.w[var] or {}) do
+    pcall(vim.fn.matchdelete, id)
+  end
+  vim.w[var] = {}
+end
+
+--- Replace this window's matches for `key` with `patterns`.
+--- @param key string rule set name, namespacing the ids within the window
+--- @param patterns table list of { highlight_group, pattern, priority? }
+local function set_window_matches(key, patterns)
+  clear_window_matches(key)
+  local ids = {}
+  for _, p in ipairs(patterns) do
+    local ok, id = pcall(vim.fn.matchadd, p[1], p[2], p[3])
+    if ok then
+      ids[#ids + 1] = id
+    end
+  end
+  vim.w["nvim_lite_matches_" .. key] = ids
+end
+
+-- A window that stops showing the buffer keeps the matches otherwise.
+autocmd("BufWinLeave", {
+  group = augroup,
+  callback = function()
+    for _, key in ipairs(MATCH_KEYS) do
+      clear_window_matches(key)
+    end
+  end,
+})
+
+-- ---------------------------------------------------------------------------
 -- log: highlights + read-only
 -- ---------------------------------------------------------------------------
 autocmd("FileType", {
@@ -15,23 +67,25 @@ autocmd("FileType", {
   pattern = "log",
   callback = function()
     local buf = vim.api.nvim_get_current_buf()
-    -- Timestamps: 2024-01-15 14:30:00 or [14:30:00] or Jan 15 14:30:00
-    vim.fn.matchadd("Comment", [=[\d\{4\}-\d\{2\}-\d\{2\}[T ]\d\{2\}:\d\{2\}:\d\{2\}]=])
-    vim.fn.matchadd("Comment", [=[\[\d\{2\}:\d\{2\}:\d\{2\}\]]=])
-    vim.fn.matchadd("Comment", [=[\v(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d+\s+\d{2}:\d{2}:\d{2}]=])
-    -- Log levels
-    vim.fn.matchadd("ErrorMsg", [=[\v\c\[(ERROR|FATAL|CRIT(ICAL)?)\]]=])
-    vim.fn.matchadd("ErrorMsg", [=[\v\c\s(ERROR|FATAL|CRIT(ICAL)?)\s]=])
-    vim.fn.matchadd("WarningMsg", [=[\v\c\[(WARN(ING)?)\]]=])
-    vim.fn.matchadd("WarningMsg", [=[\v\c\s(WARN(ING)?)\s]=])
-    vim.fn.matchadd("Function", [=[\v\c\[(INFO)\]]=])
-    vim.fn.matchadd("Function", [=[\v\c\s(INFO)\s]=])
-    vim.fn.matchadd("Special", [=[\v\c\[(DEBUG|TRACE)\]]=])
-    vim.fn.matchadd("Special", [=[\v\c\s(DEBUG|TRACE)\s]=])
-    -- IPs
-    vim.fn.matchadd("Number", [=[\v\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?]=])
-    -- File paths
-    vim.fn.matchadd("Directory", [=[\v/([\w._-]+/)+[\w._-]+]=])
+    set_window_matches("log", {
+      -- Timestamps: 2024-01-15 14:30:00 or [14:30:00] or Jan 15 14:30:00
+      { "Comment", [=[\d\{4\}-\d\{2\}-\d\{2\}[T ]\d\{2\}:\d\{2\}:\d\{2\}]=] },
+      { "Comment", [=[\[\d\{2\}:\d\{2\}:\d\{2\}\]]=] },
+      { "Comment", [=[\v(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d+\s+\d{2}:\d{2}:\d{2}]=] },
+      -- Log levels
+      { "ErrorMsg", [=[\v\c\[(ERROR|FATAL|CRIT(ICAL)?)\]]=] },
+      { "ErrorMsg", [=[\v\c\s(ERROR|FATAL|CRIT(ICAL)?)\s]=] },
+      { "WarningMsg", [=[\v\c\[(WARN(ING)?)\]]=] },
+      { "WarningMsg", [=[\v\c\s(WARN(ING)?)\s]=] },
+      { "Function", [=[\v\c\[(INFO)\]]=] },
+      { "Function", [=[\v\c\s(INFO)\s]=] },
+      { "Special", [=[\v\c\[(DEBUG|TRACE)\]]=] },
+      { "Special", [=[\v\c\s(DEBUG|TRACE)\s]=] },
+      -- IPs
+      { "Number", [=[\v\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?]=] },
+      -- File paths
+      { "Directory", [=[\v/([\w._-]+/)+[\w._-]+]=] },
+    })
 
     vim.bo[buf].readonly = true
     vim.bo[buf].modifiable = false
@@ -115,16 +169,18 @@ autocmd("FileType", {
     -- Enable `gcc` / `gc` line commenting
     vim.bo.commentstring = "# %s"
 
-    -- Comment line — HIGH priority so it wins over the key-type matches below
-    vim.fn.matchadd("Comment", [=[^\s*#.*$]=], 100)
-    -- Key types (ssh-rsa, ssh-ed25519, ecdsa-sha2-*, sk-ecdsa-*, sk-ssh-ed25519, etc.)
-    vim.fn.matchadd("Keyword", [=[\v^(ssh-(rsa|dss|ed25519)|ecdsa-sha2-\S+|sk-(ecdsa-sha2-\S+|ssh-ed25519)(\S*)?)>]=])
-    -- Base64 key blobs (long alphanumeric chunks)
-    vim.fn.matchadd("String", [=[\v\s\zs[A-Za-z0-9+/=]{40,}\ze]=])
-    -- Comment/label at end of line (usually user@host)
-    vim.fn.matchadd("Identifier", [=[\v\s\zs\S+\@\S+\ze\s*$]=])
-    -- Options (prefix before key type: command="...", no-pty, from="...", etc.)
-    vim.fn.matchadd("Type", [=[\v^[^#]*\ze\s+(ssh-|ecdsa-|sk-)]=])
+    set_window_matches("authorized_keys", {
+      -- Comment line — HIGH priority so it wins over the key-type matches below
+      { "Comment", [=[^\s*#.*$]=], 100 },
+      -- Key types (ssh-rsa, ssh-ed25519, ecdsa-sha2-*, sk-ecdsa-*, sk-ssh-ed25519, etc.)
+      { "Keyword", [=[\v^(ssh-(rsa|dss|ed25519)|ecdsa-sha2-\S+|sk-(ecdsa-sha2-\S+|ssh-ed25519)(\S*)?)>]=] },
+      -- Base64 key blobs (long alphanumeric chunks)
+      { "String", [=[\v\s\zs[A-Za-z0-9+/=]{40,}\ze]=] },
+      -- Comment/label at end of line (usually user@host)
+      { "Identifier", [=[\v\s\zs\S+\@\S+\ze\s*$]=] },
+      -- Options (prefix before key type: command="...", no-pty, from="...", etc.)
+      { "Type", [=[\v^[^#]*\ze\s+(ssh-|ecdsa-|sk-)]=] },
+    })
   end,
 })
 -- Reload files changed outside the editor, without being asked to.
