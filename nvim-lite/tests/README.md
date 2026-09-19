@@ -4,10 +4,16 @@
 cd nvim-lite/tests
 ./run.sh                 # every distro
 ./run.sh debian12        # one — the awkward GLIBC 2.36 case
+./matches.test.sh        # window matches — on the host, no container
 ```
 
-Runs only in containers. Every scenario installs Neovim into `/opt`, replaces
-`~/.config/nvim` and clones the whole plugin set.
+`run.sh` runs only in containers. Every scenario installs Neovim into `/opt`,
+replaces `~/.config/nvim` and clones the whole plugin set.
+
+`matches.test.sh` is the exception, and deliberately so: it asserts things about
+`lua/config/` that `nvim -u NONE` can load on its own — no plugins, no parsers,
+no distro. Putting it behind the container setup would have meant paying 45 s of
+installation to check three counters.
 
 
 ## No edites el repo mientras corre la suite
