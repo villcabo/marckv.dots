@@ -136,7 +136,7 @@ _install_fzf() {
 # Installing it on PATH is enough: LazyVim checks `executable("tree-sitter")`
 # first and returns before it ever reaches mason.
 _install_tree_sitter_cli() {
-    local glibc major minor version arch url dest tmp
+    local glibc major minor version arch url dest work tmp
     glibc=$(ldd --version 2>/dev/null | head -n1 | awk '{print $NF}')
     major="${glibc%%.*}"
     minor="${glibc##*.}"
@@ -176,9 +176,11 @@ _install_tree_sitter_cli() {
 
     info "GLIBC ${BOLD}${glibc}${NC} — installing tree-sitter CLI ${BOLD}v${version}${NC} (${arch})"
     info "URL: ${url}"
-    tmp=$(mktemp /tmp/tree-sitter-XXXXXX.gz)
-    curl -fSL "$url" -o "$tmp" || { error "Failed to download the tree-sitter CLI"; rm -f "$tmp"; return 1; }
-    gunzip -c "$tmp" > "${tmp}.bin" || { error "Failed to unpack the tree-sitter CLI"; rm -f "$tmp" "${tmp}.bin"; return 1; }
+    # Not /tmp: it is noexec on hardened servers, and the binary is run right below.
+    work=$(exec_tmpdir) || { error "Could not create a scratch directory for the tree-sitter CLI"; return 1; }
+    tmp="$work/tree-sitter.gz"
+    curl -fSL "$url" -o "$tmp" || { error "Failed to download the tree-sitter CLI"; rm -rf "$work"; return 1; }
+    gunzip -c "$tmp" > "${tmp}.bin" || { error "Failed to unpack the tree-sitter CLI"; rm -rf "$work"; return 1; }
     rm -f "$tmp"
     chmod 755 "${tmp}.bin"
 
@@ -188,7 +190,7 @@ _install_tree_sitter_cli() {
     if ! "${tmp}.bin" --version >/dev/null 2>&1; then
         error "The tree-sitter CLI v${version} cannot run on this system:"
         "${tmp}.bin" --version 2>&1 | head -n2 | sed 's/^/  /'
-        rm -f "${tmp}.bin"
+        rm -rf "$work"
         return 1
     fi
 
@@ -203,12 +205,13 @@ _install_tree_sitter_cli() {
     # _install_fzf writes to the same directory and always did it directly.
     # Same function, two different rules, and only one of them was right.
     if [[ "$dest" == "$HOME"/* ]]; then
-        mv "${tmp}.bin" "${dest}/tree-sitter" || { rm -f "${tmp}.bin"; return 1; }
+        mv "${tmp}.bin" "${dest}/tree-sitter" || { rm -rf "$work"; return 1; }
         chmod 755 "${dest}/tree-sitter"
     else
-        _run mv "${tmp}.bin" "${dest}/tree-sitter" || { rm -f "${tmp}.bin"; return 1; }
+        _run mv "${tmp}.bin" "${dest}/tree-sitter" || { rm -rf "$work"; return 1; }
         _run chmod 755 "${dest}/tree-sitter"
     fi
+    rm -rf "$work"
     return 0
 }
 
