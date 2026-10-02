@@ -86,6 +86,19 @@ _run() {
     esac
 }
 
+# A scratch directory that can run what is put in it.
+#
+# /tmp is mounted noexec on hardened servers. On buildproapp (Ubuntu 26.04 on
+# OpenStack) the tree-sitter CLI downloaded and unpacked fine, then failed its
+# own --version check with "Permission denied", and the installer called the
+# binary unable to run on this system. Nothing was wrong with the binary.
+# atuin's gnu/musl probe had the same trap and would have blamed the version.
+# The cache dir lives in $HOME, where these installers put user binaries anyway.
+exec_tmpdir() {
+    local base="${XDG_CACHE_HOME:-$HOME/.cache}/marckv-installer"
+    mkdir -p "$base" && mktemp -d "$base/tmp.XXXXXX"
+}
+
 # ---------------------------------------------------------------------------
 # Preview and confirmation
 #

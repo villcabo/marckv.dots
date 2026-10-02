@@ -93,7 +93,8 @@ do_install() {
         fi
 
         local tmp_dir
-        tmp_dir="$(mktemp -d)"
+        # Not /tmp: it is noexec on hardened servers, and each build is run below to pick gnu or musl.
+        tmp_dir="$(exec_tmpdir)"
         trap 'rm -rf "$tmp_dir"' EXIT
 
         # gnu first, musl as the fallback — and which one works is measured, not
