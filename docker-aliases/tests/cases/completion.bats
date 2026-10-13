@@ -147,3 +147,31 @@ load '../helpers/common'
     run complete_in "$WORK" 1 dver ''
     [[ "$output" == *"other-api"* ]]
 }
+
+# --- profiles ---------------------------------------------------------------
+#
+# TAB used to offer a narrower list than the command accepted, which is the
+# worst of both: it stayed silent about a service that would have worked.
+
+@test "dclt completion offers a service behind a profile" {
+    run complete_in "$F/profiles" 1 dclt see
+    [[ "$output" == *"seeder"* ]]
+}
+
+@test "dcx completion offers a service behind a profile" {
+    run complete_in "$F/profiles" 1 dcx debug
+    [[ "$output" == *"debugger"* ]]
+}
+
+@test "dcdown completion offers a service behind a profile" {
+    run complete_in "$F/profiles" 1 dcdown metr
+    [[ "$output" == *"metrics"* ]]
+}
+
+@test "dcup completion offers a service behind a profile" {
+    # dcup narrows its PREVIEW, not what it accepts: it never validates the
+    # names it is handed. Completing only the profile-less ones would hide a
+    # service `dcup seeder` starts perfectly well.
+    run complete_in "$F/profiles" 1 dcup see
+    [[ "$output" == *"seeder"* ]]
+}

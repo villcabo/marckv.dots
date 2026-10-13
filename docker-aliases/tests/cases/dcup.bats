@@ -236,3 +236,29 @@ load '../helpers/common'
         'DOCKER_ALIASES_AUTO_YES=1 _confirm_operation x </dev/null >/dev/null 2>&1 && echo ACCEPT || echo REJECT'
     [ "$output" = "ACCEPT" ]
 }
+
+# --- profiles ---------------------------------------------------------------
+
+@test "dcup preview does not widen past the active profiles" {
+    # dcup deliberately does NOT use _get_all_compose_services. With no service
+    # named it passes none and docker starts only the profile-less ones, so a
+    # preview listing every declared service would promise four and start one.
+    # Every other command widened; this one must not.
+    run declined "$F/profiles" 'dcup'
+    [[ "$output" == *"api"* ]]
+    [[ "$output" != *"debugger"* ]]
+    [[ "$output" != *"seeder"* ]]
+}
+
+@test "dcup still accepts a service behind a profile by name" {
+    # Naming a service activates its own profile, measured on compose v5.6.0:
+    # `up --dry-run` on a profile-gated service reaches the image pull.
+    run declined "$F/profiles" 'dcup debugger'
+    [[ "$output" == *"debugger"* ]]
+}
+
+@test "dcup honours two repeated -P" {
+    run declined "$F/profiles" 'dcup -P dev -P full'
+    [[ "$output" == *"seeder"* ]]
+    [[ "$output" == *"metrics"* ]]
+}

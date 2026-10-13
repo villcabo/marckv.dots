@@ -191,3 +191,56 @@ load '../helpers/common'
     run in_dir "$F/basic" 'dclt api </dev/null'
     [[ "$output" != *"[yes/N]"* ]]
 }
+
+# --- profiles ---------------------------------------------------------------
+#
+# The gap that let the bug through: not one case here ever named a service
+# sitting behind a profile. In a real project `dclt suitems` answered "no
+# service matched" about a container that was running at that moment, because
+# discovery asked `config --services`, which lists only the profile-less ones —
+# three of seventeen there. `docker compose logs` never filtered by profile, so
+# the command it was about to build would have worked fine.
+
+@test "dclt matches a service behind a profile with no -P" {
+    run out_of "$F/profiles" 'dclt debugger'
+    [[ "$output" == *"[debugger]"* ]]
+}
+
+@test "dclt with no pattern includes services behind profiles" {
+    run out_of "$F/profiles" 'dclt'
+    [[ "$output" == *"[api]"* ]]
+    [[ "$output" == *"[debugger]"* ]]
+    [[ "$output" == *"[metrics]"* ]]
+    [[ "$output" == *"[seeder]"* ]]
+}
+
+@test "dclt regex reaches services behind profiles" {
+    run out_of "$F/profiles" "dclt 'see|metr'"
+    [[ "$output" == *"[seeder]"* ]]
+    [[ "$output" == *"[metrics]"* ]]
+    [[ "$output" != *"[debugger]"* ]]
+}
+
+@test "dclt still narrows to a single -P" {
+    run out_of "$F/profiles" 'dclt -P debug'
+    [[ "$output" == *"[debugger]"* ]]
+    [[ "$output" != *"[seeder]"* ]]
+}
+
+@test "dclt honours two repeated -P" {
+    # Two -P used to collapse into one. The array was flattened with
+    # "${profiles[*]}", which joins on a SPACE, and _split_commas only ever
+    # split on a comma — so -P dev -P full asked compose for a profile named
+    # "dev full". No such profile, no error, and the answer silently became the
+    # profile-less list.
+    run out_of "$F/profiles" 'dclt -P dev -P full'
+    [[ "$output" == *"[seeder]"* ]]
+    [[ "$output" == *"[metrics]"* ]]
+    [[ "$output" != *"[debugger]"* ]]
+}
+
+@test "dclt honours two comma-separated profiles" {
+    run out_of "$F/profiles" 'dclt -P dev,full'
+    [[ "$output" == *"[seeder]"* ]]
+    [[ "$output" == *"[metrics]"* ]]
+}

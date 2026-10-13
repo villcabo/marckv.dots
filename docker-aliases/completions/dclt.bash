@@ -34,7 +34,7 @@ _dclt_complete_bash() {
         COMPREPLY=( $(compgen -W "-n -s -o -t -f -e -P -h --help" -- "$cur") )
     else
         # Honour the -P already on the line: profiles decide which services exist.
-        COMPREPLY=( $(compgen -W "$(_get_compose_services --profiles \
+        COMPREPLY=( $(compgen -W "$(_get_all_compose_services --profiles \
             "$(_profiles_from_words "${COMP_WORDS[@]}")" 2>/dev/null)" -- "$cur") )
     fi
     return 0

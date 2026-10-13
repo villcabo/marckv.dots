@@ -123,7 +123,7 @@ dcver() {
     local services=() svc
     while IFS= read -r svc; do
         [[ -n "$svc" ]] && services+=("$svc")
-    done <<< "$(_get_compose_services --profiles "${profiles[*]}" "${files[@]}")"
+    done <<< "$(_get_all_compose_services --profiles "$(_join_commas "${profiles[@]}")" "${files[@]}")"
 
     if [[ ${#services[@]} -eq 0 ]]; then
         _err dcver "no services found in the compose file"
@@ -246,5 +246,5 @@ dcver() {
 
 # Completion source: service names, honouring any -P already typed.
 _dcver_candidates() {
-    _get_compose_services --profiles "$(_profiles_from_words "$@")" 2>/dev/null
+    _get_all_compose_services --profiles "$(_profiles_from_words "$@")" 2>/dev/null
 }
