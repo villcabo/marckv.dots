@@ -34,7 +34,7 @@ _dcup_complete_zsh() {
         compadd -a flags
     else
         # Honour the -P already on the line: profiles decide which services exist.
-        services=(${(f)"$(_get_compose_services --profiles \
+        services=(${(f)"$(_get_all_compose_services --profiles \
             "$(_profiles_from_words "${words[@]}")" 2>/dev/null)"})
         (( ${#services} )) && compadd -a services
     fi

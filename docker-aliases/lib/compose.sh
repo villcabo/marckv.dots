@@ -236,6 +236,57 @@ _get_compose_services() {
     printf '%s\n' "$result"
 }
 
+# _get_all_compose_services [--profiles "<list>"] [file...] → one per line
+#
+# Every service the project DECLARES, which is a different question from the one
+# _get_compose_services answers. That one reports what docker would act on under
+# the given profiles, and under none it reports only the profile-less ones —
+# three of seventeen in genesis-pgw-deploy, which is why `dclt suitems` said
+# "no service matched" about a service that was running at the time.
+#
+# Matching a pattern against service names has to see all of them, because the
+# commands that do it don't care about profiles: `logs`, `exec` and `down` act
+# on a named service whether or not its profile is active. Measured on compose
+# v5.6.0 — `up --dry-run tigomoneyms` with no -P reaches the image pull, so
+# naming a service activates its own profile implicitly.
+#
+# dcup deliberately does NOT use this. There the list feeds the preview, and
+# with no service named dcup passes none, leaving the choice to docker. A wider
+# list there would announce seventeen services while docker started three, and
+# a preview that overstates what is about to happen is the one thing
+# docker-aliases must never ship.
+_get_all_compose_services() {
+    local profiles=""
+    if [[ "${1:-}" == "--profiles" ]]; then
+        profiles="$2"; shift 2
+    fi
+
+    # An explicit -P narrows on purpose. Widening it back would answer a
+    # question the user did not ask.
+    if [[ -n "$profiles" ]]; then
+        _get_compose_services --profiles "$profiles" "$@"
+        return $?
+    fi
+
+    local declared=() prof
+    while IFS= read -r prof; do
+        [[ -n "$prof" ]] && declared+=("$prof")
+    done <<< "$(_get_compose_profiles "$@")"
+
+    # Nothing is behind a profile here, so the plain list already is the whole
+    # list — and asking for it costs one docker call instead of two.
+    if [[ ${#declared[@]} -eq 0 ]]; then
+        _get_compose_services --profiles "" "$@"
+        return $?
+    fi
+
+    # Every profile named explicitly rather than `--profile '*'`: both return
+    # the same seventeen services here, and this one does not bet on a shorthand
+    # whose availability on the older compose these scripts meet has not been
+    # checked on the servers that run them.
+    _get_compose_services --profiles "$(_join_commas "${declared[@]}")" "$@"
+}
+
 # _get_compose_profiles [file...] → one profile name per line
 #
 # Uncached: profiles are only ever asked for during TAB completion of -P, which
@@ -369,6 +420,20 @@ _get_running_services() {
 
 # _split_commas <string> → one item per line.
 # Written as a loop because `IFS=, read -ra` is bash-only and breaks in zsh.
+# _join_commas <item>... → the items joined by commas
+#
+# The counterpart to _split_commas, and the absence of it was a bug. Callers
+# hold profiles in an array and used to flatten it with "${profiles[*]}", which
+# joins on a SPACE — while _split_commas only ever splits on a comma. One -P
+# survived the round trip; two came out as a single profile named "suite
+# payment", which compose does not have, so it silently fell back to the
+# profile-less services. `dclt -P suite -P payment` answered as though no
+# profile had been asked for, with no error anywhere.
+_join_commas() {
+    local IFS=','
+    printf '%s' "$*"
+}
+
 _split_commas() {
     local rest="$1"
     while [[ "$rest" == *,* ]]; do

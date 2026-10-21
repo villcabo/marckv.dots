@@ -33,7 +33,7 @@ _dcx_complete_bash() {
         COMPREPLY=( $(compgen -W "bash sh ls cat env ps top" -- "$cur") )
     else
         # Honour the -P already on the line: profiles decide which services exist.
-        COMPREPLY=( $(compgen -W "$(_get_compose_services --profiles \
+        COMPREPLY=( $(compgen -W "$(_get_all_compose_services --profiles \
             "$(_profiles_from_words "${COMP_WORDS[@]}")" 2>/dev/null)" -- "$cur") )
     fi
     return 0

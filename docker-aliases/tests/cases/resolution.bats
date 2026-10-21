@@ -206,3 +206,28 @@ load '../helpers/common'
     run lib_call "$F/profiles" '_get_compose_profiles'
     [[ "$output" == *"debug"* ]]
 }
+
+# --- joining profiles -------------------------------------------------------
+
+@test "_join_commas joins on commas, not spaces" {
+    # The counterpart _split_commas needs. Without it callers flattened arrays
+    # with "${arr[*]}" — a space-joined string that _split_commas handed back
+    # as one item.
+    run lib_call "$F/basic" '_join_commas a b c'
+    [[ "$output" == "a,b,c" ]]
+}
+
+@test "_join_commas on one item adds no separator" {
+    run lib_call "$F/basic" '_join_commas only'
+    [[ "$output" == "only" ]]
+}
+
+@test "_join_commas on nothing is empty" {
+    run lib_call "$F/basic" '_join_commas'
+    [[ -z "$output" ]]
+}
+
+@test "_join_commas round-trips through _split_commas" {
+    run lib_call "$F/basic" '_split_commas "$(_join_commas dev full debug)" | tr "\\n" " "'
+    [[ "$output" == "dev full debug "* ]]
+}

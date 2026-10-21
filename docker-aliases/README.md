@@ -237,6 +237,31 @@ it), and `COMPOSE_PROFILES` — including that `-P` *replaces* it rather than
 adding to it. Diverging by one file or one profile means the preview describes
 something docker is not about to do.
 
+**Two questions about services, and they get two functions.** `config
+--services` answers *what would docker act on under these profiles* — with none
+active, only the profile-less services. That is the right answer for `dcup`'s
+preview, where naming nothing means docker starts exactly those. It is the wrong
+answer everywhere else: `dclt`, `dcx`, `dcver` and `dcdown` match a pattern
+against service names, and `logs`, `exec` and `down` do not filter by profile at
+all — naming a service activates its own profile. So those four, and every
+completion, ask `_get_all_compose_services` instead, which widens to every
+declared service unless the user narrowed it with `-P`.
+
+The cost of getting this backwards was measured in both directions. Using the
+narrow list to match made `dclt suitems` answer *"no service matched"* about a
+running container, in a project where three of seventeen services have no
+profile. Using the wide list in `dcup`'s preview would promise seventeen
+services and start three — a preview that overstates the action, which this
+README forbids above.
+
+**Join on the separator the splitter expects.** Profiles live in an array and
+reach `_get_compose_services` as one string. Flattening with `"${profiles[*]}"`
+joins on a space while `_split_commas` only splits on a comma, so `-P dev -P
+full` asked compose for a profile named `"dev full"` — no such profile, no
+error, and the answer silently fell back to the profile-less list. `_join_commas`
+exists so the two halves agree, and the completions never had the bug because
+`_profiles_from_words` had been joining on commas all along.
+
 **Nothing beyond a POSIX shell and coreutils.** `sd`, `rg`, `jq` and friends are
 excellent and none of them is on a fresh Debian server, which is where these
 aliases get used. A guard test enforces it.
