@@ -6,11 +6,12 @@ _dps_complete_bash() {
     cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
 
-    case "$prev" in
-        -f) COMPREPLY=( $(compgen -f -X '!*.y*ml' -- "$cur") ); return 0 ;;
-        -e) COMPREPLY=( $(compgen -f -- "$cur") ); return 0 ;;
-        -P) COMPREPLY=( $(compgen -W "$(_get_compose_profiles 2>/dev/null)" -- "$cur") ); return 0 ;;
-    esac
+    # No value-taking flags here. dps accepts -a -x -t and the two help forms,
+    # none of which takes an argument, so there is nothing to complete after
+    # one. This used to carry -f, -e and -P branches copied from the compose
+    # commands: dead, because the flag list never offers them and dps rejects
+    # them if typed by hand — it just cost a docker call to answer for a flag
+    # that was about to be refused.
 
     if [[ "$cur" == -* ]]; then
         COMPREPLY=( $(compgen -W "-a -x -t -h --help" -- "$cur") )
