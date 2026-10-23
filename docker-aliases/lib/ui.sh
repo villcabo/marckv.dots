@@ -15,20 +15,20 @@
 # Colors and styles
 # ---------------------------------------------------------------------------
 
-CR="\033[0m"        # reset
-CRE="\033[1;31m"    # red
-CGR="\033[1;32m"    # green
-CYE="\033[1;33m"    # yellow
-CBL="\033[1;34m"    # blue
-CMA="\033[1;35m"    # magenta
-CCY="\033[1;36m"    # cyan
-CWH="\033[1;37m"    # white
+CR=$'\033[0m'        # reset
+CRE=$'\033[1;31m'    # red
+CGR=$'\033[1;32m'    # green
+CYE=$'\033[1;33m'    # yellow
+CBL=$'\033[1;34m'    # blue
+CMA=$'\033[1;35m'    # magenta
+CCY=$'\033[1;36m'    # cyan
+CWH=$'\033[1;37m'    # white
 
-CB="\033[1m"        # bold
-CI="\033[3m"        # italic
-CU="\033[4m"        # underline
-CDIM="\033[2m"      # dim
-CCY_DIM="\033[2;36m"
+CB=$'\033[1m'        # bold
+CI=$'\033[3m'        # italic
+CU=$'\033[4m'        # underline
+CDIM=$'\033[2m'      # dim
+CCY_DIM=$'\033[2;36m'
 
 # ---------------------------------------------------------------------------
 # Icons — Nerd Font glyphs with an ASCII fallback
@@ -232,7 +232,14 @@ _render_preview() {
         [[ -n "$volumes" ]]  && printf "  %s ${CRE}${CB}%s${CR}  ${CRE}← deleted, cannot be undone${CR}\n" \
                                       "$(_icon volumes)" "$volumes"
         [[ -n "$flags" ]]    && printf "  %s ${CYE}%s${CR}\n" "$(_icon flags)" "$flags"
-        [[ -n "$command_display" ]] && printf "  %s %b${CR}\n" "$(_icon cmd)" "$command_display"
+        # %s, not %b. The colours above are real escape bytes now, so nothing
+        # here needs escape processing — and %b ran it over the USER's argv.
+        # Measured before the change: `sed 's/a/\\n/'` printed a real line
+        # break, `\\t` a real tab, and an argument containing `\\c` TRUNCATED
+        # the rest of the preview silently. Quoting is still lost (an argv
+        # array cannot round-trip through one string), but the preview no
+        # longer rewrites what the user typed.
+        [[ -n "$command_display" ]] && printf "  %s %s${CR}\n" "$(_icon cmd)" "$command_display"
 
         _hr
     } >&2
