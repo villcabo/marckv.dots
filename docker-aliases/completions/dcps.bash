@@ -9,13 +9,18 @@ _dcps_complete_bash() {
     case "$prev" in
         -f) COMPREPLY=( $(compgen -f -X '!*.y*ml' -- "$cur") ); return 0 ;;
         -e) COMPREPLY=( $(compgen -f -- "$cur") ); return 0 ;;
-        -P) COMPREPLY=( $(compgen -W "$(_get_compose_profiles 2>/dev/null)" -- "$cur") ); return 0 ;;
+        # _into: the printing form loses the profile cache in its subshell.
+        -P) _get_compose_profiles_into 2>/dev/null || _DA_R=""
+            COMPREPLY=( $(compgen -W "$_DA_R" -- "$cur") ); return 0 ;;
     esac
 
     if [[ "$cur" == -* ]]; then
         COMPREPLY=( $(compgen -W "-a -x -t -f -e -P -h --help" -- "$cur") )
     else
-        COMPREPLY=( $(compgen -W "$(_dcps_candidates "${COMP_WORDS[@]}" 2>/dev/null)" -- "$cur") )
+        # The _into form: $(…) is a subshell and the cache it fills dies there.
+        # TAB is the case the cache exists for.
+        _dcps_candidates_into "${COMP_WORDS[@]}" 2>/dev/null || _DA_R=""
+        COMPREPLY=( $(compgen -W "$_DA_R" -- "$cur") )
     fi
     return 0
 }

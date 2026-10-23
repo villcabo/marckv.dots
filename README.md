@@ -134,7 +134,7 @@ source ~/.bashrc
 ~/.marckv.dots/
 ├── bash/                   # Bash modules (colors, aliases, functions, theme)
 ├── bash-extensions/        # Extra functions (Gradle, etc.)
-├── docker-aliases/         # Ten Docker & Compose commands, with docs and tests
+├── docker-aliases/         # Eleven Docker & Compose commands, with docs and tests
 ├── nvim/                   # Full Neovim config (LazyVim)
 ├── nvim-lite/              # Minimal Neovim config for servers (LazyVim)
 ├── kitty/                  # Kitty terminal config
@@ -177,7 +177,7 @@ docker compose up -d ubuntu24
 docker compose exec ubuntu24 bash -c "cd /root/.marckv.dots/installer && ./01-install-bash.sh"
 ```
 
-The docker aliases have their own suite — 357 checks per shell, run in **both**
+The docker aliases have their own suite — 441 checks per shell, run in **both**
 bash and zsh across seven distros:
 
 ```bash
