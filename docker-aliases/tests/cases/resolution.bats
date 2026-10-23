@@ -232,6 +232,62 @@ load '../helpers/common'
     [[ "$output" == "dev full debug "* ]]
 }
 
+# --- the order of the conventional names ------------------------------------
+#
+# docker's order, measured on compose v5.6.1 by dropping all four names in one
+# directory and asking `config` which it took: compose.yaml, compose.yml,
+# docker-compose.yml, docker-compose.yaml. The code used to try
+# docker-compose.yml FIRST, so any project that had moved to compose.yaml
+# without deleting the legacy file was operated on through a different file
+# than docker used — and the preview named the wrong one confidently.
+#
+# Each file in the fixture declares a different container_name, so the test can
+# tell which one was actually read instead of trusting the filename.
+
+@test "compose.yaml wins over every other conventional name" {
+    run lib_call "$F/allnames" '_resolve_compose_files | head -1'
+    [[ "$output" == *"compose.yaml"* ]]
+    [[ "$output" != *"docker-compose"* ]]
+}
+
+@test "the file picked is the one docker would pick" {
+    run lib_call "$F/allnames" 'docker compose config 2>/dev/null | grep container_name'
+    local theirs="$output"
+    run lib_call "$F/allnames" 'docker compose -f "$(_resolve_compose_files | head -1)" config 2>/dev/null | grep container_name'
+    [ "$output" = "$theirs" ]
+}
+
+@test "compose.yml wins once compose.yaml is gone" {
+    cp -r "$F/allnames" "$BATS_TEST_TMPDIR/n2" && rm "$BATS_TEST_TMPDIR/n2/compose.yaml"
+    run lib_call "$BATS_TEST_TMPDIR/n2" '_resolve_compose_files | head -1'
+    [[ "$output" == *"compose.yml"* ]]
+    [[ "$output" != *"docker-compose"* ]]
+}
+
+@test "docker-compose.yml wins over docker-compose.yaml" {
+    # Documents the order inside that family. It does NOT guard the bug this
+    # block is about: both the old order and the correct one try .yml before
+    # .yaml, so reverting the fix leaves this one green. Verified by doing
+    # exactly that. Kept because the relative order is still worth pinning,
+    # and labelled so nobody reads it as the regression test.
+    cp -r "$F/allnames" "$BATS_TEST_TMPDIR/n3"
+    rm "$BATS_TEST_TMPDIR/n3/compose.yaml" "$BATS_TEST_TMPDIR/n3/compose.yml"
+    run lib_call "$BATS_TEST_TMPDIR/n3" '_resolve_compose_files | head -1'
+    [[ "$output" == *"docker-compose.yml"* ]]
+    [[ "$output" != *"docker-compose.yaml"* ]]
+}
+
+@test "a legacy docker-compose.yml never shadows a modern compose.yaml" {
+    # THIS is the regression test. The old order picked docker-compose.yml in
+    # a directory that also had compose.yaml, so these commands and docker
+    # operated on different files — and the preview named the wrong one.
+    cp -r "$F/allnames" "$BATS_TEST_TMPDIR/n4"
+    rm "$BATS_TEST_TMPDIR/n4/compose.yml" "$BATS_TEST_TMPDIR/n4/docker-compose.yaml"
+    run lib_call "$BATS_TEST_TMPDIR/n4" '_resolve_compose_files | head -1'
+    [[ "$output" == *"compose.yaml"* ]]
+    [[ "$output" != *"docker-compose"* ]]
+}
+
 # --- the service cache actually caches --------------------------------------
 #
 # It never did. Every caller wrote `x=$(_get_compose_services …)`, and a

@@ -128,11 +128,22 @@ _resolve_compose_files() {
     fi
 
     # --- 5: the conventional names, plus the override sibling ---------------
+    #
+    # This order is docker's, and it used to be docker's REVERSED.
+    #
+    # Measured on compose v5.6.1 by dropping all four names in one directory
+    # and asking `config` which one it took: compose.yaml, then compose.yml,
+    # then docker-compose.yml, then docker-compose.yaml. The old order here
+    # tried docker-compose.yml first, so in any project that had migrated to
+    # compose.yaml without deleting the legacy file, these commands operated on
+    # a DIFFERENT file than `docker compose` did — and the preview named the
+    # wrong one with complete confidence. "Resolve files exactly as docker
+    # does" is the rule this subsystem is built on; it was not being followed.
     local base=""
-    if   [[ -f docker-compose.yml ]];  then base="docker-compose.yml"
-    elif [[ -f docker-compose.yaml ]]; then base="docker-compose.yaml"
+    if   [[ -f compose.yaml ]];        then base="compose.yaml"
     elif [[ -f compose.yml ]];         then base="compose.yml"
-    elif [[ -f compose.yaml ]];        then base="compose.yaml"
+    elif [[ -f docker-compose.yml ]];  then base="docker-compose.yml"
+    elif [[ -f docker-compose.yaml ]]; then base="docker-compose.yaml"
     else return 1
     fi
 
