@@ -184,9 +184,11 @@ dcup() {
     # actually means right now instead of leaving the line blank.
     local preview_services="${services[*]}"
     if [[ ${#services[@]} -eq 0 ]]; then
-        local discovered
-        if discovered=$(_get_compose_services --profiles "$(_join_commas "${profiles[@]}")" "${files[@]}" 2>/dev/null); then
-            preview_services=$(printf '%s' "$discovered" | tr '\n' ' ')
+        # Still the NARROW list: the preview must name what docker will
+        # actually start, not every declared service. The _into form keeps the
+        # cache alive, which the $(…) version threw away.
+        if _get_compose_services_into --profiles "$(_join_commas "${profiles[@]}")" "${files[@]}" 2>/dev/null; then
+            preview_services="${_DA_R//$'\n'/ }"
         fi
     fi
 

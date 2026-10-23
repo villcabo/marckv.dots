@@ -137,9 +137,13 @@ dcdown() {
 
     # --- what is actually out there ----------------------------------------
     local declared=() running=() svc
+    # The _into form: the printing one runs inside $(…), a subshell, and the
+    # service cache it fills dies there. `|| _DA_R=""` matters — on failure
+    # _DA_R still holds whatever the last successful call left in it.
+    _get_all_compose_services_into --profiles "$(_join_commas "${profiles[@]}")" "${files[@]}" || _DA_R=""
     while IFS= read -r svc; do
         [[ -n "$svc" ]] && declared+=("$svc")
-    done <<< "$(_get_all_compose_services --profiles "$(_join_commas "${profiles[@]}")" "${files[@]}")"
+    done <<< "$_DA_R"
 
     if [[ ${#declared[@]} -eq 0 ]]; then
         _err dcdown "no services found in the compose file"

@@ -179,8 +179,15 @@ dcps() {
         "CONTAINER ID" "IMAGE" "CREATED" "STATUS" "PORTS" "SERVICE" "$rows"
 }
 
-# Completion source: service names of the current project.
 # Completion source: service names, honouring any -P already typed.
+#
+# Two forms, because the completion calls this on every TAB: the _into one
+# keeps the service cache, which a $(…) read would discard.
+_dcps_candidates_into() {
+    _get_all_compose_services_into --profiles "$(_profiles_from_words "$@")" 2>/dev/null
+}
+
 _dcps_candidates() {
-    _get_all_compose_services --profiles "$(_profiles_from_words "$@")" 2>/dev/null
+    _dcps_candidates_into "$@" || return $?
+    printf '%s\n' "$_DA_R"
 }

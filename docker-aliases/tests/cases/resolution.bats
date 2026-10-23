@@ -231,3 +231,64 @@ load '../helpers/common'
     run lib_call "$F/basic" '_split_commas "$(_join_commas dev full debug)" | tr "\\n" " "'
     [[ "$output" == "dev full debug "* ]]
 }
+
+# --- the service cache actually caches --------------------------------------
+#
+# It never did. Every caller wrote `x=$(_get_compose_services …)`, and a
+# command substitution is a subshell, so the globals the function set died
+# with it — measured at 112/168/145/163/104 ms for five consecutive calls that
+# should have cost one. The suite could not see it because common.bash forces
+# DOCKER_ALIASES_CACHE_TTL=0, which disables the thing under test.
+#
+# Hiding the compose file between the two calls is what makes this test unable
+# to pass by accident: on a hit the second call answers from memory, and with
+# the TTL at 0 the same sequence must fail.
+
+@test "the lookup leaves its cache visible to the caller" {
+    run lib_call "$F/basic" \
+        'DOCKER_ALIASES_CACHE_TTL=60 _get_compose_services_into; printf "KEY=[%s] VAL=[%s]" "$_DAV2_SVC_KEY" "${_DAV2_SVC_VAL//$'"'"'\n'"'"'/,}"'
+    [[ "$output" == *"KEY=["*"basic"* ]]
+    [[ "$output" == *"VAL=["*"api"* ]]
+}
+
+@test "a second lookup answers from the cache, with the compose file gone" {
+    # The file is named explicitly on both calls. Left to be resolved, the
+    # second call would fail at resolution — the file is gone by then — before
+    # it ever reached the cache, and the test would be measuring the wrong
+    # thing. Found exactly that way on the first run.
+    cp -r "$F/basic" "$BATS_TEST_TMPDIR/c1"
+    run lib_call "$BATS_TEST_TMPDIR/c1" '
+        export DOCKER_ALIASES_CACHE_TTL=60
+        _get_compose_services_into docker-compose.yml || exit 1
+        mv docker-compose.yml hidden.yml
+        _get_compose_services_into docker-compose.yml || exit 2
+        printf "%s" "${_DA_R//$'"'"'\n'"'"'/,}"'
+    [[ "$output" == *"api"* ]]
+    [[ "$output" == *"worker"* ]]
+}
+
+@test "with the TTL at zero the same sequence cannot answer" {
+    # The discriminator for the test above. If it passed with caching off, it
+    # would be proving nothing.
+    cp -r "$F/basic" "$BATS_TEST_TMPDIR/c2"
+    run lib_call "$BATS_TEST_TMPDIR/c2" '
+        export DOCKER_ALIASES_CACHE_TTL=0
+        _get_compose_services_into docker-compose.yml || exit 1
+        mv docker-compose.yml hidden.yml
+        _get_compose_services_into docker-compose.yml && printf "STILL=[%s]" "$_DA_R"'
+    [[ "$output" != *"api"* ]]
+}
+
+@test "the profile list is cached too" {
+    # It was not, and it was the whole remaining cost on the wide path: the
+    # narrow lookup went 98 to 14 ms once it kept its cache while the wide one
+    # stayed at ~150 ms, because this call cost 65-84 ms every time.
+    cp -r "$F/profiles" "$BATS_TEST_TMPDIR/p1"
+    run lib_call "$BATS_TEST_TMPDIR/p1" '
+        export DOCKER_ALIASES_CACHE_TTL=60
+        _get_compose_profiles_into docker-compose.yml || exit 1
+        mv docker-compose.yml hidden.yml
+        _get_compose_profiles_into docker-compose.yml || exit 2
+        printf "%s" "${_DA_R//$'"'"'\n'"'"'/,}"'
+    [[ "$output" == *"debug"* ]]
+}
