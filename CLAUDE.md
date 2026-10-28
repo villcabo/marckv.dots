@@ -10,6 +10,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Installation (run from `installer/`)
 
+`./install.sh` runs the whole setup — 01, 02, 03 and `04 --full` — after one
+preview and one confirmation, passing `-y` to each. It re-implements nothing:
+a change to what a piece installs belongs in that piece's own installer. Its
+`uninstall` uses `confirm_destructive` (it deletes TPM's plugins and Neovim's
+data), so a pipe is a no there; `install` uses plain `confirm`. 05 is not in it.
+
 Core installers — numbered prefixes define execution order. Each supports `install` (default), `status`, and `uninstall`:
 
 ```bash
@@ -23,7 +29,8 @@ Core installers — numbered prefixes define execution order. Each supports `ins
 four scripts that used to do it separately left the user as the orchestrator:
 
 ```bash
-./04-install-nvim-lite.sh --reinstall   # clean, deps, nvim, config, sync — in that order
+./04-install-nvim-lite.sh --full        # deps, nvim, config, sync — in that order
+./04-install-nvim-lite.sh --reinstall   # the same, after clean wipes Neovim's data
 ./04-install-nvim-lite.sh -d -s         # any subset; the flags compose
 ./04-install-nvim-lite.sh status
 ```

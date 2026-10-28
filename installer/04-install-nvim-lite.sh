@@ -19,6 +19,7 @@ use_sync=false
 use_deps=false
 use_clean=false
 use_nvim=false
+use_full=false
 use_reinstall=false
 
 # This script has more flags than the shared parser knows about, so it extends
@@ -30,6 +31,7 @@ installer_flag() {
         -d|--deps)   use_deps=true ;;
         --clean)     use_clean=true ;;
         --nvim)      use_nvim=true ;;
+        --full)      use_full=true ;;
         --reinstall) use_reinstall=true ;;
         *) return 1 ;;
     esac
@@ -60,7 +62,10 @@ installer_usage() {
     echo ""
     echo -e "  ${YELLOW}--nvim${NC}           Install or verify the Neovim binary itself."
     echo ""
-    echo -e "  ${YELLOW}--reinstall${NC}      Everything, in order: clean, deps, nvim, config, sync."
+    echo -e "  ${YELLOW}--full${NC}           A whole working setup, in order: deps, nvim, config, sync."
+    echo -e "                    Nothing is deleted. What install.sh runs."
+    echo ""
+    echo -e "  ${YELLOW}--reinstall${NC}      --full, after --clean wipes Neovim's data dirs first."
     echo ""
     echo -e "  ${YELLOW}-y, --yes${NC}        Do not ask for confirmation."
     echo ""
@@ -68,7 +73,8 @@ installer_usage() {
     echo ""
     echo -e "By default (no options), only the config is installed — a symlink so changes"
     echo -e "in the repo reflect immediately. Passing any of -d/-s/--clean/--nvim runs ONLY"
-    echo -e "the steps requested; the config step is skipped unless --reinstall is used."
+    echo -e "the steps requested; the config step is skipped unless --full or --reinstall"
+    echo -e "is used."
     echo ""
 }
 
@@ -820,15 +826,22 @@ do_uninstall() {
 }
 
 do_install() {
+    # --full is the whole setup on a machine as it is. --reinstall is the same
+    # after wiping Neovim's data — which is why --full exists: a first install
+    # had only --reinstall to reach the config step together with the others,
+    # and it deleted plugins and state nobody asked to lose.
     if [[ "$use_reinstall" == true ]]; then
         use_clean=true
+        use_full=true
+    fi
+    if [[ "$use_full" == true ]]; then
         use_deps=true
         use_nvim=true
         use_sync=true
     fi
 
     local any_step_requested=false
-    if [[ "$use_clean" == true || "$use_deps" == true || "$use_nvim" == true || "$use_sync" == true || "$use_reinstall" == true ]]; then
+    if [[ "$use_clean" == true || "$use_deps" == true || "$use_nvim" == true || "$use_sync" == true || "$use_full" == true ]]; then
         any_step_requested=true
     fi
 
@@ -847,10 +860,10 @@ do_install() {
     [[ "$use_clean" == true ]] && steps+=("clean")
     [[ "$use_deps" == true ]] && steps+=("deps")
     [[ "$use_nvim" == true ]] && steps+=("nvim")
-    # step_config only runs here as part of an explicit --reinstall — requesting
-    # -d/-s/--clean/--nvim on their own must NOT also install the config, to keep
-    # today's usage (e.g. `-d -s` alone) working the same way it always has.
-    [[ "$use_reinstall" == true ]] && steps+=("config")
+    # step_config only runs here as part of --full (or --reinstall, which sets
+    # it) — requesting -d/-s/--clean/--nvim on their own must NOT also install
+    # the config, to keep today's usage (e.g. `-d -s` alone) working the same way.
+    [[ "$use_full" == true ]] && steps+=("config")
     [[ "$use_sync" == true ]] && steps+=("sync")
 
     local total_steps=${#steps[@]}
