@@ -1,7 +1,7 @@
 # docker-aliases
 
-Docker and Docker Compose shortcuts for bash and zsh. Eleven commands, each one
-earning its place by being used daily.
+Docker and Docker Compose shortcuts for bash and zsh. Twenty-three commands,
+each one earning its place by being used daily.
 
 Every command previews what it is about to do — naming the exact command it will
 run — before running it, and asks before anything that changes state.
@@ -57,63 +57,66 @@ docker-aliases/
 ├── lib/
 │   ├── ui.sh            colors, icons, preview renderer, confirmation
 │   └── compose.sh       compose file detection, service/profile discovery
-├── commands/            one file per command
-│   ├── dcup.sh
-│   ├── dclt.sh
-│   ├── dcdown.sh
-│   ├── dcx.sh
-│   ├── dcd.sh
-│   ├── dps.sh
-│   ├── dcps.sh
-│   ├── dcver.sh
-│   ├── dver.sh
-│   ├── di.sh
-│   └── dlt.sh
-├── completions/         one pair per command
-│   ├── dcup.bash / dcup.zsh
-│   ├── dclt.bash / dclt.zsh
-│   ├── dcdown.bash / dcdown.zsh
-│   ├── dcx.bash / dcx.zsh
-│   ├── dcd.bash / dcd.zsh
-│   ├── dps.bash / dps.zsh
-│   ├── dcps.bash / dcps.zsh
-│   ├── dcver.bash / dcver.zsh
-│   ├── dver.bash / dver.zsh
-│   ├── di.bash / di.zsh
-│   └── dlt.bash / dlt.zsh
-├── docs/                one page per command
-│   ├── dcup.md
-│   ├── dclt.md
-│   ├── dcdown.md
-│   ├── dcx.md
-│   ├── dcd.md
-│   ├── dps.md          (dcps.md links here)
-│   ├── dcver.md
-│   ├── dver.md
-│   ├── di.md
-│   └── dlt.md
-└── tests/               e2e across 7 distros and both shells
+├── commands/<name>.sh   one file per command — the table below is the list
+├── completions/         <name>.bash and <name>.zsh for each one
+├── docs/<name>.md       one page per command (dcps shares dps.md)
+└── tests/
+    ├── cases/<name>.bats    one case file per command, plus ui, completion, resolution
+    └── helpers/shim.bash    the fake docker every case runs against
 ```
 
-Adding a command means dropping a file in `commands/`, its completions, and a
-page in `docs/`. `init.sh` globs both `commands/*.sh` and the completions for
-the running shell, so it never needs editing.
+Adding a command means dropping a file in `commands/`, its completions, a page
+in `docs/` and a case file in `tests/cases/`. `init.sh` globs both
+`commands/*.sh` and the completions for the running shell, and
+`completion.bats` globs the commands, so none of them needs editing.
+
+Two commands share code across files, on purpose: `dcstats` is a front for the
+table in `dstats.sh`, and `devents` colours health with `dhealth.sh`'s
+function. `init.sh` always loads every command, so the dependency cannot break
+by load order.
 
 ## Commands
+
+The `dc` prefix means "the compose project in this directory, by service name";
+a bare `d` means "the whole host, by container name".
+
+### The compose project you are standing in
 
 | Command | Does | Docs |
 |---|---|---|
 | `dcup` | Bring compose services up | [docs/dcup.md](docs/dcup.md) |
-| `dclt` | Tail logs for services matched by regex | [docs/dclt.md](docs/dclt.md) |
-| `dlt` | Tail logs for containers matched by regex, host-wide | [docs/dlt.md](docs/dlt.md) |
 | `dcdown` | Stop and remove services | [docs/dcdown.md](docs/dcdown.md) |
+| `dcrestart` | Restart services — and say what a restart will not do | [docs/dcrestart.md](docs/dcrestart.md) |
 | `dcx` | Run a command or open a shell in a service | [docs/dcx.md](docs/dcx.md) |
-| `dcd` | Jump to a container's compose project directory | [docs/dcd.md](docs/dcd.md) |
-| `dps` | List containers on this host | [docs/dps.md](docs/dps.md) |
+| `dclt` | Tail logs for services matched by regex | [docs/dclt.md](docs/dclt.md) |
 | `dcps` | List this project's services | [docs/dps.md](docs/dps.md) |
 | `dcver` | Which build is running in each service | [docs/dcver.md](docs/dcver.md) |
-| `dver` | Which build is running, host-wide | [docs/dver.md](docs/dver.md) |
+| `dcstats` | Resource use by service, against each one's limits | [docs/dcstats.md](docs/dcstats.md) |
+| `dcd` | Jump to a container's compose project directory | [docs/dcd.md](docs/dcd.md) |
+
+### The host: looking
+
+| Command | Does | Docs |
+|---|---|---|
+| `dps` | List containers on this host | [docs/dps.md](docs/dps.md) |
+| `dprj` | Compose projects on this host, and how much of each is up | [docs/dprj.md](docs/dprj.md) |
+| `dip` | Which container has an IP, or what IP a container has | [docs/dip.md](docs/dip.md) |
+| `dnet` | Networks, and what really uses each one | [docs/dnet.md](docs/dnet.md) |
+| `dvol` | Volumes, who mounts them, and how big they are | [docs/dvol.md](docs/dvol.md) |
 | `di` | List images, and what you could delete | [docs/di.md](docs/di.md) |
+| `dver` | Which build is running, host-wide | [docs/dver.md](docs/dver.md) |
+| `dstats` | Resource use, against each container's own limits | [docs/dstats.md](docs/dstats.md) |
+| `dhealth` | Why a container is (un)healthy — its probe and what it printed | [docs/dhealth.md](docs/dhealth.md) |
+| `devents` | What happened to a container, and why | [docs/devents.md](docs/devents.md) |
+| `dlt` | Tail logs for containers matched by regex | [docs/dlt.md](docs/dlt.md) |
+
+### The host: acting
+
+| Command | Does | Docs |
+|---|---|---|
+| `dx` | Run a command or open a shell in any running container | [docs/dx.md](docs/dx.md) |
+| `drestart` | Restart running containers by name | [docs/drestart.md](docs/drestart.md) |
+| `dprune` | Delete what docker no longer uses, after showing exactly what | [docs/dprune.md](docs/dprune.md) |
 
 ## Testing
 
@@ -125,7 +128,7 @@ docker compose build && docker compose up -d
 docker compose exec ubuntu24 zsh      # poke around by hand
 ```
 
-441 checks per shell across 7 distros — Debian 11/12/13 and Ubuntu
+757 checks per shell across 7 distros — Debian 11/12/13 and Ubuntu
 20.04/22.04/24.04/26.04, covering bash 5.0→5.3 and zsh 5.8→5.9. The suite is
 hermetic: `docker` is shimmed, so it asserts on the exact argv each command
 would run while being unable to touch a real container. It runs on
@@ -142,11 +145,12 @@ Every command here follows these. They are why this exists in the form it does.
 form depends on what the command is: one that changes something renders a
 preview block before acting, and one whose entire output is a table renders a
 scope line instead — `docker stats · 27 of 27` — because a preview there would
-say everything twice. The five that act (`dcup` `dcdown` `dcx` `dclt` `dlt`)
-have the block; the six that only read (`dps` `dcps` `dver` `dcver` `di` `dcd`)
-have the line. This used to read "every command renders a preview", which was
-false for six of eleven and contradicted by `lib/ui.sh` and by two of the doc
-pages.
+say everything twice. The nine that act (`dcup` `dcdown` `dcrestart` `drestart`
+`dprune` `dcx` `dx` `dclt` `dlt`) have the block; the fourteen that only read
+have the line — or, for `dhealth` and `devents` on a single container, a header
+naming it. This used to read "every command renders a preview", which was false
+for six of the first eleven and contradicted by `lib/ui.sh` and by two of the
+doc pages.
 
 **The preview shows the real command.** Not a description of it, not a
 reconstruction — the actual command line. Commands build one command as an
@@ -168,9 +172,20 @@ payoff, and friction people learn to click through stops protecting anything.
 
 **Destroying data asks a different question.** `dcdown` takes `yes`; `dcdown -v`
 makes you type the project name, and names every volume it is about to delete.
-Not because `yes` is too short, but because `yes` is the answer to every other
-prompt — repeat it enough and it stops being an answer. A prompt that can only
-be satisfied by looking at the screen is the only kind that still works.
+`dprune`, where everything is irreversible, makes you type the docker host's
+name — taken from `docker info`, so under `DOCKER_HOST` it is the remote
+machine's. Not because `yes` is too short, but because `yes` is the answer to
+every other prompt — repeat it enough and it stops being an answer. A prompt
+that can only be satisfied by looking at the screen is the only kind that
+still works.
+
+**What a destructive preview shows is what runs.** `dprune` deletes each item
+it listed by its own name, never through a prune that re-evaluates at run time,
+and never with `-f` — so anything that started being used between the preview
+and the answer is refused by docker instead of deleted. And it says why each
+item is on the list: removing a stopped container frees its networks, images
+and volumes, and a preview that only asked "what is unused now?" would miss
+every one of them.
 
 **Confirmation takes the full word `yes`.** A bare `y` is rejected. Plain Enter
 cancels. These commands recreate and restart running services; one keystroke is

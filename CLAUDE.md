@@ -173,10 +173,13 @@ Colors must load first as other modules depend on them. The theme depends on fun
   `bash/`) — and it follows the POSIX-plus-coreutils rule below, since it ships
   to servers too
 - `bash-extensions/` — optional add-ons sourced separately (e.g. `bash_gradle_functions.sh`)
-- `docker-aliases/` — docker/compose shortcuts for bash and zsh. Eleven commands
-  (`dcup dclt dcdown dcx dcd dps dcps dcver dver di dlt`), one file each in `commands/`,
-  a doc page each in `docs/`, a bats case file each in `tests/cases/`. Adding a
-  command means adding those three; `init.sh` globs and needs no editing.
+- `docker-aliases/` — docker/compose shortcuts for bash and zsh. Twenty-three
+  commands — the compose project (`dcup dcdown dcrestart dcx dclt dcps dcver
+  dcstats dcd`), looking at the host (`dps dprj dip dnet dvol di dver dstats
+  dhealth devents dlt`) and acting on it (`dx drestart dprune`) — one file each
+  in `commands/`, a completion pair each in `completions/`, a doc page each in
+  `docs/`, a bats case file each in `tests/cases/`. Adding a command means
+  adding those four; `init.sh` and `completion.bats` glob and need no editing.
   **Read `docker-aliases/README.md` before changing anything there** — its
   design rules (mandatory preview, preview on stderr, confirmation scaled to
   blast radius, resolve files and profiles exactly as docker does) are the
@@ -201,6 +204,19 @@ Two, on purpose:
   own suite. Mounts **no docker socket**: a socket would let a test inside a
   container act on the host's real containers.
 
+Two traps in the aliases' suite, each paid for once:
+
+- **`tests/helpers/shim.bash` is an unquoted heredoc.** A backtick anywhere in
+  it — a comment included — runs a command on the host every time the shim is
+  written. It has happened twice (`images`, then `docker logs`). Quote names
+  with `"…"` in its comments, never with backticks.
+- **A case whose command asks for confirmation must be given its answer.**
+  `declined` and `answer` pipe one in; `out_of` and `in_dir` give no stdin, so
+  add `</dev/null` to the snippet. Without it the prompt reads whatever stdin
+  the run inherited — EOF from a terminal, so it passed, but a run started in
+  the background hung until it was killed. Run bats itself with `</dev/null`
+  too.
+
 
 ## Shell portability (bash **and** zsh)
 
@@ -215,7 +231,8 @@ of them. Re-read this list before assembling any list, array or pattern.
 | Expanding a variable whose *name* is in another variable | `${!v}` | `${(P)v}` — **no portable form**; pass data, not variable names |
 | `${var,,}` | lowercases | syntax error |
 | `IFS=, read -ra` | works | needs `read -rA` |
-| `status` as a variable | ordinary | **read-only** (zsh's name for `$?`) — assigning aborts the function. Same for `path`, `argv`, `options` |
+| `status` as a variable | ordinary | **read-only** (zsh's name for `$?`) — assigning aborts the function. `path` is tied to `PATH`: reading into it replaces the command search path. Same for `argv`, `options`. Written three times in one session; `ui.bats` now fails on any of them |
+| `${d/#$HOME/\~}` — a tilde in the replacement | `~/x` | keeps the backslash: `\~/x`. Cut the prefix instead: `"~${d#"$HOME"}"` |
 | `(` inside an expansion pattern — `${s%% (*}` | literal character | opens a glob group; unterminated, aborts. Quote it: `${s%%" ("*}` |
 | `${var:+$'\n'}` | expands the escape | does **not** — put the newline in a plain variable first |
 | `local x` on an already-local name | silent | **prints** the variable |
@@ -223,7 +240,17 @@ of them. Re-read this list before assembling any list, array or pattern.
 
 The way out of most of them is the same: **iterate, never index**, and when two
 values must stay paired, join them into one record (`"$a<TAB>$b"`) instead of
-keeping parallel arrays.
+keeping parallel arrays. When the answers to a batch of questions come back in
+order (one `date -f -` for every timestamp on screen), read them as a queue —
+take the head, `${q%%$nl*}`, drop it, `${q#*$nl}` — instead of indexing.
+
+One trap is not bash-versus-zsh but locale, and it hits both: `${#x}` counts
+**characters only under a UTF-8 locale**. Under C or POSIX — a minimal Debian
+with no locale configured, an ssh that does not forward `LANG`, the test
+containers — it counts bytes, and every `—`, `→` or `…` in a table cell stole
+columns of padding. `_pad_into` measures with the UTF-8 continuation bytes
+dropped when the shell is counting bytes; anything else that measures display
+width must do the same.
 
 Nerd Font glyphs are a related trap: they live in the Unicode Private Use Area
 and do not survive every editor or transfer. Write them as `\uXXXX` escapes,

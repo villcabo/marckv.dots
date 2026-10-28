@@ -72,9 +72,20 @@ _DA_SP="                                                                        
 # BYTES and zsh by characters, so a port rendered "3001→3000" (9 characters,
 # 11 bytes) lands two columns short in bash and correct in zsh. Every mapped
 # port and every health glyph is multibyte, so that is most of a real table.
+#
+# And the character count is only a character count in a UTF-8 locale. Under
+# C or POSIX — a minimal Debian with no locale configured, an ssh that does not
+# forward LANG, the test containers — ${#x} counts BYTES in both shells, and
+# every "—" in a cell stole two columns of padding. So when the shell is
+# counting bytes, the UTF-8 continuation bytes (0x80–0xBF) are dropped before
+# measuring: what is left is one byte per character. Decided live on every
+# call, from _DA_MB, so a locale changed mid-session is honoured.
+_DA_MB=$'\xe2\x80\x94'
+
 _pad_into() {
-    local _t="$1" _w="$2" _n
-    _n=$(( _w - ${#_t} ))
+    local _t="$1" _w="$2" _n _m="$1"
+    (( ${#_DA_MB} > 1 )) && _m="${_m//[$'\x80'-$'\xbf']/}"
+    _n=$(( _w - ${#_m} ))
     while (( _n > ${#_DA_SP} )); do _DA_SP="${_DA_SP}${_DA_SP}"; done
     if (( _n > 0 )); then _DA_R="${_t}${_DA_SP:0:_n}"; else _DA_R="$_t"; fi
 }
@@ -543,6 +554,81 @@ _status_color_into() {
 _status_color() { local _DA_R; _status_color_into "$@"; printf '%s' "$_DA_R"; }
 
 # ---------------------------------------------------------------------------
+# Byte sizes
+#
+# docker prints sizes as text — "127MB", "96.42MB", "507B" from system df,
+# "1.9GiB" from stats — and three commands need to ADD them: dvol and dprune
+# total what a cleanup would free, dstats compares usage against a limit. The
+# shell has no floating point, so these parse to integer bytes and back, with
+# arithmetic only. No fork: they run once per row.
+# ---------------------------------------------------------------------------
+
+# _bytes_of_into <size text> → _DA_R = integer bytes, 0 if it cannot be read
+#
+# Decimal units (kB MB GB TB, ×1000) are what system df uses; binary ones
+# (KiB MiB GiB TiB, ×1024) are what stats uses. Both are accepted, and kept
+# apart: reading MiB as MB would be 5% off on every container.
+_bytes_of_into() {
+    local s="${1// /}" num unit int frac mult scale=1
+    num="${s%%[!0-9.]*}"
+    unit="${s#"$num"}"
+    [[ -z "$num" ]] && { _DA_R=0; return 0; }
+    case "$unit" in
+        B|'')       mult=1 ;;
+        kB|KB|k)    mult=1000 ;;
+        MB|M)       mult=1000000 ;;
+        GB|G)       mult=1000000000 ;;
+        TB|T)       mult=1000000000000 ;;
+        KiB)        mult=1024 ;;
+        MiB)        mult=1048576 ;;
+        GiB)        mult=1073741824 ;;
+        TiB)        mult=1099511627776 ;;
+        *)          _DA_R=0; return 0 ;;
+    esac
+    int="${num%%.*}"
+    [[ -z "$int" ]] && int=0
+    if [[ "$num" == *.* ]]; then
+        frac="${num#*.}"
+        # Three digits of the fraction, because docker prints three
+        # ("1.643GB"). Keeping two lost 3 MB per volume, and over a cleanup of
+        # twenty volumes the total came out visibly short of docker's own.
+        # 999 TB at three decimals is ~1e18, still inside 64 bits.
+        frac="${frac:0:3}"
+        while (( ${#frac} < 3 )); do frac="${frac}0"; done
+        scale=1000
+        # 10# forces base ten: "08" would otherwise be read as bad octal.
+        _DA_R=$(( (10#$int * 1000 + 10#$frac) * mult / scale ))
+    else
+        _DA_R=$(( 10#$int * mult ))
+    fi
+}
+
+# _human_bytes_into <bytes> → _DA_R = "1.2GB", "340MB", "512B"
+#
+# Decimal units, like system df, so a total printed here can be checked
+# against docker's own figures without converting.
+_human_bytes_into() {
+    local b="${1:-0}" whole tenth unit div
+    if   (( b >= 1000000000000 )); then div=1000000000000; unit=TB
+    elif (( b >= 1000000000 ));    then div=1000000000;    unit=GB
+    elif (( b >= 1000000 ));       then div=1000000;       unit=MB
+    elif (( b >= 1000 ));          then div=1000;          unit=kB
+    else _DA_R="${b}B"; return 0
+    fi
+    # Rounded to the nearest tenth, not truncated: 8.387GB is "8.4GB", which
+    # is what docker shows beside it. Done in tenths so a carry is handled —
+    # 8.96 becomes 9.0, not 8.10.
+    local tenths=$(( (b * 10 + div / 2) / div ))
+    whole=$(( tenths / 10 ))
+    tenth=$(( tenths % 10 ))
+    if (( whole >= 100 )); then
+        _DA_R="${whole}${unit}"
+    else
+        _DA_R="${whole}.${tenth}${unit}"
+    fi
+}
+
+# ---------------------------------------------------------------------------
 # Container table
 #
 # _render_container_table <title> <shown> <total> <filter> \
@@ -560,9 +646,13 @@ _render_container_table() {
     local title="$1" shown="$2" total="$3" filter="$4"
     local h1="$5" h2="$6" h3="$7" h4="$8" h5="$9" h6="${10}"
     local rows="${11}"
-    # Per-column colours, comma separated. "@status" means run the cell through
-    # _status_color. Defaults to what dps/dcps want; dcver overrides it, because
-    # the same table shape can carry columns that mean quite different things.
+    # Per-column colours, comma separated. A plain name is a fixed colour; an
+    # "@name" entry runs each cell through _name_color_into, so the cell decides
+    # its own colour. "@status" was the only one of those for a long time;
+    # tables whose columns are not container states (network use, a CPU
+    # percentage against its limit) need their own, and a fixed list here would
+    # have meant editing this function for every new table. Defaults to what
+    # dps/dcps want; other commands override it.
     local colors="${12:-dim,cyan,dim,@status,green,white}"
 
     local _c1 _c2 _c3 _c4 _c5 _c6 _ci=0 _cname
@@ -583,7 +673,13 @@ _render_container_table() {
     local c1 c2 c3 c4 c5 c6
     local w1=${#h1} w2=${#h2} w3=${#h3} w4=${#h4} w5=${#h5}
 
-    if [[ -n "$rows" ]]; then
+    # Widths are measured on a copy with the UTF-8 continuation bytes dropped
+    # when the locale counts bytes (see _pad_into) — one substitution for the
+    # whole table, not one per cell. In a UTF-8 locale it is not even made.
+    local _mrows="$rows"
+    (( ${#_DA_MB} > 1 )) && _mrows="${rows//[$'\x80'-$'\xbf']/}"
+
+    if [[ -n "$_mrows" ]]; then
         while IFS=$'\t' read -r c1 c2 c3 c4 c5 c6 || [[ -n "$c1" ]]; do
             [[ -z "$c1" ]] && continue
             (( ${#c1} > w1 )) && w1=${#c1}
@@ -591,7 +687,7 @@ _render_container_table() {
             (( ${#c3} > w3 )) && w3=${#c3}
             (( ${#c4} > w4 )) && w4=${#c4}
             (( ${#c5} > w5 )) && w5=${#c5}
-        done <<< "$rows"
+        done <<< "$_mrows"
     fi
 
     # Scope line instead of a preview block: for a command whose whole output is
@@ -616,23 +712,28 @@ _render_container_table() {
     # cyan" does not become truer by asking again thirteen times. They are
     # resolved once here; only a column declared @status depends on the cell
     # and gets recomputed inside the loop.
-    local k1 k2 k3 k4 k5 k6
+    # The function name is resolved here, once, and then called by variable in
+    # the loop. Calling a function whose name is in a variable is portable —
+    # `"$f" args` works in bash and zsh alike; what has no portable form is
+    # expanding a VARIABLE by name. And it is a function call, not a fork, so
+    # the per-row path keeps the no-fork rule.
+    local k1 k2 k3 k4 k5 k6 f1 f2 f3 f4 f5 f6
     local d1=0 d2=0 d3=0 d4=0 d5=0 d6=0
-    if [[ "$_c1" == "@status" ]]; then d1=1; else _color_named_into "$_c1"; k1="$_DA_R"; fi
-    if [[ "$_c2" == "@status" ]]; then d2=1; else _color_named_into "$_c2"; k2="$_DA_R"; fi
-    if [[ "$_c3" == "@status" ]]; then d3=1; else _color_named_into "$_c3"; k3="$_DA_R"; fi
-    if [[ "$_c4" == "@status" ]]; then d4=1; else _color_named_into "$_c4"; k4="$_DA_R"; fi
-    if [[ "$_c5" == "@status" ]]; then d5=1; else _color_named_into "$_c5"; k5="$_DA_R"; fi
-    if [[ "$_c6" == "@status" ]]; then d6=1; else _color_named_into "$_c6"; k6="$_DA_R"; fi
+    if [[ "$_c1" == @* ]]; then d1=1; f1="_${_c1#@}_color_into"; else _color_named_into "$_c1"; k1="$_DA_R"; fi
+    if [[ "$_c2" == @* ]]; then d2=1; f2="_${_c2#@}_color_into"; else _color_named_into "$_c2"; k2="$_DA_R"; fi
+    if [[ "$_c3" == @* ]]; then d3=1; f3="_${_c3#@}_color_into"; else _color_named_into "$_c3"; k3="$_DA_R"; fi
+    if [[ "$_c4" == @* ]]; then d4=1; f4="_${_c4#@}_color_into"; else _color_named_into "$_c4"; k4="$_DA_R"; fi
+    if [[ "$_c5" == @* ]]; then d5=1; f5="_${_c5#@}_color_into"; else _color_named_into "$_c5"; k5="$_DA_R"; fi
+    if [[ "$_c6" == @* ]]; then d6=1; f6="_${_c6#@}_color_into"; else _color_named_into "$_c6"; k6="$_DA_R"; fi
 
     while IFS=$'\t' read -r c1 c2 c3 c4 c5 c6 || [[ -n "$c1" ]]; do
         [[ -z "$c1" ]] && continue
-        if (( d1 )); then _status_color_into "$c1"; k1="$_DA_R"; fi
-        if (( d2 )); then _status_color_into "$c2"; k2="$_DA_R"; fi
-        if (( d3 )); then _status_color_into "$c3"; k3="$_DA_R"; fi
-        if (( d4 )); then _status_color_into "$c4"; k4="$_DA_R"; fi
-        if (( d5 )); then _status_color_into "$c5"; k5="$_DA_R"; fi
-        if (( d6 )); then _status_color_into "$c6"; k6="$_DA_R"; fi
+        if (( d1 )); then "$f1" "$c1"; k1="$_DA_R"; fi
+        if (( d2 )); then "$f2" "$c2"; k2="$_DA_R"; fi
+        if (( d3 )); then "$f3" "$c3"; k3="$_DA_R"; fi
+        if (( d4 )); then "$f4" "$c4"; k4="$_DA_R"; fi
+        if (( d5 )); then "$f5" "$c5"; k5="$_DA_R"; fi
+        if (( d6 )); then "$f6" "$c6"; k6="$_DA_R"; fi
         _pad_into "$c1" "$w1"; p1="$_DA_R"; _pad_into "$c2" "$w2"; p2="$_DA_R"
         _pad_into "$c3" "$w3"; p3="$_DA_R"; _pad_into "$c4" "$w4"; p4="$_DA_R"
         _pad_into "$c5" "$w5"; p5="$_DA_R"
@@ -677,12 +778,14 @@ _confirm_typed() {
 # point: "no git.properties" tells you it failed, not where to look, and the
 # usual cause is an image that puts the file somewhere this list does not name.
 _git_props_missing_note() {
-    local n="$1" path
+    # `p`, never `path`: in zsh path is tied to PATH, and reading into it
+    # replaced the command search path for the rest of the function.
+    local n="$1" p
     (( n == 0 )) && return 0
     printf "  %s ${CDIM}%s of them had no ${CR}${CWH}git.properties${CR}${CDIM}, looked for it in:${CR}\n" \
         "$(_icon warn)" "$n" >&2
-    while IFS= read -r path; do
-        [[ -n "$path" ]] && printf "      ${CDIM}%s${CR}\n" "$path" >&2
+    while IFS= read -r p; do
+        [[ -n "$p" ]] && printf "      ${CDIM}%s${CR}\n" "$p" >&2
     done <<< "$(_git_props_paths)"
     printf "  ${CDIM}add another with${CR} ${CYE}DOCKER_ALIASES_GIT_PROPS=/path/to/git.properties${CR}\n" >&2
 }
