@@ -116,6 +116,7 @@ bashhelp() {
     # ════════════════════════════════════════════════════════════════════════
     network)
         _h_header "Network and Connections"
+        _h_cmd "ips [kind] [mac]"  "Local IPs: cable, Wi-Fi and VPN, with MAC and gateway" "ips wifi | wl-copy"
         _h_cmd "privip"            "Show server private IP"
         _h_cmd "publip"            "Show server public IP"
         _h_cmd "listen"            "TCP ports listening with associated process"

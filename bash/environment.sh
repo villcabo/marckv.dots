@@ -73,6 +73,12 @@ for dir in "$HOME/.local/bin" "$HOME/bin" "/usr/local/bin"; do
     fi
 done
 
+# The repo's own commands (ips). Appended, never prepended: a tool of ours must
+# not shadow a system command of the same name.
+if [[ -d "$BASH_MODULES_DIR/bin" && ":$PATH:" != *":$BASH_MODULES_DIR/bin:"* ]]; then
+    PATH="$PATH:$BASH_MODULES_DIR/bin"
+fi
+
 # Add Node.js path if installed via our installer
 if [[ -d "/opt/nodejs/bin" && ":$PATH:" != *":/opt/nodejs/bin:"* ]]; then
     PATH="$PATH:/opt/nodejs/bin"

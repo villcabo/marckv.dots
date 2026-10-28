@@ -167,6 +167,11 @@ Colors must load first as other modules depend on them. The theme depends on fun
 
 ### Component layout
 - `bash/` — modules loaded by `bash/.bashrc` (see load order above)
+- `bash/bin/` — the repo's own commands (`ips`), appended to PATH by
+  `environment.sh`. A tool goes here as an executable, not as a function in
+  `functions.sh`, when it must also run from zsh (a laptop on zsh never loads
+  `bash/`) — and it follows the POSIX-plus-coreutils rule below, since it ships
+  to servers too
 - `bash-extensions/` — optional add-ons sourced separately (e.g. `bash_gradle_functions.sh`)
 - `docker-aliases/` — docker/compose shortcuts for bash and zsh. Eleven commands
   (`dcup dclt dcdown dcx dcd dps dcps dcver dver di dlt`), one file each in `commands/`,
