@@ -695,12 +695,14 @@ _confirm_typed() {
 # point: "no git.properties" tells you it failed, not where to look, and the
 # usual cause is an image that puts the file somewhere this list does not name.
 _git_props_missing_note() {
-    local n="$1" path
+    # `p`, never `path`: in zsh path is tied to PATH, and reading into it
+    # replaced the command search path for the rest of the function.
+    local n="$1" p
     (( n == 0 )) && return 0
     printf "  %s ${CDIM}%s of them had no ${CR}${CWH}git.properties${CR}${CDIM}, looked for it in:${CR}\n" \
         "$(_icon warn)" "$n" >&2
-    while IFS= read -r path; do
-        [[ -n "$path" ]] && printf "      ${CDIM}%s${CR}\n" "$path" >&2
+    while IFS= read -r p; do
+        [[ -n "$p" ]] && printf "      ${CDIM}%s${CR}\n" "$p" >&2
     done <<< "$(_git_props_paths)"
     printf "  ${CDIM}add another with${CR} ${CYE}DOCKER_ALIASES_GIT_PROPS=/path/to/git.properties${CR}\n" >&2
 }

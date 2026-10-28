@@ -241,3 +241,67 @@ render_in_locale() {
     u=$(render_in_locale C.UTF-8)
     [ "$c" = "$u" ]
 }
+
+# --- no zsh read-only or special names as variables -------------------------
+#
+# In zsh, `status` is $? and read-only: assigning it aborts the function, and
+# `local status` is refused outright. `path` is tied to PATH, so assigning it
+# replaces the command search path; `argv` and `options` are special too. bash
+# treats all four as ordinary names, so every one of these bugs passes in bash
+# and only the zsh run of the suite can see it — after it has been written.
+#
+# It was written three times while adding twelve commands: dip, dhealth and
+# dprune each declared a `status`. This guard makes the fourth one fail on the
+# line that does it, in either shell. Its first run also found a `local path`
+# that had sat in _git_props_missing_note since dcver shipped — harmless only
+# because nothing but builtins ran while PATH held a file path.
+
+zsh_special_vars() {
+    local dir="${1:-$DA_DIR}" names='(status|path|argv|options)'
+    [ -d "$dir/commands" ] || { echo "MISSING SOURCES: $dir/commands"; return 0; }
+    grep -rnE \
+        -e "(^|[;&|[:space:]])(local|typeset|declare|readonly)([[:space:]]+-[a-zA-Z]+)*[[:space:]]+([^#]*[[:space:]])?${names}([=[:space:]]|\$)" \
+        -e "(^[[:space:]]*|[;&|({][[:space:]]*|(then|do|else)[[:space:]]+)${names}=" \
+        -e "(^|[;&|[:space:]])for[[:space:]]+${names}[[:space:]]" \
+        -e "(^|[;&|[:space:]])read[[:space:]]+(-[a-zA-Z]+[[:space:]]+)*${names}([[:space:]]|\$)" \
+        "$dir/commands" "$dir/lib" "$dir/completions" "$dir/init.sh" 2>/dev/null \
+        | grep -vE '^[^:]+:[0-9]+:[[:space:]]*#' || true
+}
+
+@test "zsh_special_vars actually fires on every form that assigns one" {
+    local sandbox="$BATS_TEST_TMPDIR/zsh-sandbox" form
+    mkdir -p "$sandbox/commands" "$sandbox/lib" "$sandbox/completions"
+    : > "$sandbox/init.sh"
+    for form in \
+        'local status' \
+        'local a="$1" status b' \
+        'status="${x%%y}"' \
+        'typeset -A options' \
+        'for path in a b; do :; done' \
+        'read -r argv' \
+        'x=1; status=2'
+    do
+        printf '%s\n' "$form" > "$sandbox/lib/planted.sh"
+        run zsh_special_vars "$sandbox"
+        if [ -z "$output" ]; then
+            printf 'zsh_special_vars did NOT see: %s\n' "$form" >&2
+            return 1
+        fi
+    done
+    # And what is fine: other names that contain them, reading them, fields,
+    # and docker's own filter syntax — which the first version flagged.
+    printf '%s\n' 'cstatus=1; local hstate; echo "$status ${#path}"; x={{.State.Status}}; docker ps --filter status=exited' \
+        > "$sandbox/lib/planted.sh"
+    run zsh_special_vars "$sandbox"
+    [ -z "$output" ]
+}
+
+@test "zsh_special_vars reports instead of passing when the sources are unreadable" {
+    run zsh_special_vars "$BATS_TEST_TMPDIR/nope"
+    [[ "$output" == *"MISSING SOURCES"* ]]
+}
+
+@test "the sources assign no zsh read-only or special name" {
+    run zsh_special_vars
+    [ -z "$output" ]
+}
