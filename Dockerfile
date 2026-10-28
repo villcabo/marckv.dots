@@ -37,6 +37,7 @@ RUN . /etc/os-release 2>/dev/null; \
 RUN apt-get update -qq \
     && apt-get install -y -qq --no-install-recommends \
        curl git wget gcc make libc6-dev ripgrep fd-find docker.io ca-certificates \
+       sudo \
     && mkdir -p /usr/local/lib/docker/cli-plugins \
     && curl -fsSL "https://github.com/docker/compose/releases/download/v2.32.4/docker-compose-linux-$(uname -m)" \
        -o /usr/local/lib/docker/cli-plugins/docker-compose \
