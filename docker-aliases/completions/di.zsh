@@ -5,7 +5,7 @@ _di_complete_zsh() {
     local -a flags images
 
     if [[ "${words[CURRENT]}" == -* ]]; then
-        flags=(-u -d -t -h --help)
+        flags=(-u -d -t -s -h --help)
         compadd -a flags
     else
         images=(${(f)"$(_di_candidates 2>/dev/null)"})

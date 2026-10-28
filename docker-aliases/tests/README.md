@@ -153,7 +153,8 @@ inside a container act on the host's real containers.
 
 ## What is covered
 
-357 checks per shell, per distro — 714 per distro, 4998 across the matrix.
+441 checks per shell, per distro — 882 per distro. `run.sh` prints the
+live count; believe it over this line, which has been stale before.
 
 `di`:
 

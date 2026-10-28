@@ -121,9 +121,13 @@ dcver() {
 
     # --- match services -----------------------------------------------------
     local services=() svc
+    # The _into form: the printing one runs inside $(…), a subshell, and the
+    # service cache it fills dies there. `|| _DA_R=""` matters — on failure
+    # _DA_R still holds whatever the last successful call left in it.
+    _get_all_compose_services_into --profiles "$(_join_commas "${profiles[@]}")" "${files[@]}" || _DA_R=""
     while IFS= read -r svc; do
         [[ -n "$svc" ]] && services+=("$svc")
-    done <<< "$(_get_all_compose_services --profiles "$(_join_commas "${profiles[@]}")" "${files[@]}")"
+    done <<< "$_DA_R"
 
     if [[ ${#services[@]} -eq 0 ]]; then
         _err dcver "no services found in the compose file"
@@ -245,6 +249,15 @@ dcver() {
 }
 
 # Completion source: service names, honouring any -P already typed.
-_dcver_candidates() {
-    _get_all_compose_services --profiles "$(_profiles_from_words "$@")" 2>/dev/null
+#
+# Two forms, for the same reason as _dcps_candidates: TAB calls it repeatedly
+# and the printing form cannot keep a cache.
+_dcver_candidates_into() {
+    _get_all_compose_services_into --profiles "$(_profiles_from_words "$@")" 2>/dev/null
 }
+
+_dcver_candidates() {
+    _dcver_candidates_into "$@" || return $?
+    printf '%s\n' "$_DA_R"
+}
+

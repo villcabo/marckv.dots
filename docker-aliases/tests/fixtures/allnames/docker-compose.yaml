@@ -1,0 +1,4 @@
+services:
+  s:
+    image: busybox
+    container_name: picked-dockercompose-yaml

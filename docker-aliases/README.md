@@ -67,7 +67,8 @@ docker-aliases/
 │   ├── dcps.sh
 │   ├── dcver.sh
 │   ├── dver.sh
-│   └── di.sh
+│   ├── di.sh
+│   └── dlt.sh
 ├── completions/         one pair per command
 │   ├── dcup.bash / dcup.zsh
 │   ├── dclt.bash / dclt.zsh
@@ -78,7 +79,8 @@ docker-aliases/
 │   ├── dcps.bash / dcps.zsh
 │   ├── dcver.bash / dcver.zsh
 │   ├── dver.bash / dver.zsh
-│   └── di.bash / di.zsh
+│   ├── di.bash / di.zsh
+│   └── dlt.bash / dlt.zsh
 ├── docs/                one page per command
 │   ├── dcup.md
 │   ├── dclt.md
@@ -88,7 +90,8 @@ docker-aliases/
 │   ├── dps.md          (dcps.md links here)
 │   ├── dcver.md
 │   ├── dver.md
-│   └── di.md
+│   ├── di.md
+│   └── dlt.md
 └── tests/               e2e across 7 distros and both shells
 ```
 
@@ -122,7 +125,7 @@ docker compose build && docker compose up -d
 docker compose exec ubuntu24 zsh      # poke around by hand
 ```
 
-357 checks per shell across 7 distros — Debian 11/12/13 and Ubuntu
+441 checks per shell across 7 distros — Debian 11/12/13 and Ubuntu
 20.04/22.04/24.04/26.04, covering bash 5.0→5.3 and zsh 5.8→5.9. The suite is
 hermetic: `docker` is shimmed, so it asserts on the exact argv each command
 would run while being unable to touch a real container. It runs on
@@ -135,13 +138,25 @@ See [tests/README.md](tests/README.md) — including an honest account of what i
 
 Every command here follows these. They are why this exists in the form it does.
 
-**The preview is mandatory.** Every command renders what it is about to do
-before doing it. No flag disables it.
+**Every command says what it is about to do, and no flag disables it.** The
+form depends on what the command is: one that changes something renders a
+preview block before acting, and one whose entire output is a table renders a
+scope line instead — `docker stats · 27 of 27` — because a preview there would
+say everything twice. The five that act (`dcup` `dcdown` `dcx` `dclt` `dlt`)
+have the block; the six that only read (`dps` `dcps` `dver` `dcver` `di` `dcd`)
+have the line. This used to read "every command renders a preview", which was
+false for six of eleven and contradicted by `lib/ui.sh` and by two of the doc
+pages.
 
 **The preview shows the real command.** Not a description of it, not a
 reconstruction — the actual command line. Commands build one command as an
-array, render those same pieces, and execute it. No `eval`, so quoting can
-never make the preview lie.
+array, render those same pieces, and execute it, and nothing here uses `eval`.
+Two honest limits. The command line is printed with `%s` and the colour
+constants are real escape bytes, because it used to be `%b` over literal ones
+and that ran escape processing on the user's own argv — `sed 's/a/\n/'` showed
+a line break, and an argument containing `\c` silently truncated the rest of
+the preview. And argv boundaries are still not round-tripped: an array cannot
+survive as one string, so `sh -c 'echo a b'` renders without its quotes.
 
 **The preview goes to stderr.** It is UI, not data. A command whose output you
 pipe — `dclt -o api | grep error` — must not have its preview land in the pipe.
@@ -186,6 +201,17 @@ contract the tests check never moved. Constants get resolved once above the
 loop, not inside it. `dps` went 104 → 21 ms, `dps -a` 201 → 27 ms, with the
 output byte-identical in both shells.
 
+The same rule reaches the service lookups, for a second reason: a `$(…)` is a
+subshell, so anything the function *stores* is lost as well. Every caller of
+`_get_compose_services` read it that way, which silently discarded the cache on
+every single call — five consecutive lookups measured 112/168/145/163/104 ms
+where one should have cost anything at all, while the same function called
+directly answered the second time in 18 ms. They now call
+`_get_compose_services_into`, `_get_all_compose_services_into` and
+`_get_compose_profiles_into` and read `_DA_R`; the wide path, which is what TAB
+uses, went **234 → ~30 ms**. The printing wrappers remain, and their comments
+say plainly that they forfeit the cache.
+
 **Read a file with `$(<file)`, never `$(cat file)`.** bash and zsh both
 special-case the first form and read the file inline — no subshell, no
 `/bin/cat`. Measured 0.032 ms against 2.06 ms, **65 times cheaper**, and `dver`
@@ -225,10 +251,18 @@ a lasting place to leave a credential.
 only act on one thing, `dcx` lists the matches and stops. Silently taking the
 first is how you end up typing into the wrong container — and not noticing.
 
-**Flags mean the same thing everywhere.** `-f` is the compose file in every
-command — never "follow". `-e` is the env file, `-P` the profile. A letter is
-never reused for a second meaning: `-o` is *once* in `dclt`, so `dcdown` spells
-orphans `-O`, and anything that would collide is long-form only.
+**The shared flags mean the same thing everywhere.** `-f` is the compose file
+in every command — never "follow". `-e` is the env file, `-P` the profile, `-o`
+is *once*, which is why `dcdown` spells orphans `-O`.
+
+Outside that shared set a letter can mean two things, and six do: `-r` is
+*recreate* in `dcup` and *raw* in `dver`/`dcver`; `-p` is *pull* in `dcup` and
+*print* in `dcd`; `-s` is *since* in `dclt`/`dlt` and *size* in `di`; `-u` is
+*user* in `dcx` and *unused* in `di`; `-a` is *all containers* in
+`dps`/`dcps`/`dlt` and *show-without-git.properties* in `dver`; `-t` is
+*timestamps* in the log commands and *absolute time* in the tables. This line
+claimed none of that happened. The guarantee that holds is the one above —
+within a family, a letter does not move.
 
 **Resolve files and profiles exactly as docker does.** Whatever `docker compose`
 would act on in a directory, these commands act on too: the `COMPOSE_FILE` list,
@@ -264,12 +298,31 @@ exists so the two halves agree, and the completions never had the bug because
 
 **Nothing beyond a POSIX shell and coreutils.** `sd`, `rg`, `jq` and friends are
 excellent and none of them is on a fresh Debian server, which is where these
-aliases get used. A guard test enforces it.
+aliases get used.
+
+A guard test enforces it — and for a long time it did not. Its pattern required
+the tool to follow start-of-line, `;`, `&`, `|`, `(`, a backtick or `$(`, so
+`if jq …`, `then rg …`, `do sd …`, `! rg …`, `xargs fd …` and a `| jq` at end of
+line all walked past it. Falsified by planting seven forms: six escaped, and the
+only one caught was a tool at the very start of a line — which is exactly the
+shape the `sd` that originally slipped into `dcver` happened to have. The guard
+now asks whether the token is a command word, and a positive control plants a
+violation and fails if the detector stays quiet.
 
 **A test that cannot fail is not a test.** The suite runs with
 `DOCKER_ALIASES_NERD_FONT=0`, so for a long time it never executed the Nerd Font
 branch at all — and that branch shipped completely broken behind a wall of green
 checks. Whenever a mode exists, something has to exercise it.
+
+The same shape turned up twice more, so it is worth stating as a method rather
+than a warning. `DOCKER_ALIASES_CACHE_TTL=0` in the test helpers disabled the
+service cache, which is how a cache that never once worked sat behind green
+checks for months. And the forbidden-tool guard above caught one form in seven.
+Both were found the same way: **plant the regression and watch the test go
+red.** A new test earns its place only after it has been seen to fail, and a
+test whose subject has a mode has to name which mode it is in. Where a check
+could pass for the wrong reason, add the positive control next to it — the
+suite now has three, and each one fails if its detector goes quiet.
 
 **bash and zsh, equally.** Every command is verified in both. The traps that
 already bit us, kept here so they don't bite twice:
@@ -304,4 +357,5 @@ already bit us, kept here so they don't bite twice:
 | `DOCKER_ALIASES_NERD_FONT` | `1` | `0` forces ASCII icons |
 | `DOCKER_ALIASES_CACHE_TTL` | `5` | Service-list cache seconds, `0` disables |
 | `DOCKER_ALIASES_AUTO_YES` | `0` | `1` bypasses confirmation. **Tests/CI only** |
+| `DOCKER_ALIASES_LOG_LINES` | `100` | Default `-n` for `dclt` and `dlt` |
 | `DOCKER_ALIASES_GIT_PROPS` | — | Extra `git.properties` paths for `dcver`, `:`-separated |

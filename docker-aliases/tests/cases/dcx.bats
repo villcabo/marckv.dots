@@ -153,3 +153,65 @@ with_bash() {
     run err_of "$F/multimatch" "dcx '^api\$'"
     [[ "$output" != *"[yes/N]"* ]]
 }
+
+# --- the preview does not rewrite the user's argv ---------------------------
+#
+# The design rule says the preview shows the real command, and the reason given
+# is that nothing here uses `eval`. That was the wrong hazard. The command line
+# was printed with `printf %b`, which runs escape processing over the argv the
+# USER typed:
+#
+#   sed 's/a/\n/'     →  preview showed a real line break
+#   printf 'a\tb'     →  preview showed a real tab
+#   echo 'a\cb'       →  `\c` means "stop output here", so the preview TRUNCATED
+#                         itself and the rest of the command vanished silently
+#
+# Fixed by making the colour constants real escape bytes and the command line
+# a plain %s. Quoting is still not round-tripped — an argv array cannot survive
+# as one string — but the preview no longer shows something the user did not
+# type.
+
+@test "the preview shows a backslash-n literally" {
+    run err_of "$F/basic" "dcx api sed 's/a/\\n/'"
+    [[ "$output" == *'s/a/\n/'* ]]
+}
+
+@test "the preview does not turn backslash-n into a line break" {
+    run err_of "$F/basic" "dcx api sed 's/a/\\n/'"
+    # The command line is one line. If %b resolved the escape, the argument
+    # splits across two and `s/a/` ends a line on its own.
+    [[ "$output" != *'s/a/'$'\n'* ]]
+}
+
+@test "the preview shows a backslash-t literally" {
+    run err_of "$F/basic" "dcx api printf 'uno\\tdos'"
+    [[ "$output" == *'uno\tdos'* ]]
+}
+
+@test "a backslash-c in an argument does not truncate the preview" {
+    # The severe one: \c told printf to stop, so everything after it — including
+    # any further argument — was dropped without a trace.
+    run err_of "$F/basic" "dcx api echo 'antes\\cdespues'"
+    [[ "$output" == *'antes\cdespues'* ]]
+}
+
+# Raw stderr, deliberately not through strip_ansi: this is the one assertion
+# that has to see the escape bytes.
+raw_err() {
+    local dir="$1"; shift
+    "$DA_SHELL" -c "
+        cd '$dir' || exit 99
+        source '$INIT'
+        $*
+    " 2>&1 >/dev/null
+}
+
+@test "the preview still renders colour" {
+    # The fix moved the colour constants from literal backslash sequences to
+    # real escape bytes. If that had gone wrong the four tests above would pass
+    # while every preview came out full of visible \033[1;37m.
+    run raw_err "$F/basic" "dcx api echo hi"
+    printf '%s' "$output" | grep -q $'\033\[' || { echo "no escape bytes at all" >&2; return 1; }
+    printf '%s' "$output" | grep -qF '\033[' && { echo "escapes came out literal" >&2; return 1; }
+    return 0
+}

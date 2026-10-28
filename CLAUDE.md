@@ -190,6 +190,7 @@ of them. Re-read this list before assembling any list, array or pattern.
 | `(` inside an expansion pattern — `${s%% (*}` | literal character | opens a glob group; unterminated, aborts. Quote it: `${s%%" ("*}` |
 | `${var:+$'\n'}` | expands the escape | does **not** — put the newline in a plain variable first |
 | `local x` on an already-local name | silent | **prints** the variable |
+| `${(f)"$var"}` — splitting a VARIABLE on newlines | n/a | **parse error**, `bad substitution`. `${(f)"$(cmd)"}` is fine, the same flag over a plain variable is not. Use `${(f)var}`, which also yields **0** elements when empty instead of one blank |
 
 The way out of most of them is the same: **iterate, never index**, and when two
 values must stay paired, join them into one record (`"$a<TAB>$b"`) instead of

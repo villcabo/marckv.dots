@@ -2,16 +2,12 @@
 # docker-aliases — zsh completion for dps.
 
 _dps_complete_zsh() {
-    local -a flags candidates profiles
+    local -a flags candidates
 
-    case "${words[CURRENT-1]}" in
-        -f) _files -g '*.y(a|)ml'; return ;;
-        -e) _files; return ;;
-        -P)
-            profiles=(${(f)"$(_get_compose_profiles 2>/dev/null)"})
-            (( ${#profiles} )) && compadd -a profiles
-            return ;;
-    esac
+    # No value-taking flags here. dps accepts -a -x -t and the two help forms,
+    # none of which takes an argument. This used to carry -f, -e and -P
+    # branches copied from the compose commands: dead, because the flag list
+    # never offers them and dps rejects them if typed by hand.
 
     if [[ "${words[CURRENT]}" == -* ]]; then
         flags=(-a -x -t -h --help)

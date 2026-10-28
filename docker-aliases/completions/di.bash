@@ -6,7 +6,7 @@ _di_complete_bash() {
     cur="${COMP_WORDS[COMP_CWORD]}"
 
     if [[ "$cur" == -* ]]; then
-        COMPREPLY=( $(compgen -W "-u -d -t -h --help" -- "$cur") )
+        COMPREPLY=( $(compgen -W "-u -d -t -s -h --help" -- "$cur") )
     else
         COMPREPLY=( $(compgen -W "$(_di_candidates 2>/dev/null)" -- "$cur") )
     fi
