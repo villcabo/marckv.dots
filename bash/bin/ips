@@ -7,15 +7,14 @@
 #        ips cable|wifi|vpn mac    just that MAC address, bare
 #
 # Built on `ip` and /sys/class/net alone, so it runs on a server with nothing
-# installed. nmcli or iw (the Wi-Fi name) and docker (a VPN living inside a
-# container) add detail where they exist and are skipped where they do not.
+# installed. nmcli or iw add the Wi-Fi name where they exist, and are skipped
+# where they do not.
 # When NetworkManager randomizes a MAC for a network, the hardware one is shown
 # next to it: that is the one infra asks for in a firewall rule.
 #
 # A script on PATH rather than a function in functions.sh: zsh never loads
 # bash/, and a laptop on zsh should run the same file the servers do.
 
-vpn_container="${VPN_CONTAINER:-openvpn-client}"
 bold=$'\e[1m' dim=$'\e[2m' green=$'\e[32m' cyan=$'\e[36m' reset=$'\e[0m'
 rows=()   # kind|ifname|ip|prefix|mac|details
 
@@ -65,14 +64,6 @@ for path in /sys/class/net/*; do
     fi
     rows+=("$kind|$dev|$ip|$prefix|$mac|$extra")
 done
-
-# The laptop's VPN lives inside a container (its own tun0), not on the host.
-if command -v docker >/dev/null 2>&1 \
-    && [[ "$(docker inspect -f '{{.State.Running}}' "$vpn_container" 2>/dev/null)" == true ]]; then
-    while read -r dev cidr; do
-        rows+=("VPN|$vpn_container/$dev|${cidr%/*}|${cidr#*/}|-|(container)")
-    done < <(docker exec "$vpn_container" ip -o -4 addr show 2>/dev/null | awk '$2 ~ /^tun/ {print $2, $4}')
-fi
 
 # Bare mode: only the IPs (or MACs) of one kind, one per line, no colors.
 if [[ $# -gt 0 ]]; then
