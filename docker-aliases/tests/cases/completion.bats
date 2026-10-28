@@ -186,6 +186,17 @@ load '../helpers/common'
 # Short clusters (`dcd -pi`) and the `--` separator are not flags a completion
 # should offer, so they are dropped rather than special-cased per command.
 
+# Every command, derived from commands/ rather than listed. The first version of
+# these tests named the eleven by hand, so the next command to be added would
+# have escaped the parity check entirely — which is the exact failure the
+# tests exist to prevent, recreated one level up.
+all_commands() {
+    local f
+    for f in "$DA_DIR"/commands/*.sh; do
+        f="${f##*/}"; printf '%s\n' "${f%.sh}"
+    done
+}
+
 flags_of_parser() {   # commands/<x>.sh → one flag per line
     sed -n '/while \[\[ \$# -gt 0 \]\]/,/^[[:space:]]*done/p' "$1" \
         | grep -oE '^[[:space:]]+-[a-zA-Z|-]+\)' \
@@ -209,7 +220,7 @@ flags_of_completion() {   # completions/<x>.{bash,zsh} → one flag per line
     # makes every comparison below pass — which is how the bug it is meant to
     # catch would survive the test written to catch it.
     local cmd n
-    for cmd in dcup dclt dcdown dcx dcd dps dcps dcver dver di dlt; do
+    for cmd in $(all_commands); do
         n=$(flags_of_parser "$DA_DIR/commands/$cmd.sh" | grep -c .)
         [ "$n" -gt 0 ] || { printf 'parser extraction empty: %s\n' "$cmd" >&2; return 1; }
         n=$(flags_of_completion "$DA_DIR/completions/$cmd.bash" | grep -c .)
@@ -221,7 +232,7 @@ flags_of_completion() {   # completions/<x>.{bash,zsh} → one flag per line
 
 @test "every flag the parser accepts is offered by both completions" {
     local cmd missing_bash missing_zsh bad=""
-    for cmd in dcup dclt dcdown dcx dcd dps dcps dcver dver di dlt; do
+    for cmd in $(all_commands); do
         missing_bash=$(LC_ALL=C comm -23 \
             <(flags_of_parser "$DA_DIR/commands/$cmd.sh") \
             <(flags_of_completion "$DA_DIR/completions/$cmd.bash") | tr '\n' ' ')
@@ -239,7 +250,7 @@ flags_of_completion() {   # completions/<x>.{bash,zsh} → one flag per line
     # command refuses. dps completes values for -f, -e and -P, which dps does
     # not accept.
     local cmd extra_bash extra_zsh bad=""
-    for cmd in dcup dclt dcdown dcx dcd dps dcps dcver dver di dlt; do
+    for cmd in $(all_commands); do
         extra_bash=$(LC_ALL=C comm -13 \
             <(flags_of_parser "$DA_DIR/commands/$cmd.sh") \
             <(flags_of_completion "$DA_DIR/completions/$cmd.bash") | tr '\n' ' ')
@@ -254,7 +265,7 @@ flags_of_completion() {   # completions/<x>.{bash,zsh} → one flag per line
 
 @test "bash and zsh completions offer the same flags" {
     local cmd d bad=""
-    for cmd in dcup dclt dcdown dcx dcd dps dcps dcver dver di dlt; do
+    for cmd in $(all_commands); do
         d=$(LC_ALL=C diff \
             <(flags_of_completion "$DA_DIR/completions/$cmd.bash") \
             <(flags_of_completion "$DA_DIR/completions/$cmd.zsh") || true)
@@ -279,7 +290,7 @@ flags_with_values_of_completion() {   # completions/<x>.{bash,zsh} → flags who
     # accepts none of the three. The flag-list tests above cannot see this: the
     # dead branches are in the value-completion case, not in the offered list.
     local cmd extra bad=""
-    for cmd in dcup dclt dcdown dcx dcd dps dcps dcver dver di dlt; do
+    for cmd in $(all_commands); do
         for sh in bash zsh; do
             extra=$(LC_ALL=C comm -13 \
                 <(flags_of_parser "$DA_DIR/commands/$cmd.sh") \
