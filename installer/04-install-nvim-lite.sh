@@ -365,11 +365,44 @@ step_nvim() {
         fi
         warn "No root or sudo, and no working ${BOLD}nvim${NC} on PATH"
         info "Installing for ${BOLD}$(id -un)${NC} only, under ${BOLD}$HOME/.local${NC}"
-        "$INSTALLER_DIR/install-nvim.sh" "${nvim_args[@]}"
-        return $?
+        "$INSTALLER_DIR/install-nvim.sh" "${nvim_args[@]}" || return $?
+        _adopt_nvim_path
+        return 0
     fi
 
-    _run "$INSTALLER_DIR/install-nvim.sh" "${nvim_args[@]}"
+    _run "$INSTALLER_DIR/install-nvim.sh" "${nvim_args[@]}" || return $?
+    _adopt_nvim_path
+}
+
+# Put an already-installed Neovim on PATH, for the rest of THIS run.
+#
+# install-nvim.sh reaches PATH through /etc/profile.d/nvim.sh as root, or a
+# symlink in ~/.local/bin as a user, and neither of those touches a shell that
+# is already running — it tells the user to restart their terminal, which is
+# correct for a human and useless to a script.
+#
+# Called twice on purpose, and both are needed:
+#
+#   at startup — a Neovim installed by an EARLIER run, or by install-nvim.sh
+#   directly, is at /opt/nvim/bin and not on PATH until the next login. Without
+#   this, `./04-install-nvim-lite.sh` right after `sudo ./install-nvim.sh` says
+#   "Neovim is not installed" while the binary sits there.
+#
+#   after step_nvim — the one it just installed, same reason. Measured in a
+#   clean ubuntu:22.04 as root: `--reinstall` printed
+#   "[OK] Neovim installed: NVIM v0.12.6 / Location: /opt/nvim/bin/nvim" and
+#   the config step immediately after failed with "Neovim is not installed",
+#   which stopped sync too — so a fresh machine, the case --reinstall exists
+#   for, could never get past it.
+_adopt_nvim_path() {
+    local d
+    for d in /opt/nvim/bin "$HOME/.local/nvim/bin" "$HOME/.local/bin"; do
+        [[ -x "$d/nvim" ]] || continue
+        case ":$PATH:" in
+            *":$d:"*) ;;
+            *) PATH="$d:$PATH"; export PATH; info "Added ${BOLD}$d${NC} to PATH for this run" ;;
+        esac
+    done
 }
 
 # --- step: config --------------------------------------------------------------
@@ -838,5 +871,9 @@ do_install() {
     echo ""
     success "All requested steps completed."
 }
+
+# Before anything dispatches: a Neovim this script did not install is still a
+# Neovim, and /opt/nvim/bin is not on PATH until the next login.
+_adopt_nvim_path
 
 installer_main "$@"
