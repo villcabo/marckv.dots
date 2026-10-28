@@ -205,7 +205,7 @@ fi
 # ---------------------------------------------------------------------------
 # Repair
 #
-# Two things an earlier copy of this script left behind that installing again
+# Three things an earlier copy of this script left behind that installing again
 # does not undo on its own, so they are corrected on every run.
 # ---------------------------------------------------------------------------
 repair_existing_install() {
@@ -227,7 +227,21 @@ repair_existing_install() {
         fi
     fi
 
-    # 2. Cache files from before the version tag was part of the name. Nothing
+    # 2. A system-wide install owned by someone other than root — what every
+    #    root install made before tar was told --no-same-owner (see the
+    #    extraction below). Reinstalling the same version is skipped, so
+    #    without this the servers already installed would keep it for good.
+    if [ "$INSTALL_SCOPE" = "system" ] && [ -d "$NVIM_PATH" ]; then
+        f=$(find "$NVIM_PATH" ! -user root -print -quit 2>/dev/null)
+        if [ -n "$f" ]; then
+            warn "Existing install has files not owned by root (e.g. $f, uid $(stat -c '%u' "$f"))"
+            chown -R root:root "$NVIM_PATH"
+            success "Ownership repaired: $NVIM_PATH belongs to root again"
+            repaired=true
+        fi
+    fi
+
+    # 3. Cache files from before the version tag was part of the name. Nothing
     #    reads them any more, but an older copy of this script would still
     #    happily install one of them as whatever version it was asked for.
     for f in /tmp/nvim-linux64.tar.gz /tmp/nvim-linux-x86_64.tar.gz; do
@@ -463,7 +477,15 @@ info "Extracting..."
 # --strip-components=1 drops the archive's own top-level directory, whose name
 # changes between releases; it is also the directory tar would otherwise have
 # to invent, and inventing it is what produced the unreachable install.
-tar -C "$stage" --strip-components=1 -xzf "$NVIM_TAR" || die "Failed to extract Neovim"
+#
+# --no-same-owner: as root, tar defaults to KEEPING the owners recorded in the
+# archive, and Neovim's release tarball records uid 1001 — on most machines the
+# second human account. Measured: 2,228 files of /opt/nvim, bin/nvim included,
+# came out owned by 1001. That account could replace the system-wide nvim, and
+# the next `sudo nvim` would run its code as root. The suite never saw it: the
+# user its S2 creates is uid 1001 in a fresh container, so it owned the install
+# it was checking it could reach.
+tar -C "$stage" --strip-components=1 --no-same-owner -xzf "$NVIM_TAR" || die "Failed to extract Neovim"
 [ -f "$stage/bin/nvim" ] || die "Unexpected archive structure: no bin/nvim inside $NVIM_TAR"
 
 # Explicit, not inherited. umask 022 above already gets this right; saying it

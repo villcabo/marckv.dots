@@ -352,11 +352,19 @@ step_nvim() {
         current=$(nvim --version 2>/dev/null | head -n1 | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+')
         target=$("$INSTALLER_DIR/install-nvim.sh" --print-target 2>/dev/null | tail -n1)
 
-        if [[ -n "$current" && "$current" == "$target" ]]; then
+        # Current, unless the system-wide copy is owned by someone other than
+        # root — which every root install made it, before install-nvim.sh
+        # extracted with --no-same-owner. install-nvim.sh repairs that on
+        # every run, but only if it is run, and this early return is what
+        # used to skip it.
+        local foreign=""
+        [[ -d /opt/nvim ]] && foreign=$(find /opt/nvim ! -user root -print -quit 2>/dev/null)
+        if [[ -n "$current" && "$current" == "$target" && -z "$foreign" ]]; then
             success "Neovim $current is already the version this system should have"
             info "Nothing to install — no privileges needed"
             return 0
         fi
+        [[ -n "$foreign" ]] && warn "/opt/nvim has files not owned by root — running install-nvim.sh to repair it"
         if [[ -n "$current" && -n "$target" ]]; then
             info "Neovim ${BOLD}$current${NC} installed, ${BOLD}$target${NC} is available"
         fi
