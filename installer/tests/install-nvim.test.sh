@@ -49,6 +49,13 @@ mode=$(stat -c '%a' /opt/nvim 2>/dev/null)
 [ "$mode" = "755" ] && ok "/opt/nvim is 755 despite umask 027" || bad "/opt/nvim is 755" "got $mode"
 /opt/nvim/bin/nvim --version >/dev/null 2>&1 && ok "the binary starts" || bad "the binary starts"
 printf '       installed: %s\n' "$(/opt/nvim/bin/nvim --version 2>/dev/null | head -1)"
+# Checked HERE, before S2 creates testuser: in a fresh container that account
+# gets uid 1001 — the uid Neovim's tarball records — and from then on a file
+# left owned by 1001 looks like "the test user's", which is how this stayed
+# invisible while S2 reported the install reachable.
+f=$(find /opt/nvim ! -user root -print -quit 2>/dev/null)
+[ -z "$f" ] && ok "every file in /opt/nvim is owned by root" \
+    || bad "every file in /opt/nvim is owned by root" "$f is uid $(stat -c '%u' "$f") — tar kept the archive's owner"
 
 # --- S2: a non-root user can actually use it --------------------------------
 #
@@ -87,6 +94,19 @@ grep -q "Cancelled" /tmp/s4.log && ok "the answer was read (not assumed)" || bad
 grep -q "Permissions repaired" /tmp/s4.log && ok "detects and reports it" || bad "detects and reports it" "$(grep -i perm /tmp/s4.log | head -2)"
 [ "$(stat -c '%a' /opt/nvim)" = "755" ] && ok "leaves it 755 WITHOUT reinstalling" || bad "leaves it 755 without reinstalling" "got $(stat -c '%a' /opt/nvim)"
 su - testuser -c 'nvim --version >/dev/null 2>&1' && ok "the user can run it now" || bad "the user can run it now"
+
+# --- S4b: repair an install whose files belong to someone else --------------
+#
+# Every root install made before --no-same-owner has this, and reinstalling the
+# same version is skipped — so the repair is the only thing that reaches them.
+printf '\nS4b repairs an install owned by uid 1001\n'
+chown -R 1001:1001 /opt/nvim/bin /opt/nvim/share /opt/nvim/lib 2>/dev/null
+[ -n "$(find /opt/nvim ! -user root -print -quit)" ] && printf '       (broken on purpose: owned by 1001)\n'
+answer n "bash $I --version v0.10.3" > /tmp/s4b.log 2>&1
+grep -q "Ownership repaired" /tmp/s4b.log && ok "detects and reports it" || bad "detects and reports it" "$(grep -iE 'owner|repair' /tmp/s4b.log | head -2)"
+f=$(find /opt/nvim ! -user root -print -quit 2>/dev/null)
+[ -z "$f" ] && ok "every file belongs to root again, WITHOUT reinstalling" || bad "every file belongs to root again" "$f"
+su - testuser -c 'nvim --version >/dev/null 2>&1' && ok "the user can still run it" || bad "the user can still run it"
 
 # --- S5: the unversioned cache is cleaned up --------------------------------
 printf '\nS5  removes the old unversioned cache\n'

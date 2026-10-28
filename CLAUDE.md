@@ -10,6 +10,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Installation (run from `installer/`)
 
+`./install.sh` runs the whole setup — 01, 02, 03 and `04 --full` — after one
+preview and one confirmation, passing `-y` to each. It re-implements nothing:
+a change to what a piece installs belongs in that piece's own installer. Its
+`uninstall` uses `confirm_destructive` (it deletes TPM's plugins and Neovim's
+data), so a pipe is a no there; `install` uses plain `confirm`. 05 is not in it.
+
 Core installers — numbered prefixes define execution order. Each supports `install` (default), `status`, and `uninstall`:
 
 ```bash
@@ -23,7 +29,8 @@ Core installers — numbered prefixes define execution order. Each supports `ins
 four scripts that used to do it separately left the user as the orchestrator:
 
 ```bash
-./04-install-nvim-lite.sh --reinstall   # clean, deps, nvim, config, sync — in that order
+./04-install-nvim-lite.sh --full        # deps, nvim, config, sync — in that order
+./04-install-nvim-lite.sh --reinstall   # the same, after clean wipes Neovim's data
 ./04-install-nvim-lite.sh -d -s         # any subset; the flags compose
 ./04-install-nvim-lite.sh status
 ```
@@ -65,11 +72,17 @@ what it leaves behind is reachable by anyone but root:
 
 ```bash
 cd installer/tests
-./run.sh                       # six distros, both scenario files
+./run.sh                       # seven distros, every scenario file
 ./run.sh debian11              # one — the GLIBC 2.31 case
 ```
 
 It writes to `/opt` and `/etc/profile.d`, so it only ever runs in a container.
+
+`oneshot.test.sh` runs `install.sh` the way a person does: as a normal user
+with a sudo password, answering in a terminal, twice, and in copy mode. Its
+checks are the ones made by hand afterwards — the password asked once and
+before step 1, nothing in the user's home owned by root, `nvim` on the PATH of
+the user's next login shell. The image needs `sudo` for it.
 
 `lifecycle.test.sh` runs alongside it and tests the *shape* rather than the
 outcome: that every installer answers `--help`, exits 1 on an unknown flag,
@@ -82,6 +95,17 @@ does not say no: `confirm` sees a non-terminal stdin and assumes yes, so the
 pipe silently became a yes and one scenario went on passing while testing
 nothing. `answer n "bash $I --version v0.10.3"` in `install-nvim.test.sh` gives
 it a pty, and an assertion checks the reply was actually read.
+
+**The answers' stdin must close exactly when the command finishes** — both
+other choices hang, and both were made in `oneshot.test.sh`. Left open after
+the command exits, `script` never exits (40 minutes, after `install.sh` had
+already printed "Cancelled"). Closed before it, `script` spins at full CPU and
+stops relaying the pty, so the command blocks writing to a terminal nobody
+reads. And `script`'s own exit code is 0 whenever the command ends with stdin
+still open. So `as_user_tty` has the command write `$?` to a marker file, holds
+stdin open until that file appears, and reads the code from it. Give every such
+call a timeout sized to what it runs, so a hang fails in a minute and names its
+scenario.
 
 `nvim-lite` has one too, for the same reason — whether a parser can be built at
 all depends on the distro's GLIBC, in two different ways depending on the

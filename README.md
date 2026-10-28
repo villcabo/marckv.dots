@@ -85,7 +85,23 @@ alone — verified, 16 of 16 parsers.
 
 ### 3. Install components
 
-Each script is independent — install only what you need.
+**The whole setup, in one command:**
+
+```bash
+./install.sh                            # bash, docker aliases, tmux, Neovim + nvim-lite
+./install.sh -c                         # same, copying the nvim-lite config (no repo dependency)
+exec bash                               # load it into the shell you ran it from
+```
+
+It shows the plan once, asks once, asks for `sudo` right then rather than
+minutes in, and runs `01`, `02`, `03` and `04-install-nvim-lite.sh --full` in
+that order — no `source` between steps. `./install.sh status` asks each piece
+how it is; `./install.sh uninstall` undoes all of it in reverse, keeping the
+Neovim binary and the system packages. A run that stopped half way is finished
+by running it again: every step skips what is already in place. `05` (atuin)
+is not part of it.
+
+Or one piece at a time — each script is independent:
 
 ```bash
 ./01-install-bash.sh                    # Custom bash config (robbyrussell theme, aliases, functions)
@@ -93,6 +109,7 @@ Each script is independent — install only what you need.
 ./03-install-tmux.sh                    # Tmux config (symlink) + TPM plugin manager
 ./04-install-nvim-lite.sh               # Neovim config — server-focused, minimal (symlink)
 ./04-install-nvim-lite.sh --copy        # Same but copies the directory (no repo dependency)
+./04-install-nvim-lite.sh --full        # Deps, the Neovim binary, the config, plugins — nothing deleted
 ./05-install-atuin.sh                   # Shell history with Ctrl+R search (sync off)
 ```
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Run the installer scenarios across the distro containers.
 #
-#   ./run.sh                 every distro, both cases
+#   ./run.sh                 every distro, every case
 #   ./run.sh debian11        just one distro
 #
 # Uses the repo-root docker-compose.yml, which mounts the repo read-only at
@@ -11,9 +11,9 @@ set -e
 
 TESTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "${TESTS_DIR}/../.." && pwd)"
-CASES="install-nvim.test.sh lifecycle.test.sh"
+CASES="install-nvim.test.sh lifecycle.test.sh oneshot.test.sh"
 
-ALL="debian11 debian12 debian13 ubuntu20 ubuntu22 ubuntu24"
+ALL="debian11 debian12 debian13 ubuntu20 ubuntu22 ubuntu24 ubuntu26"
 TARGETS="${*:-$ALL}"
 
 cd "$REPO_DIR"

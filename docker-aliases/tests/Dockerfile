@@ -17,6 +17,19 @@ ARG BATS_VERSION=1.14.0
 
 ENV DEBIAN_FRONTEND=noninteractive
 
+# Debian 11 is EOL: deb.debian.org still serves bullseye's Release files but has
+# pruned the packages, so every security update 404s mid-install. The archive
+# has them all — same fix, and same comment, as the repo-root Dockerfile.
+RUN . /etc/os-release 2>/dev/null; \
+    if [ "${ID}${VERSION_ID}" = "debian11" ]; then \
+        { \
+          echo 'deb http://archive.debian.org/debian bullseye main'; \
+          echo 'deb http://archive.debian.org/debian bullseye-updates main'; \
+          echo 'deb http://archive.debian.org/debian-security bullseye-security main'; \
+        } > /etc/apt/sources.list; \
+        printf 'Acquire::Check-Valid-Until "false";\n' > /etc/apt/apt.conf.d/99no-check-valid; \
+    fi
+
 # Both shells live in one image on purpose: two images per distro would double
 # the build, the push and the maintenance to test the very same code.
 RUN apt-get update -qq \
