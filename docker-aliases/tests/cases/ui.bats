@@ -204,3 +204,40 @@ uses_tool() {
     run uses_tool procs
     [ -z "$output" ]
 }
+
+# --- table alignment under a byte-counting locale ---------------------------
+#
+# ${#x} counts characters only in a UTF-8 locale. Under C or POSIX — a minimal
+# Debian with no locale configured, an ssh that does not forward LANG, these
+# very containers — it counts bytes, and every "—" in a cell (3 bytes) stole
+# two columns of padding from dps, di, dip, dnet, dvol and dprj. Nothing caught
+# it because no test ever looked at the alignment of a row holding a dash.
+
+render_in_locale() {
+    LC_ALL="$1" "$DA_SHELL" -c "
+        source '$INIT'
+        _render_container_table t 2 2 '' A B C D E F \
+            \$'—\tb\tc\td\te\tf\nxxxxxxxxxxxx\tb\tc\td\te\tf\n3001→3000\tb\tc\td\te\tf' \
+            white,white,white,white,white,white" 2>/dev/null | strip_ansi
+}
+
+@test "table pads a dash by characters under a byte-counting locale" {
+    # Column one is 12 wide, so "—" takes 11 spaces plus the 2-space gap.
+    run render_in_locale C
+    [[ "$output" == *"—             b  c"* ]]
+    [[ "$output" == *"xxxxxxxxxxxx  b  c"* ]]
+}
+
+@test "table pads an arrow by characters under a byte-counting locale" {
+    # The arrow must NOT be the widest cell: the first version of this test
+    # made it the widest, so it was never padded and passed with the bug in.
+    run render_in_locale C
+    [[ "$output" == *"3001→3000     b  c"* ]]
+}
+
+@test "table output is the same under C and UTF-8 locales" {
+    local c u
+    c=$(render_in_locale C)
+    u=$(render_in_locale C.UTF-8)
+    [ "$c" = "$u" ]
+}

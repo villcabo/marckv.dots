@@ -72,9 +72,20 @@ _DA_SP="                                                                        
 # BYTES and zsh by characters, so a port rendered "3001→3000" (9 characters,
 # 11 bytes) lands two columns short in bash and correct in zsh. Every mapped
 # port and every health glyph is multibyte, so that is most of a real table.
+#
+# And the character count is only a character count in a UTF-8 locale. Under
+# C or POSIX — a minimal Debian with no locale configured, an ssh that does not
+# forward LANG, the test containers — ${#x} counts BYTES in both shells, and
+# every "—" in a cell stole two columns of padding. So when the shell is
+# counting bytes, the UTF-8 continuation bytes (0x80–0xBF) are dropped before
+# measuring: what is left is one byte per character. Decided live on every
+# call, from _DA_MB, so a locale changed mid-session is honoured.
+_DA_MB=$'\xe2\x80\x94'
+
 _pad_into() {
-    local _t="$1" _w="$2" _n
-    _n=$(( _w - ${#_t} ))
+    local _t="$1" _w="$2" _n _m="$1"
+    (( ${#_DA_MB} > 1 )) && _m="${_m//[$'\x80'-$'\xbf']/}"
+    _n=$(( _w - ${#_m} ))
     while (( _n > ${#_DA_SP} )); do _DA_SP="${_DA_SP}${_DA_SP}"; done
     if (( _n > 0 )); then _DA_R="${_t}${_DA_SP:0:_n}"; else _DA_R="$_t"; fi
 }
@@ -583,15 +594,22 @@ _render_container_table() {
     local c1 c2 c3 c4 c5 c6
     local w1=${#h1} w2=${#h2} w3=${#h3} w4=${#h4} w5=${#h5}
 
-    if [[ -n "$rows" ]]; then
+    # Widths are measured on a copy with the UTF-8 continuation bytes dropped
+    # when the locale counts bytes (see _pad_into) — one substitution for the
+    # whole table, not one per cell. In a UTF-8 locale it is not even made.
+    local _mrows="$rows"
+    (( ${#_DA_MB} > 1 )) && _mrows="${rows//[$'\x80'-$'\xbf']/}"
+
+    if [[ -n "$_mrows" ]]; then
         while IFS=$'\t' read -r c1 c2 c3 c4 c5 c6 || [[ -n "$c1" ]]; do
+
             [[ -z "$c1" ]] && continue
             (( ${#c1} > w1 )) && w1=${#c1}
             (( ${#c2} > w2 )) && w2=${#c2}
             (( ${#c3} > w3 )) && w3=${#c3}
             (( ${#c4} > w4 )) && w4=${#c4}
             (( ${#c5} > w5 )) && w5=${#c5}
-        done <<< "$rows"
+        done <<< "$_mrows"
     fi
 
     # Scope line instead of a preview block: for a command whose whole output is
