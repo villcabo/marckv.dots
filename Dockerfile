@@ -3,24 +3,36 @@ FROM ${BASE_IMAGE}
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Debian 10 is EOL: deb.debian.org no longer serves buster at all, and its
-# Release files are past their validity date. Without both of these, every
-# apt-get here fails with "does not have a Release file".
-# Debian 10 is EOL: deb.debian.org no longer serves buster at all, and what is
-# left in the archive is past its Release validity date.
+# Debian 10 and 11 are EOL, and apt fails on both without the archive.
 #
-# The security archive is not optional here. Without it, `apt-get update`
-# succeeds and `libc6-dev` then fails with "held broken packages": the base
-# image already carries libc6 2.28-10+deb10u3, and the main archive only offers
-# libc6-dev …u1. The matching …u4 lives in buster/updates.
+# Debian 10: deb.debian.org no longer serves buster at all, and what is left in
+# the archive is past its Release validity date. The security archive is not
+# optional: without it `apt-get update` succeeds and `libc6-dev` then fails
+# with "held broken packages" — the base image carries libc6 2.28-10+deb10u3,
+# the main archive only offers libc6-dev …u1, and …u4 lives in buster/updates.
+#
+# Debian 11: measured 2026-10-28, deb.debian.org still serves bullseye's
+# Release files but has pruned the packages they point to — every security
+# update 404s (perl …deb11u5, openssl, curl). archive.debian.org has all of
+# them. The failure is the confusing kind: `apt-get update` succeeds and the
+# install dies on 404s, so the error does not say "EOL".
 RUN . /etc/os-release 2>/dev/null; \
-    if [ "${ID}${VERSION_ID}" = "debian10" ]; then \
+    case "${ID}${VERSION_ID}" in \
+      debian10) \
         { \
           echo 'deb http://archive.debian.org/debian buster main contrib non-free'; \
           echo 'deb http://archive.debian.org/debian-security buster/updates main contrib non-free'; \
-        } > /etc/apt/sources.list; \
-        printf 'Acquire::Check-Valid-Until "false";\n' > /etc/apt/apt.conf.d/99no-check-valid; \
-    fi
+        } > /etc/apt/sources.list ;; \
+      debian11) \
+        { \
+          echo 'deb http://archive.debian.org/debian bullseye main'; \
+          echo 'deb http://archive.debian.org/debian bullseye-updates main'; \
+          echo 'deb http://archive.debian.org/debian-security bullseye-security main'; \
+        } > /etc/apt/sources.list ;; \
+    esac; \
+    case "${ID}${VERSION_ID}" in debian10|debian11) \
+        printf 'Acquire::Check-Valid-Until "false";\n' > /etc/apt/apt.conf.d/99no-check-valid ;; \
+    esac
 
 RUN apt-get update -qq \
     && apt-get install -y -qq --no-install-recommends \
