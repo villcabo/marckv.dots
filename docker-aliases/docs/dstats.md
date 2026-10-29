@@ -36,21 +36,33 @@ nothing in docker's output says so. `dstats` shows `50.7% / 50%`, in red.
 
 ```
   docker stats  ·  33 of 33
-  CPU           MEM                PIDS    NET I/O          DISK I/O         NAME
-  52.33% / 50%  576KiB / 64MiB     2 / 50  16.4kB / 126B    0B / 0B          dxprobe-lim
-  1.28%         707.4MiB / 2GiB    117     1.89MB / 126B    810MB / 2.17GB   crossborder-kafka
-  0.10% / 50%   178.6MiB / 256MiB  18      183kB / 5.07MB   69.9MB / 24MB    nginx-api-ws-vector-1
-  0.00%         41.91MiB / ∞       7       20.2MB / 40.7MB  49MB / 60.8MB    nginx-api-ws-echo-integrado-1
-  35 shown use 2.9GB of memory (host: 32.3GB) · CPU 162.72% of 1400% (14 cores)
+  CPU           MEM               PIDS      NET I/O          DISK I/O         NAME
+  52.33% / 50%   576KiB /  64MiB    2 / 50  16.4kB /   126B      0B /     0B  dxprobe-lim
+   1.28%         707MiB /   2GiB  117        1.9MB /   126B   810MB /  2.2GB  crossborder-kafka
+   0.10% / 50%   179MiB / 256MiB   18        183kB /  5.1MB  69.9MB / 24.0MB  nginx-api-ws-vector-1
+   0.00%        41.9MiB /      ∞    7       20.2MB / 40.7MB  49.0MB / 60.8MB  nginx-api-ws-echo-integrado-1
+  35 shown use 2.7GiB of memory (host: 30.1GiB) · CPU 162.72% of 1400% (14 cores)
   [!] 11 with no memory limit — nothing stops one of them from taking the host's RAM
 ```
 
 | Column | Shows | Colour |
 |---|---|---|
 | `CPU` | usage, and ` / ceiling` when `--cpus` (or a CPU quota) is set | of the ceiling: red ≥ 90%, yellow ≥ 70%. No limit: yellow past one whole core |
-| `MEM` | used / limit, or `/ ∞` when there is none | of the limit: red ≥ 90%, yellow ≥ 70%. `∞`: always yellow |
+| `MEM` | used / limit, or `/ ∞` when there is none | of the limit: red ≥ 90%, yellow ≥ 70%. `∞`: yellow |
 | `PIDS` | processes, and ` / limit` when `--pids-limit` is set | of the limit, same thresholds |
-| `NET I/O`, `DISK I/O` | totals since the container started | none — a total is not a pressure |
+| `NET I/O`, `DISK I/O` | in / out — read / write — since the container started | dim: a total is not a pressure |
+
+**Every figure lines up.** docker prints memory with whatever precision fits
+(`33.1MiB`, `30.07MiB`, `8.184MiB`), so `dstats` re-formats every number to one
+precision — memory in binary units, one decimal, none from 100 up; a limit
+without a decimal when it is round — and right-aligns each half of every
+`used / limit` pair against the widest one in its column. The ` / ` sits in the
+same place on every row. Widths are measured by what the terminal shows, not by
+bytes, so `∞` does not throw a row off under a C locale.
+
+**Colour means "look here".** An ordinary figure is printed plain; only what is
+near a limit, past a core, or unbounded is coloured. Painting every value made
+the one that mattered impossible to spot.
 
 **Rows near a limit come first**, then by memory used. Memory is what gets a
 container killed; a single CPU sample is too spiky to rank by.

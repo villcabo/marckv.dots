@@ -467,13 +467,14 @@ case "\$1" in
         #   fx-api     48% under --cpus 0.5        -> at its CPU ceiling, red
         #   fx-db      no memory limit, 120% CPU   -> "∞", more than a core
         #   other-api  240MiB/256MiB, 95/100 pids  -> near two limits, red
-        #   dav2-fixture-basic-*  fixtures/basic's project, worker scaled to 2
+        #   dav2-fixture-basic-*  fixtures/basic's project, worker scaled to 2;
+        #                         worker-2 in docker's own odd precision (30.07MiB)
         printf 'fx-api\t48.00%%\t150MiB / 256MiB\t1.2MB / 3.4MB\t10MB / 2MB\t12\n'
         printf 'fx-db\t120.50%%\t1.5GiB / 15.5GiB\t5MB / 1MB\t900MB / 2GB\t40\n'
         printf 'other-api\t2.00%%\t240MiB / 256MiB\t2kB / 1kB\t0B / 0B\t95\n'
         printf 'dav2-fixture-basic-api-1\t0.50%%\t20MiB / 15.5GiB\t1kB / 0B\t0B / 0B\t3\n'
         printf 'dav2-fixture-basic-worker-1\t0.10%%\t30MiB / 512MiB\t1kB / 0B\t0B / 0B\t2\n'
-        printf 'dav2-fixture-basic-worker-2\t0.10%%\t31MiB / 512MiB\t1kB / 0B\t0B / 0B\t2\n'
+        printf 'dav2-fixture-basic-worker-2\t0.10%%\t30.07MiB / 512MiB\t1kB / 0B\t0B / 0B\t2\n'
         exit 0 ;;
     info)
         printf '8\t16000000000\n'

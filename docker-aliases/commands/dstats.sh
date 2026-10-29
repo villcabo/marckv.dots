@@ -61,7 +61,8 @@ _dstats_reading_help() {
     printf "  ${CB}MEM${CR}   used / limit. ${CYE}∞${CR} means no limit — docker's own MEM %% divides by\n"
     printf "        the host's RAM then, and makes an unbounded container look calm.\n"
     printf "  ${CB}PIDS${CR}  processes / limit, when there is one.\n"
-    printf "  ${CI}Red at 90%% of a limit, yellow at 70%%. Rows near a limit come first.${CR}\n\n"
+    printf "  ${CI}Red at 90%% of a limit, yellow at 70%%; anything else is left plain.${CR}\n"
+    printf "  ${CI}Rows near a limit come first.${CR}\n\n"
 }
 
 # ---------------------------------------------------------------------------
@@ -90,12 +91,55 @@ _dstats_level_into() {
     fi
 }
 
+# _dstats_ibytes_into <bytes> [exact] → "912.9MiB", "1.5GiB", "114MiB"
+#
+# One format for every figure in a column, so the column lines up. docker
+# prints memory with whatever precision it likes — "33.1MiB", "30.07MiB",
+# "8.184MiB" — and that alone kept the " / " from sitting in one place. Binary
+# units, as docker's memory figures are; one decimal, none from 100 up, the
+# same rule as _human_bytes_into. "exact" drops the decimal whenever there is
+# none to show, for limits, which are set in round numbers: "512MiB", "1GiB".
+_dstats_ibytes_into() {
+    local b="${1:-0}" exact="${2:-}" unit div t
+    if   (( b >= 1073741824 )); then div=1073741824; unit=GiB
+    elif (( b >= 1048576 ));    then div=1048576;    unit=MiB
+    elif (( b >= 1024 ));       then div=1024;       unit=KiB
+    else _DA_R="${b}B"; return 0
+    fi
+    if [[ -n "$exact" ]] && (( b % div == 0 )); then _DA_R="$(( b / div ))$unit"; return 0; fi
+    t=$(( (b * 10 + div / 2) / div ))
+    if (( t >= 1000 )); then _DA_R="$(( t / 10 ))$unit"
+    else _DA_R="$(( t / 10 )).$(( t % 10 ))$unit"; fi
+}
+
+# _dstats_width_into <text> → its display width, not its byte count. "∞" is
+# three bytes; under a C locale ${#x} counts all three (see _pad_into).
+_dstats_width_into() {
+    local m="$1"
+    (( ${#_DA_MB} > 1 )) && m="${m//[$'\x80'-$'\xbf']/}"
+    _DA_R=${#m}
+}
+
+# _dstats_rjust_into <text> <width> → the text right-aligned to that width
+_dstats_rjust_into() {
+    local t="$1" w="$2" n
+    _dstats_width_into "$t"; n=$(( w - _DA_R ))
+    while (( n > ${#_DA_SP} )); do _DA_SP="${_DA_SP}${_DA_SP}"; done
+    # $n, not a bare n: zsh reads ${x:0:n} as the history modifier :n and aborts.
+    if (( n > 0 )); then _DA_R="${_DA_SP:0:$n}${t}"; else _DA_R="$t"; fi
+}
+
 # ---------------------------------------------------------------------------
 # Cell colours — each parses its own cell, so the table stays generic
+#
+# Colour means "look here", so a figure with nothing to say gets none. Every
+# colour this library has is bold, and the first version painted ordinary
+# values bold white: on a screen where every MEM cell was highlighted, the one
+# near its limit did not stand out.
 # ---------------------------------------------------------------------------
 
 _level_color_into() {
-    case "$1" in 2) _DA_R="$CRE" ;; 1) _DA_R="$CYE" ;; *) _DA_R="$CWH" ;; esac
+    case "$1" in 2) _DA_R="$CRE" ;; 1) _DA_R="$CYE" ;; *) _DA_R="" ;; esac
 }
 
 # "50.7% / 50%"  or  "0.32%"
@@ -108,7 +152,7 @@ _stcpu_color_into() {
     else
         # No limit: worth a look only past a whole core.
         _dstats_hundredths_into "$cell"
-        if (( _DA_R >= 10000 )); then _DA_R="$CYE"; else _DA_R="$CDIM"; fi
+        if (( _DA_R >= 10000 )); then _DA_R="$CYE"; else _DA_R=""; fi
     fi
 }
 
@@ -116,7 +160,7 @@ _stcpu_color_into() {
 _stmem_color_into() {
     local cell="$1" u l
     case "$cell" in
-        *"∞") _DA_R="$CYE"; return 0 ;;
+        *"∞"*) _DA_R="$CYE"; return 0 ;;
     esac
     _bytes_of_into "${cell%% / *}"; u="$_DA_R"
     _bytes_of_into "${cell##* / }"; l="$_DA_R"
@@ -129,13 +173,73 @@ _stpids_color_into() {
     if [[ "$cell" == *" / "* ]]; then
         _dstats_level_into "${cell%% / *}" "${cell##* / }"; _level_color_into "$_DA_R"
     else
-        _DA_R="$CDIM"
+        _DA_R=""
     fi
 }
 
 # ---------------------------------------------------------------------------
 # The core: collect, join, render — shared by dstats and dcstats
 # ---------------------------------------------------------------------------
+
+# _dstats_align_into <sorted rows> → the table's rows, every figure aligned
+#
+# Rows arrive as "flag<TAB>bytes<TAB>cpu<US>lim<TAB>mem<US>lim<TAB>pids<US>lim
+# <TAB>rx<US>tx<TAB>read<US>write<TAB>name". Two passes: the first measures the
+# widest half of every pair across all rows, the second right-aligns each half
+# to it, so every " / " in a column sits in the same place and the digits line
+# up under each other. A pair with no limit (CPU, PIDS) shows the used half
+# alone, aligned with the others.
+_dstats_align_into() {
+    local sorted="$1" line rest tab=$'\t' nl=$'\n' us=$'\x1f' out="" f a b
+    local wa wb i cells name
+    # Pass 1: widths. Ten plain variables rather than an array: this file runs
+    # in bash and zsh, whose arrays start at 0 and 1.
+    local w1a=0 w1b=0 w2a=0 w2b=0 w3a=0 w3b=0 w4a=0 w4b=0 w5a=0 w5b=0
+    while IFS= read -r line; do
+        [[ -z "$line" ]] && continue
+        rest="${line#*"$tab"}"; rest="${rest#*"$tab"}"
+        i=0
+        while (( i < 5 )); do
+            i=$(( i + 1 ))
+            f="${rest%%"$tab"*}"; rest="${rest#*"$tab"}"
+            a="${f%%"$us"*}"; b="${f#*"$us"}"
+            _dstats_width_into "$a"; wa=$_DA_R
+            _dstats_width_into "$b"; wb=$_DA_R
+            case $i in
+                1) (( wa > w1a )) && w1a=$wa; (( wb > w1b )) && w1b=$wb ;;
+                2) (( wa > w2a )) && w2a=$wa; (( wb > w2b )) && w2b=$wb ;;
+                3) (( wa > w3a )) && w3a=$wa; (( wb > w3b )) && w3b=$wb ;;
+                4) (( wa > w4a )) && w4a=$wa; (( wb > w4b )) && w4b=$wb ;;
+                5) (( wa > w5a )) && w5a=$wa; (( wb > w5b )) && w5b=$wb ;;
+            esac
+        done
+    done <<< "$sorted"
+
+    # Pass 2: build the cells.
+    while IFS= read -r line; do
+        [[ -z "$line" ]] && continue
+        rest="${line#*"$tab"}"; rest="${rest#*"$tab"}"
+        cells=""
+        i=0
+        while (( i < 5 )); do
+            i=$(( i + 1 ))
+            f="${rest%%"$tab"*}"; rest="${rest#*"$tab"}"
+            a="${f%%"$us"*}"; b="${f#*"$us"}"
+            case $i in
+                1) wa=$w1a; wb=$w1b ;; 2) wa=$w2a; wb=$w2b ;; 3) wa=$w3a; wb=$w3b ;;
+                4) wa=$w4a; wb=$w4b ;; 5) wa=$w5a; wb=$w5b ;;
+            esac
+            _dstats_rjust_into "$a" "$wa"; a="$_DA_R"
+            if [[ -n "$b" ]]; then
+                _dstats_rjust_into "$b" "$wb"; a="$a / $_DA_R"
+            fi
+            cells+="${a}${tab}"
+        done
+        name="$rest"
+        out+="${cells}${name}${nl}"
+    done <<< "$sorted"
+    _DA_R="${out%"$nl"}"
+}
 
 # _dstats_table <title> <mode> <pattern> [project]
 #   mode "host":    every running container, named by container
@@ -145,7 +249,8 @@ _dstats_table() {
     local tab=$'\t' nl=$'\n' line rest raw lim info
     local name cpu memu net blk pids memused memlim
     local mem nanocpu quota period pidslim proj svc num
-    local cpucell memcell pidscell label risk mb u l shown=0 total=0 unlimited=0
+    local cpul meml pidsl label risk mb u l shown=0 total=0 unlimited=0
+    local us=$'\x1f' memu_f rx tx br bw
     local sum_mem=0 sum_cpu=0 ncpu="" memtotal="" rowsort="" rows="" sorted
     local -a names
     typeset -A l_mem l_cpu l_quota l_period l_pids l_proj l_svc l_num
@@ -223,61 +328,68 @@ _dstats_table() {
         if (( nanocpu > 0 )); then l=$(( nanocpu / 100000 ))       # hundredths of a percent
         elif (( quota > 0 )); then l=$(( quota * 10000 / period ))
         fi
+        cpul=""
         if (( l > 0 )); then
-            cpucell="$cpu / $(( l / 100 ))%"
+            cpul="$(( l / 100 ))%"
             _dstats_level_into "$u" "$l"; (( _DA_R > risk )) && risk=$_DA_R
-        else
-            cpucell="$cpu"
         fi
 
-        # --- memory: docker's own strings; ∞ when there is no limit ---------
-        memused="${memu%% / *}"; memlim="${memu##* / }"
+        # --- memory: re-formatted, not docker's strings; ∞ with no limit -----
+        memused="${memu%% / *}"
         _bytes_of_into "$memused"; mb="$_DA_R"
         sum_mem=$(( sum_mem + mb ))
+        _dstats_ibytes_into "$mb"; memu_f="$_DA_R"
         mem="${l_mem[$name]:-0}"; [[ "$mem" =~ ^[0-9]+$ ]] || mem=0
         if (( mem > 0 )); then
-            memcell="$memused / $memlim"
+            _dstats_ibytes_into "$mem" exact; meml="$_DA_R"
             _dstats_level_into "$mb" "$mem"; (( _DA_R > risk )) && risk=$_DA_R
         else
-            memcell="$memused / ∞"
+            meml="∞"
             unlimited=$(( unlimited + 1 ))
         fi
 
         # --- pids ------------------------------------------------------------
         pidslim="${l_pids[$name]:-}"
+        pidsl=""
         if [[ "$pidslim" =~ ^[0-9]+$ ]] && (( pidslim > 0 )); then
-            pidscell="$pids / $pidslim"
+            pidsl="$pidslim"
             _dstats_level_into "$pids" "$pidslim"; (( _DA_R > risk )) && risk=$_DA_R
-        else
-            pidscell="$pids"
         fi
+
+        # --- network and disk: totals, re-formatted the same way -------------
+        _bytes_of_into "${net%% / *}"; _human_bytes_into "$_DA_R"; rx="$_DA_R"
+        _bytes_of_into "${net##* / }"; _human_bytes_into "$_DA_R"; tx="$_DA_R"
+        _bytes_of_into "${blk%% / *}"; _human_bytes_into "$_DA_R"; br="$_DA_R"
+        _bytes_of_into "${blk##* / }"; _human_bytes_into "$_DA_R"; bw="$_DA_R"
 
         shown=$(( shown + 1 ))
         # Sort key: near a limit (red) first, then memory used, descending.
-        rowsort+="$(( risk == 2 ? 1 : 0 ))${tab}${mb}${tab}${cpucell}${tab}${memcell}${tab}${pidscell}${tab}${net}${tab}${blk}${tab}${label}${nl}"
+        # Each figure travels as its two halves — used and limit, in and out —
+        # joined by \x1f, because the widths that line them up can only be
+        # known once every row is in.
+        rowsort+="$(( risk == 2 ? 1 : 0 ))${tab}${mb}${tab}${cpu}${us}${cpul}${tab}${memu_f}${us}${meml}${tab}${pids}${us}${pidsl}${tab}${rx}${us}${tx}${tab}${br}${us}${bw}${tab}${label}${nl}"
     done <<< "$raw"
 
     if [[ -n "$rowsort" ]]; then
         sorted=$(printf '%s' "$rowsort" | LC_ALL=C sort -t "$tab" -k1,1nr -k2,2nr)
-        while IFS= read -r line; do
-            [[ -z "$line" ]] && continue
-            line="${line#*"$tab"}"; rows+="${line#*"$tab"}$nl"
-        done <<< "$sorted"
+        _dstats_align_into "$sorted"; rows="$_DA_R"
     fi
 
     local namehdr="NAME"
+    local memsum hostmem
     [[ "$mode" == "project" ]] && namehdr="SERVICE"
     _render_container_table "$title" "$shown" "$total" "$pattern" \
-        "CPU" "MEM" "PIDS" "NET I/O" "DISK I/O" "$namehdr" "${rows%"$nl"}" \
+        "CPU" "MEM" "PIDS" "NET I/O" "DISK I/O" "$namehdr" "$rows" \
         "@stcpu,@stmem,@stpids,dim,dim,white"
 
     # --- the footer: the host, and what has no ceiling ----------------------
-    local memsum hostmem
-    _human_bytes_into "$sum_mem"; memsum="$_DA_R"
+    # Binary units, like the MEM column above it: the first version said "GB"
+    # under a column of "MiB".
+    _dstats_ibytes_into "$sum_mem"; memsum="$_DA_R"
     {
         printf "  ${CDIM}%s shown use${CR} %s ${CDIM}of memory" "$shown" "$memsum"
         if [[ "$memtotal" =~ ^[0-9]+$ ]]; then
-            _human_bytes_into "$memtotal"; hostmem="$_DA_R"
+            _dstats_ibytes_into "$memtotal"; hostmem="$_DA_R"
             printf " (host: %s)" "$hostmem"
         fi
         printf " · CPU %d.%02d%%" $(( sum_cpu / 100 )) $(( sum_cpu % 100 ))

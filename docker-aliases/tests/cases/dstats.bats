@@ -111,11 +111,75 @@ load '../helpers/common'
     [ "$output" = "5070 300" ]
 }
 
+# --- alignment ------------------------------------------------------------------
+#
+# What the first version got wrong, and what was visible at a glance: docker
+# prints "33.1MiB", "30.07MiB", "8.184MiB", the cells were its strings, and the
+# " / " wandered from row to row.
+
+@test "dstats puts every MEM ' / ' in the same column" {
+    run out_of "$WORK" 'dstats'
+    local cols
+    cols=$(printf '%s\n' "$output" | sed -n '3,$p' | awk '{ i = index($0, "iB / "); print i }' | sort -u | wc -l)
+    [ "$cols" = "1" ]
+}
+
+@test "dstats right-aligns CPU so the percent signs line up" {
+    run out_of "$WORK" 'dstats'
+    local cols
+    cols=$(printf '%s\n' "$output" | sed -n '3,$p' | awk '{ print index($0, "%") }' | sort -u | wc -l)
+    [ "$cols" = "1" ]
+}
+
+@test "dstats shows memory in one precision, not docker's" {
+    # worker-2 comes from docker as "30.07MiB". Right-alignment alone would
+    # still line up the " / " — this is what catches the raw string coming back.
+    run out_of "$WORK" 'dstats'
+    [[ "$output" == *"30.1MiB / 512MiB"* ]]
+    [[ "$output" != *"30.07MiB"* ]]
+}
+
+@test "dstats re-formats memory instead of echoing docker's precision" {
+    run lib_call "$WORK" 'for b in 8581545 1610612736 157286400 512; do _dstats_ibytes_into $b; printf "%s " "$_DA_R"; done'
+    [ "$output" = "8.2MiB 1.5GiB 150MiB 512B " ]
+}
+
+@test "dstats shows a round limit without a decimal" {
+    run lib_call "$WORK" 'for b in 536870912 1073741824 1610612736; do _dstats_ibytes_into $b exact; printf "%s " "$_DA_R"; done'
+    [ "$output" = "512MiB 1GiB 1.5GiB " ]
+}
+
+@test "dstats measures alignment by display width, not bytes" {
+    # "∞" is three bytes; under a C locale ${#x} counts all three.
+    run lib_call "$WORK" '_dstats_rjust_into "∞" 4; printf "[%s]" "$_DA_R"'
+    [ "$output" = "[   ∞]" ]
+}
+
+# --- colour: only what needs a look --------------------------------------------
+
+@test "dstats leaves an ordinary figure uncoloured" {
+    # Every colour here is bold. Painting ordinary values bold white made the
+    # one near its limit impossible to spot among them.
+    run lib_call "$WORK" '_stmem_color_into " 20.0MiB / 512MiB"; a=$_DA_R; _stcpu_color_into " 0.50%"; b=$_DA_R; _stpids_color_into " 3"; [[ -z "$a$b$_DA_R" ]] && echo plain'
+    [ "$output" = "plain" ]
+}
+
+@test "dstats colours a padded cell the same as a bare one" {
+    run lib_call "$WORK" '_stmem_color_into " 240MiB / 256MiB"; [[ "$_DA_R" == "$CRE" ]] && echo red'
+    [ "$output" = "red" ]
+}
+
 # --- footer ---------------------------------------------------------------------
 
 @test "dstats counts the containers with no memory limit" {
     run err_of "$WORK" 'dstats'
     [[ "$output" == *"2 with no memory limit"* ]]
+}
+
+@test "dstats sums memory in the same binary units as the table" {
+    # 150 + 1536 + 240 + 20 + 30 + 30.07 ≈ 2006MiB; the host has 16e9 bytes.
+    run err_of "$WORK" 'dstats'
+    [[ "$output" == *"use 2.0GiB of memory (host: 14.9GiB)"* ]]
 }
 
 @test "dstats sums CPU against the host's cores" {
