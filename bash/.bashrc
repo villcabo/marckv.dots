@@ -31,6 +31,9 @@ source "$BASH_MODULES_DIR/functions.sh"
 # Load interactive help
 source "$BASH_MODULES_DIR/help.sh"
 
+# Load marckv: update, reload, help, status... for this repo
+source "$BASH_MODULES_DIR/marckv.sh"
+
 # Load theme (robbyrussell by default, can be changed with BASH_THEME)
 BASH_THEME=${BASH_THEME:-robbyrussell}
 if [[ -f "$BASH_MODULES_DIR/themes/${BASH_THEME}.sh" ]]; then

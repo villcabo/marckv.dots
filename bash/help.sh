@@ -1,8 +1,8 @@
 #!/bin/bash
 # Interactive help for marckv.dots bash configuration
-# Command: bashhelp [category]
+# Command: marckv help [category]  (dispatched from bash/marckv.sh)
 
-bashhelp() {
+_marckv_help() {
     local R="${RED:-\033[0;31m}"
     local G="${GREEN:-\033[0;32m}"
     local Y="${YELLOW:-\033[1;33m}"
@@ -42,7 +42,7 @@ bashhelp() {
         echo -e "\n${BO}${C}╔══════════════════════════════════════════════════════╗${RE}"
         echo -e "${BO}${C}║          marckv.dots — Command Reference             ║${RE}"
         echo -e "${BO}${C}╚══════════════════════════════════════════════════════╝${RE}"
-        echo -e "\n  ${W}Usage:${RE} ${BO}${G}bashhelp${RE} ${Y}[category]${RE}\n"
+        echo -e "\n  ${W}Usage:${RE} ${BO}${G}marckv help${RE} ${Y}[category]${RE}\n"
         echo -e "  ${BO}${C}Available categories:${RE}"
         printf "  ${BO}${G}%-18s${RE}${W}%s${RE}\n" "nav"       "Directory navigation"
         printf "  ${BO}${G}%-18s${RE}${W}%s${RE}\n" "git"       "Git aliases"
@@ -56,7 +56,7 @@ bashhelp() {
         printf "  ${BO}${G}%-18s${RE}${W}%s${RE}\n" "shell"     "Shell configuration"
         printf "  ${BO}${G}%-18s${RE}${W}%s${RE}\n" "security"  "Server security"
         printf "  ${BO}${G}%-18s${RE}${W}%s${RE}\n" "docker"    "Docker and Docker Compose aliases"
-        echo -e "\n  ${Y}↳ Example:${RE} ${G}bashhelp services${RE}"
+        echo -e "\n  ${Y}↳ Example:${RE} ${G}marckv help services${RE}"
         echo ""
         return 0
     fi
@@ -186,10 +186,15 @@ bashhelp() {
     # ════════════════════════════════════════════════════════════════════════
     shell)
         _h_header "Shell Configuration"
-        _h_cmd "dotsupdate"        "Pull latest marckv.dots changes and reload bash"
-        _h_cmd "reloadbash"        "Reload bash config without closing the session"
+        _h_section "marckv — this repo"
+        _h_cmd "marckv update"     "Pull the repo; reload bash if anything changed"
+        _h_cmd "marckv reload"     "Reload bash config without closing the session"
+        _h_cmd "marckv help [cat]" "This help; pass a category for details"   "marckv help services"
+        _h_cmd "marckv status"     "Repo state and what each installer reports"
+        _h_cmd "marckv doctor"     "Check the tools and settings this setup relies on"
+        _h_cmd "marckv"            "Every subcommand: cd, version, whatsnew, install"
+        _h_section "History"
         _h_cmd "clearhistory"      "Clear history for the current session"
-        _h_cmd "bashhelp [cat]"    "This help; pass a category for details"   "bashhelp services"
         _h_section "Active settings"
         _h_cmd "histappend"        "History is always appended, never overwritten"
         _h_cmd "checkjobs"         "Warns before exit if background jobs are running"
@@ -269,7 +274,7 @@ bashhelp() {
 
     *)
         echo -e "  ${R}Unknown category:${RE} ${BO}'${category}'${RE}"
-        echo -e "  Run ${BO}${G}bashhelp${RE} to see available categories."
+        echo -e "  Run ${BO}${G}marckv help${RE} to see available categories."
         return 1
         ;;
     esac
