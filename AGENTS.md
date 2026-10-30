@@ -1,6 +1,9 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for coding agents working in this repository. It is the only
+instructions file on purpose: Claude Code reads `AGENTS.md` directly since
+v2.1.277, but only when no `CLAUDE.md`, `.claude/CLAUDE.md` or `CLAUDE.local.md`
+exists here or above — adding one silently stops it from reading this file.
 
 ## Project Overview
 
@@ -23,6 +26,7 @@ Core installers — numbered prefixes define execution order. Each supports `ins
 ./02-install-docker-aliases.sh          # Docker & Compose shortcuts (bash + zsh)
 ./03-install-tmux.sh                    # Tmux config (symlink) + TPM
 ./04-install-nvim-lite.sh [--copy]      # Server-focused Neovim config (symlink, or copy)
+./05-install-atuin.sh                   # atuin shell history — optional, not in install.sh
 ```
 
 `04-install-nvim-lite.sh` also orchestrates the whole Neovim stack, because the
@@ -113,7 +117,7 @@ Neovim version:
 
 ```bash
 cd nvim-lite/tests
-./run.sh                       # six distros
+./run.sh                       # eight distros, Debian 10 included
 ./run.sh debian12              # one — the GLIBC 2.36 case, the awkward one
 ```
 
@@ -136,7 +140,7 @@ Follows `nvim/stylua.toml`: 2-space indent, 120 column width.
 No symlinks. Installers append `source` lines to `~/.bashrc` and `~/.bash_aliases` that point into the repo (e.g., `~/.marckv.dots/bash/.bashrc`). Changes in the repo are immediately live. Backups are created with timestamps before any modification.
 
 ### Bash module load order (bash/.bashrc)
-`colors.sh` → `environment.sh` → `completion.sh` → `aliases.sh` → `functions.sh` → `help.sh` → `marckv.sh` → `themes/robbyrussell.sh` → `welcome.sh` → `~/.bash_aliases` → `~/.bash_local` → `/etc/profile.d/*`
+`colors.sh` → `environment.sh` → `completion.sh` → `aliases.sh` → `functions.sh` → `help.sh` → `marckv.sh` → `themes/robbyrussell.sh` → `welcome.sh` → `atuin.sh` → `~/.bash_aliases` → `~/.bash_local` → `/etc/profile.d/*`
 
 Colors must load first as other modules depend on them. The theme depends on functions from `colors.sh` and `functions.sh`.
 
@@ -201,8 +205,10 @@ Colors must load first as other modules depend on them. The theme depends on fun
 Two, on purpose:
 
 - **`docker-compose.yml` (repo root)** — mounts the repo read-only at
-  `/root/.marckv.dots` in 6 containers (debian11/12/13, ubuntu20/22/24) for
-  exercising the **installers**. Primary target: `ubuntu24`.
+  `/root/.marckv.dots` in 8 containers (debian10/11/12/13,
+  ubuntu20/22/24/26) for exercising the **installers**. Primary target:
+  `ubuntu24`. It also mounts the host's docker socket, so never run the
+  aliases' suite there.
 - **`docker-aliases/tests/compose.yml`** — 7 containers (adds ubuntu26),
   mounting the repo at `/repo` and carrying `bats` and `zsh`, for the aliases'
   own suite. Mounts **no docker socket**: a socket would let a test inside a
@@ -267,9 +273,9 @@ cannot draw.
 `sd`, `rg`, `fd`, `bat`, `eza`, `jq` are excellent and **none of them is on a
 fresh Debian server**, which is where these scripts run.
 
-This is the one place the global instruction to prefer `rg`/`fd`/`sd` over
-`grep`/`find`/`sed` does **not** apply: that rule is about commands *you* run
-while working. Anything written into a script in this repo must survive on a
+If your own tooling prefers `rg`/`fd`/`sd` over `grep`/`find`/`sed`, that
+preference covers the commands *you* run while working, never what gets
+written into a script here. Anything written into a script in this repo must survive on a
 box with nothing installed. `docker-aliases/tests/cases/ui.bats` enforces it —
 an `sd` reached `dcver.sh` once and only the distro matrix caught it.
 
@@ -287,6 +293,13 @@ an `sd` reached `dcver.sh` once and only the distro matrix caught it.
   - Types: `feat`, `fix`, `refactor`, `docs`, `chore`, `style`, `test`
   - Examples: `feat(docker): add dip command to search containers by IP`
   - No body, no footer, no multi-line messages
+- **Pull requests**: body in Spanish — what was decided and why, and how it was
+  validated (commands and distros); `Closes #N` when there is an issue. Merged
+  with a merge commit, never squashed
+- **Releases**: semver over the repo; major when something in use is removed or
+  renamed. A signed annotated tag on `main` after the merge, titled
+  `vX.Y.Z — <summary in Spanish>`, with Spanish notes that open with anything
+  a server must do before updating
 - **New features**: Add as modular files in existing directories, not monolithic scripts
 - **Renames in git**: stage *both* sides in the **same** commit. Staging the new
   path in one commit and the deletion in the next records create+delete instead
