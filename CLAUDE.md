@@ -136,7 +136,7 @@ Follows `nvim/stylua.toml`: 2-space indent, 120 column width.
 No symlinks. Installers append `source` lines to `~/.bashrc` and `~/.bash_aliases` that point into the repo (e.g., `~/.marckv.dots/bash/.bashrc`). Changes in the repo are immediately live. Backups are created with timestamps before any modification.
 
 ### Bash module load order (bash/.bashrc)
-`colors.sh` → `environment.sh` → `completion.sh` → `aliases.sh` → `functions.sh` → `themes/robbyrussell.sh` → `welcome.sh` → `~/.bash_aliases` → `~/.bash_local` → `/etc/profile.d/*`
+`colors.sh` → `environment.sh` → `completion.sh` → `aliases.sh` → `functions.sh` → `help.sh` → `marckv.sh` → `themes/robbyrussell.sh` → `welcome.sh` → `~/.bash_aliases` → `~/.bash_local` → `/etc/profile.d/*`
 
 Colors must load first as other modules depend on them. The theme depends on functions from `colors.sh` and `functions.sh`.
 
@@ -172,6 +172,10 @@ Colors must load first as other modules depend on them. The theme depends on fun
   `functions.sh`, when it must also run from zsh (a laptop on zsh never loads
   `bash/`) — and it follows the POSIX-plus-coreutils rule below, since it ships
   to servers too
+- `bash/marckv.sh` — the `marckv` command (`update`, `reload`, `help`, `cd`,
+  `status`, `version`, `whatsnew`, `install`, `doctor`). A function, not a
+  `bash/bin/` tool, because `update`/`reload`/`cd` must act on the calling
+  shell. `install` and `status` delegate to `installer/`, never re-implement it
 - `bash-extensions/` — optional add-ons sourced separately (e.g. `bash_gradle_functions.sh`)
 - `docker-aliases/` — docker/compose shortcuts for bash and zsh. Twenty-three
   commands — the compose project (`dcup dcdown dcrestart dcx dclt dcps dcver

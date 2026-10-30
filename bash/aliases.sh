@@ -1,9 +1,6 @@
 #!/bin/bash
 # Useful aliases for Debian/Ubuntu systems
 
-# marckv.dots
-alias marckvdots='cd "$MARCKV_DOTS_DIR"'
-
 # Enhanced ls aliases
 alias ls='ls --color=auto'
 alias ll='ls -alF'
@@ -55,7 +52,6 @@ alias privip='hostname -I 2>/dev/null | awk "{print \$1}" || ip -4 addr show sco
 
 # Shell management aliases
 alias clearhistory='history -c && history -w'
-alias reloadbash='source ~/.bashrc && echo "Bash configuration reloaded."'
 
 # systemctl shortcuts
 alias scs='sudo systemctl status'
