@@ -64,7 +64,9 @@ load '../helpers/common'
 
 @test "dstats shows pids alone when there is no limit" {
     run out_of "$WORK" 'dstats fx-db'
-    [[ "$output" == *"∞  40  "* ]]
+    # Right-aligned under the PIDS header, and alone: no " / ".
+    [[ "$output" == *" 40"* ]]
+    [[ "$output" != *"40 /"* ]]
 }
 
 # --- order ----------------------------------------------------------------------
@@ -129,6 +131,36 @@ load '../helpers/common'
     local cols
     cols=$(printf '%s\n' "$output" | sed -n '3,$p' | awk '{ print index($0, "%") }' | sort -u | wc -l)
     [ "$cols" = "1" ]
+}
+
+# ends_under <header> <pattern for the last char> — every data row has that
+# char in the column where the header ends: the header sits over its figures.
+#
+# The "∞" becomes one byte first: the suite runs under a POSIX locale, where
+# awk counts bytes, and the three bytes of "∞" shifted every column after MEM
+# by two — the table was right and the test was not.
+ends_under() {
+    printf '%s\n' "$output" | sed 's/∞/~/g' | awk -v h="$1" -v re="$2" '
+        NR == 2 { end = index($0, h) + length(h) - 1; next }
+        NR > 2  { if (substr($0, end, 1) !~ re || substr($0, end + 1, 1) != " ") bad++ }
+        END     { print (end > 0 && bad == 0) ? "ok" : "misaligned" }'
+}
+
+@test "dstats ends the CPU header where the percentages end" {
+    run out_of "$WORK" 'dstats'
+    [ "$(ends_under CPU '%')" = "ok" ]
+}
+
+@test "dstats ends the PIDS header where the counts end" {
+    # The first version put "55" and "6" under "PI": a left-aligned header over
+    # right-aligned numbers.
+    run out_of "$WORK" 'dstats'
+    [ "$(ends_under PIDS '[0-9]')" = "ok" ]
+}
+
+@test "dstats ends the NET I/O header where the received figures end" {
+    run out_of "$WORK" 'dstats'
+    [ "$(ends_under 'NET I/O' 'B')" = "ok" ]
 }
 
 @test "dstats shows memory in one precision, not docker's" {

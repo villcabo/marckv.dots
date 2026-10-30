@@ -27,10 +27,10 @@ dcstats [-f file] [-w] [service-pattern]
 
 ```
   compose stats · dxprobe-rs  ·  3 of 3
-  CPU    MEM         PIDS  NET I/O        DISK I/O  SERVICE
-  0.00%  388KiB / ∞  1      7.0kB / 126B  0B / 0B   worker #2
-  0.00%  384KiB / ∞  1     39.6kB / 126B  0B / 0B   web
-  0.00%  384KiB / ∞  1     41.4kB / 126B  0B / 0B   worker
+    CPU     MEM      PIDS  NET I/O         DISK I/O       SERVICE
+  0.00%  388KiB / ∞     1    7.0kB / 126B        0B / 0B  worker #2
+  0.00%  384KiB / ∞     1   39.6kB / 126B        0B / 0B  web
+  0.00%  384KiB / ∞     1   41.4kB / 126B        0B / 0B  worker
   [!] 3 with no memory limit — nothing stops one of them from taking the host's RAM
 ```
 

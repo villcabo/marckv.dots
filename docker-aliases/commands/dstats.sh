@@ -181,7 +181,8 @@ _stpids_color_into() {
 # The core: collect, join, render — shared by dstats and dcstats
 # ---------------------------------------------------------------------------
 
-# _dstats_align_into <sorted rows> → the table's rows, every figure aligned
+# _dstats_align_into <sorted rows> <header>×5 → the table's rows, every figure
+# aligned; the five headers come back aligned too, in _DSTATS_H1.._DSTATS_H5
 #
 # Rows arrive as "flag<TAB>bytes<TAB>cpu<US>lim<TAB>mem<US>lim<TAB>pids<US>lim
 # <TAB>rx<US>tx<TAB>read<US>write<TAB>name". Two passes: the first measures the
@@ -189,12 +190,23 @@ _stpids_color_into() {
 # to it, so every " / " in a column sits in the same place and the digits line
 # up under each other. A pair with no limit (CPU, PIDS) shows the used half
 # alone, aligned with the others.
+#
+# Each header ends where the figures under it end. Its width counts in the
+# first half of the pair: a left-aligned "PIDS" over right-aligned "55" and "6"
+# put the numbers under "PI", and figures narrower than their header floated
+# off to the left of the column.
 _dstats_align_into() {
     local sorted="$1" line rest tab=$'\t' nl=$'\n' us=$'\x1f' out="" f a b
+    local h1="$2" h2="$3" h3="$4" h4="$5" h5="$6"
     local wa wb i cells name
     # Pass 1: widths. Ten plain variables rather than an array: this file runs
     # in bash and zsh, whose arrays start at 0 and 1.
     local w1a=0 w1b=0 w2a=0 w2b=0 w3a=0 w3b=0 w4a=0 w4b=0 w5a=0 w5b=0
+    _dstats_width_into "$h1"; w1a=$_DA_R
+    _dstats_width_into "$h2"; w2a=$_DA_R
+    _dstats_width_into "$h3"; w3a=$_DA_R
+    _dstats_width_into "$h4"; w4a=$_DA_R
+    _dstats_width_into "$h5"; w5a=$_DA_R
     while IFS= read -r line; do
         [[ -z "$line" ]] && continue
         rest="${line#*"$tab"}"; rest="${rest#*"$tab"}"
@@ -214,6 +226,12 @@ _dstats_align_into() {
             esac
         done
     done <<< "$sorted"
+
+    _dstats_rjust_into "$h1" "$w1a"; _DSTATS_H1="$_DA_R"
+    _dstats_rjust_into "$h2" "$w2a"; _DSTATS_H2="$_DA_R"
+    _dstats_rjust_into "$h3" "$w3a"; _DSTATS_H3="$_DA_R"
+    _dstats_rjust_into "$h4" "$w4a"; _DSTATS_H4="$_DA_R"
+    _dstats_rjust_into "$h5" "$w5a"; _DSTATS_H5="$_DA_R"
 
     # Pass 2: build the cells.
     while IFS= read -r line; do
@@ -372,14 +390,15 @@ _dstats_table() {
 
     if [[ -n "$rowsort" ]]; then
         sorted=$(printf '%s' "$rowsort" | LC_ALL=C sort -t "$tab" -k1,1nr -k2,2nr)
-        _dstats_align_into "$sorted"; rows="$_DA_R"
+        _dstats_align_into "$sorted" "CPU" "MEM" "PIDS" "NET I/O" "DISK I/O"; rows="$_DA_R"
     fi
 
     local namehdr="NAME"
     local memsum hostmem
     [[ "$mode" == "project" ]] && namehdr="SERVICE"
     _render_container_table "$title" "$shown" "$total" "$pattern" \
-        "CPU" "MEM" "PIDS" "NET I/O" "DISK I/O" "$namehdr" "$rows" \
+        "${_DSTATS_H1:-CPU}" "${_DSTATS_H2:-MEM}" "${_DSTATS_H3:-PIDS}" \
+        "${_DSTATS_H4:-NET I/O}" "${_DSTATS_H5:-DISK I/O}" "$namehdr" "$rows" \
         "@stcpu,@stmem,@stpids,dim,dim,white"
 
     # --- the footer: the host, and what has no ceiling ----------------------

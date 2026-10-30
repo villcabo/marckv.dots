@@ -36,11 +36,11 @@ nothing in docker's output says so. `dstats` shows `50.7% / 50%`, in red.
 
 ```
   docker stats  ·  33 of 33
-  CPU           MEM               PIDS      NET I/O          DISK I/O         NAME
-  52.33% / 50%   576KiB /  64MiB    2 / 50  16.4kB /   126B      0B /     0B  dxprobe-lim
-   1.28%         707MiB /   2GiB  117        1.9MB /   126B   810MB /  2.2GB  crossborder-kafka
-   0.10% / 50%   179MiB / 256MiB   18        183kB /  5.1MB  69.9MB / 24.0MB  nginx-api-ws-vector-1
-   0.00%        41.9MiB /      ∞    7       20.2MB / 40.7MB  49.0MB / 60.8MB  nginx-api-ws-echo-integrado-1
+     CPU            MEM           PIDS       NET I/O           DISK I/O           NAME
+  52.33% / 50%   576KiB /  64MiB     2 / 50   16.4kB /   126B        0B /     0B  dxprobe-lim
+   1.28%         707MiB /   2GiB   117         1.9MB /   126B     810MB /  2.2GB  crossborder-kafka
+   0.10% / 50%   179MiB / 256MiB    18         183kB /  5.1MB    69.9MB / 24.0MB  nginx-api-ws-vector-1
+   0.00%        41.9MiB /      ∞     7        20.2MB / 40.7MB    49.0MB / 60.8MB  nginx-api-ws-echo-integrado-1
   35 shown use 2.7GiB of memory (host: 30.1GiB) · CPU 162.72% of 1400% (14 cores)
   [!] 11 with no memory limit — nothing stops one of them from taking the host's RAM
 ```
@@ -57,7 +57,7 @@ nothing in docker's output says so. `dstats` shows `50.7% / 50%`, in red.
 precision — memory in binary units, one decimal, none from 100 up; a limit
 without a decimal when it is round — and right-aligns each half of every
 `used / limit` pair against the widest one in its column. The ` / ` sits in the
-same place on every row. Widths are measured by what the terminal shows, not by
+same place on every row, and each header ends where the figures under it end. Widths are measured by what the terminal shows, not by
 bytes, so `∞` does not throw a row off under a C locale.
 
 **Colour means "look here".** An ordinary figure is printed plain; only what is
