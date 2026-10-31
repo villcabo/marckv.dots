@@ -26,12 +26,14 @@ dcstats [-f file] [-w] [service-pattern]
 ## Output
 
 ```
-  compose stats · dxprobe-rs  ·  3 of 3
-    CPU     MEM      PIDS  NET I/O         DISK I/O       SERVICE
-  0.00%  388KiB / ∞     1    7.0kB / 126B        0B / 0B  worker #2
-  0.00%  384KiB / ∞     1   39.6kB / 126B        0B / 0B  web
-  0.00%  384KiB / ∞     1   41.4kB / 126B        0B / 0B  worker
-  [!] 3 with no memory limit — nothing stops one of them from taking the host's RAM
+  compose stats · docker-aliases-tests  ·  7 of 7
+  SERVICE       CPU      MEM      PIDS  NET I/O         DISK I/O
+  debian11  123.99%  70.2MiB / ∞   566    5.2kB / 126B    50.2MB / 4.0MB
+  ubuntu24    0.00%  48.7MiB / ∞     1    5.3kB / 126B    50.4MB /    0B
+  ubuntu26    0.00%   1.6MiB / ∞     1    5.0kB / 126B        0B /    0B
+  debian13    0.00%   436KiB / ∞     1    5.2kB / 126B        0B /    0B
+  7 shown use 122MiB of memory (host: 30.1GiB) · CPU 123.99% of 1400% (14 cores)
+  [!] 7 with no memory limit — nothing stops one of them from taking the host's RAM
 ```
 
 Every column reads as in [`dstats`](dstats.md#what-docker-stats-gets-wrong-and-what-this-shows-instead):

@@ -185,7 +185,8 @@ _stpids_color_into() {
 # aligned; the five headers come back aligned too, in _DSTATS_H1.._DSTATS_H5
 #
 # Rows arrive as "flag<TAB>bytes<TAB>cpu<US>lim<TAB>mem<US>lim<TAB>pids<US>lim
-# <TAB>rx<US>tx<TAB>read<US>write<TAB>name". Two passes: the first measures the
+# <TAB>rx<US>tx<TAB>read<US>write<TAB>name". The rows it returns put the name
+# FIRST, then the five aligned cells. Two passes: the first measures the
 # widest half of every pair across all rows, the second right-aligns each half
 # to it, so every " / " in a column sits in the same place and the digits line
 # up under each other. A pair with no limit (CPU, PIDS) shows the used half
@@ -254,7 +255,9 @@ _dstats_align_into() {
             cells+="${a}${tab}"
         done
         name="$rest"
-        out+="${cells}${name}${nl}"
+        # The name leads. The renderer left-aligns and pads the first column,
+        # and prints the last one as it comes — which is already aligned here.
+        out+="${name}${tab}${cells%"$tab"}${nl}"
     done <<< "$sorted"
     _DA_R="${out%"$nl"}"
 }
@@ -397,9 +400,9 @@ _dstats_table() {
     local memsum hostmem
     [[ "$mode" == "project" ]] && namehdr="SERVICE"
     _render_container_table "$title" "$shown" "$total" "$pattern" \
-        "${_DSTATS_H1:-CPU}" "${_DSTATS_H2:-MEM}" "${_DSTATS_H3:-PIDS}" \
-        "${_DSTATS_H4:-NET I/O}" "${_DSTATS_H5:-DISK I/O}" "$namehdr" "$rows" \
-        "@stcpu,@stmem,@stpids,dim,dim,white"
+        "$namehdr" "${_DSTATS_H1:-CPU}" "${_DSTATS_H2:-MEM}" "${_DSTATS_H3:-PIDS}" \
+        "${_DSTATS_H4:-NET I/O}" "${_DSTATS_H5:-DISK I/O}" "$rows" \
+        "white,@stcpu,@stmem,@stpids,dim,dim"
 
     # --- the footer: the host, and what has no ceiling ----------------------
     # Binary units, like the MEM column above it: the first version said "GB"

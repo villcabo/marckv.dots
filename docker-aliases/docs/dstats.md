@@ -35,14 +35,14 @@ limit shows `50.71%` — pinned against its ceiling, being throttled — and
 nothing in docker's output says so. `dstats` shows `50.7% / 50%`, in red.
 
 ```
-  docker stats  ·  33 of 33
-     CPU            MEM           PIDS       NET I/O           DISK I/O           NAME
-  52.33% / 50%   576KiB /  64MiB     2 / 50   16.4kB /   126B        0B /     0B  dxprobe-lim
-   1.28%         707MiB /   2GiB   117         1.9MB /   126B     810MB /  2.2GB  crossborder-kafka
-   0.10% / 50%   179MiB / 256MiB    18         183kB /  5.1MB    69.9MB / 24.0MB  nginx-api-ws-vector-1
-   0.00%        41.9MiB /      ∞     7        20.2MB / 40.7MB    49.0MB / 60.8MB  nginx-api-ws-echo-integrado-1
-  35 shown use 2.7GiB of memory (host: 30.1GiB) · CPU 162.72% of 1400% (14 cores)
-  [!] 11 with no memory limit — nothing stops one of them from taking the host's RAM
+  docker stats  ·  26 of 26
+  NAME                   CPU      MEM           PIDS  NET I/O           DISK I/O
+  crossborder-kafka    1.13%  1005MiB /   2GiB   117   19.7kB /   126B     215MB / 36.6MB
+  keycloak             0.37%   652MiB / 1.5GiB    78    3.1MB /  4.0MB     137MB /  1.7MB
+  warpgate             0.23%  58.8MiB / 256MiB    28   39.8kB /   252B    51.9MB /  3.3MB
+  da-ubuntu24          0.00%  48.7MiB /      ∞     1    5.3kB /   126B    50.4MB /     0B
+  26 shown use 2.8GiB of memory (host: 30.1GiB) · CPU 208.34% of 1400% (14 cores)
+  [!] 15 with no memory limit — nothing stops one of them from taking the host's RAM
 ```
 
 | Column | Shows | Colour |

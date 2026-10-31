@@ -76,7 +76,7 @@ load '../helpers/common'
     # memory first; then fx-db's 1.5GiB, then the small fixture containers.
     run out_of "$WORK" 'dstats'
     local order
-    order=$(printf '%s\n' "$output" | sed -n '3,$p' | awk '{print $NF}' | tr '\n' ' ')
+    order=$(printf '%s\n' "$output" | sed -n '3,$p' | awk '{print $1}' | tr '\n' ' ')
     [ "$order" = "other-api fx-api fx-db dav2-fixture-basic-worker-2 dav2-fixture-basic-worker-1 dav2-fixture-basic-api-1 " ]
 }
 
@@ -135,6 +135,7 @@ load '../helpers/common'
 
 # ends_under <header> <pattern for the last char> — every data row has that
 # char in the column where the header ends: the header sits over its figures.
+# Nothing after it is also fine: DISK I/O is the last column.
 #
 # The "∞" becomes one byte first: the suite runs under a POSIX locale, where
 # awk counts bytes, and the three bytes of "∞" shifted every column after MEM
@@ -142,7 +143,7 @@ load '../helpers/common'
 ends_under() {
     printf '%s\n' "$output" | sed 's/∞/~/g' | awk -v h="$1" -v re="$2" '
         NR == 2 { end = index($0, h) + length(h) - 1; next }
-        NR > 2  { if (substr($0, end, 1) !~ re || substr($0, end + 1, 1) != " ") bad++ }
+        NR > 2  { if (substr($0, end, 1) !~ re || (substr($0, end + 1, 1) != " " && substr($0, end + 1, 1) != "")) bad++ }
         END     { print (end > 0 && bad == 0) ? "ok" : "misaligned" }'
 }
 
@@ -160,6 +161,29 @@ ends_under() {
 
 @test "dstats ends the NET I/O header where the received figures end" {
     run out_of "$WORK" 'dstats'
+    [ "$(ends_under 'NET I/O' 'B')" = "ok" ]
+}
+
+@test "dstats puts NAME first, and the figures stay aligned under names of different lengths" {
+    # The name leads, left-aligned and padded to the longest one. Every figure
+    # column must still end where its header does, whatever the name widths.
+    run out_of "$WORK" 'dstats'
+    local lens first
+    first=$(printf '%s\n' "$output" | sed -n '2p' | awk '{ print $1 }')
+    [ "$first" = "NAME" ]
+    [ "$(printf '%s\n' "$output" | sed -n '3p' | awk '{ print $1 }')" != "48.00%" ]
+    lens=$(printf '%s\n' "$output" | sed -n '3,$p' | awk '{ print length($1) }' | sort -u | wc -l)
+    [ "$lens" -gt 1 ]
+    [ "$(ends_under CPU '%')" = "ok" ]
+    [ "$(ends_under PIDS '[0-9]')" = "ok" ]
+    [ "$(ends_under 'NET I/O' 'B')" = "ok" ]
+    [ "$(ends_under 'DISK I/O' 'B')" = "ok" ]
+}
+
+@test "dcstats puts SERVICE first, and the figures stay aligned" {
+    run out_of "$F/basic" 'dcstats'
+    [ "$(printf '%s\n' "$output" | sed -n '2p' | awk '{ print $1 }')" = "SERVICE" ]
+    [ "$(ends_under CPU '%')" = "ok" ]
     [ "$(ends_under 'NET I/O' 'B')" = "ok" ]
 }
 
