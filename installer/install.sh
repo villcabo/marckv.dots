@@ -80,15 +80,28 @@ _steps() {
 # minute or more in. Left to that point the password prompt lands in the middle
 # of the output, after the screen has scrolled past the plan, on a run the
 # person may have walked away from.
+#
+# Only an account lib/common.sh judged able to sudo gets here: one with no
+# sudo rights is already in user mode, and is never asked.
+#
+# A refusal at a terminal still stops the run. Whoever typed a wrong password
+# meant a system-wide install; quietly carrying on as a user would put a second
+# Neovim under ~/.local instead, and that is not what they asked for. They are
+# told how to ask for the user install. With no terminal there is nobody to
+# type a password at all, so the run goes on as a user rather than failing at
+# step 4.
 _prime_sudo() {
     [[ "$PRIV_MODE" == "sudo" ]] || return 0
     if [[ -t 0 ]]; then
         info "Neovim and its dependencies need ${BOLD}sudo${NC} — asking once, now"
-        sudo -v || die "sudo was not granted. Nothing was changed."
-    elif ! sudo -n true 2>/dev/null; then
-        warn "sudo wants a password and there is no terminal to type it in"
-        info "System deps and Neovim will be skipped or fail; run it from a terminal, or as root"
+        sudo -v && return 0
+        error "sudo was not granted. Nothing was changed."
+        info "To install for ${BOLD}$(id -un)${NC} only, under ~/.local: ${BOLD}MARCKV_PRIV_MODE=user ./${INSTALLER_NAME}${NC}"
+        exit 1
     fi
+    sudo -n true 2>/dev/null && return 0
+    warn "sudo wants a password and there is no terminal to type it in — installing for ${BOLD}$(id -un)${NC} only"
+    PRIV_MODE="user"
 }
 
 do_install() {
@@ -100,7 +113,7 @@ do_install() {
         preview_line "$n. $label" "$what"
         preview_line "" "${DIM}./$script${NC}"
     done < <(_steps)
-    preview_line "privileges" "$PRIV_MODE"
+    preview_line "privileges" "$(priv_label)"
     [[ "$use_copy" == true ]] \
         && preview_line "nvim config" "copied — the server will not need the repo afterwards" \
         || preview_line "nvim config" "symlinked — repo edits are live"
@@ -109,6 +122,8 @@ do_install() {
 
     confirm "Install all of it?" || { info "Cancelled — nothing was changed."; return 0; }
     _prime_sudo
+    # Every step re-sources lib/common.sh; this keeps them on the answer above.
+    export MARCKV_PRIV_MODE="$PRIV_MODE"
 
     # Read into an array BEFORE running anything. Looping `while read … < <(_steps)`
     # would hand the step list to each installer as its stdin, and the first one

@@ -53,7 +53,9 @@ installer_usage() {
     echo -e "                    Useful for remote servers where the repo won't be available."
     echo ""
     echo -e "  ${YELLOW}-d, --deps${NC}       Install system dependencies (gcc, make, ripgrep, fzf, fd,"
-    echo -e "                    tree-sitter CLI). Requires root or sudo."
+    echo -e "                    tree-sitter CLI). The apt packages need root or sudo;"
+    echo -e "                    without it they are listed for an admin, and fzf and the"
+    echo -e "                    tree-sitter CLI go to ~/.local/bin."
     echo ""
     echo -e "  ${YELLOW}-s, --sync${NC}       Install plugins and treesitter parsers headlessly."
     echo -e "                    Run this after install to avoid waiting on first launch."
@@ -119,6 +121,7 @@ _install_fzf() {
     curl -fSL "$fzf_url" -o "$tmp_file" || { error "Failed to download fzf"; rm -f "$tmp_file"; return 1; }
     tar -C "$fzf_bin" -xzf "$tmp_file" fzf || { error "Failed to extract fzf to ${fzf_bin}"; rm -f "$tmp_file"; return 1; }
     rm -f "$tmp_file"
+    _adopt_dir "$fzf_bin"
 }
 
 # Install the tree-sitter CLI, pinned to a build this machine's GLIBC can run
@@ -213,6 +216,7 @@ _install_tree_sitter_cli() {
     if [[ "$dest" == "$HOME"/* ]]; then
         mv "${tmp}.bin" "${dest}/tree-sitter" || { rm -rf "$work"; return 1; }
         chmod 755 "${dest}/tree-sitter"
+        _adopt_dir "$dest"
     else
         _run mv "${tmp}.bin" "${dest}/tree-sitter" || { rm -rf "$work"; return 1; }
         _run chmod 755 "${dest}/tree-sitter"
@@ -274,7 +278,15 @@ step_deps() {
     done
 
     # Install missing apt packages
-    if [[ ${#missing_apt[@]} -gt 0 ]]; then
+    if [[ ${#missing_apt[@]} -gt 0 && "$PRIV_MODE" == "user" ]]; then
+        # Not an error: a user cannot install system packages, and everything
+        # below (fzf, tree-sitter, Neovim itself) still goes to ~/.local.
+        echo ""
+        warn "Missing system packages, and installing them needs root: ${BOLD}${missing_apt[*]}${NC}"
+        info "Ask an admin to run: ${BOLD}sudo apt-get install -y ${missing_apt[*]}${NC}"
+        [[ " ${missing_apt[*]} " == *" gcc "* ]] \
+            && info "Until then Neovim works, but cannot build treesitter parsers (no gcc)"
+    elif [[ ${#missing_apt[@]} -gt 0 ]]; then
         echo ""
         info "Missing packages: ${BOLD}${missing_apt[*]}${NC}"
         _apt_install "${missing_apt[@]}" && success "apt packages installed" || error "Failed to install: ${missing_apt[*]}"
@@ -364,6 +376,17 @@ step_nvim() {
             info "Nothing to install — no privileges needed"
             return 0
         fi
+        if [[ "$PRIV_MODE" == "user" ]]; then
+            # Whatever is wrong with the system-wide copy is root's to fix, and
+            # it runs: a second Neovim under $HOME would only shadow it.
+            if [[ -n "$foreign" ]]; then
+                warn "/opt/nvim has files not owned by root — root can repair it: ${BOLD}sudo $INSTALLER_DIR/install-nvim.sh${NC}"
+            else
+                warn "A newer Neovim ($target) exists, but updating it needs root"
+            fi
+            info "Keeping the system-wide ${BOLD}$current${NC}"
+            return 0
+        fi
         [[ -n "$foreign" ]] && warn "/opt/nvim has files not owned by root — running install-nvim.sh to repair it"
         if [[ -n "$current" && -n "$target" ]]; then
             info "Neovim ${BOLD}$current${NC} installed, ${BOLD}$target${NC} is available"
@@ -372,11 +395,6 @@ step_nvim() {
 
     # From here something has to be written, so privileges matter.
     if [[ "$PRIV_MODE" == "user" ]]; then
-        if [[ -n "$current" ]]; then
-            warn "A newer Neovim ($target) exists, but updating it needs root"
-            info "Keeping the system-wide ${BOLD}$current${NC} — a copy under \$HOME would only shadow it"
-            return 0
-        fi
         warn "No root or sudo, and no working ${BOLD}nvim${NC} on PATH"
         info "Installing for ${BOLD}$(id -un)${NC} only, under ${BOLD}$HOME/.local${NC}"
         "$INSTALLER_DIR/install-nvim.sh" "${nvim_args[@]}" || return $?
@@ -408,6 +426,20 @@ step_nvim() {
 #   the config step immediately after failed with "Neovim is not installed",
 #   which stopped sync too — so a fresh machine, the case --reinstall exists
 #   for, could never get past it.
+# Put a directory just installed into on PATH, for the rest of THIS run.
+#
+# ~/.local/bin reaches PATH through ~/.profile, and only when it already
+# existed at login. On an account that never had one, the tree-sitter CLI
+# landed there and the sync step right after could not find it: measured on
+# Ubuntu 24.04 as a user without sudo, "ENOENT: 'tree-sitter'" for every
+# grammar and "0 of 24 parsers built", on a run that otherwise succeeded.
+_adopt_dir() {
+    case ":$PATH:" in
+        *":$1:"*) ;;
+        *) PATH="$1:$PATH"; export PATH; info "Added ${BOLD}$1${NC} to PATH for this run" ;;
+    esac
+}
+
 _adopt_nvim_path() {
     local d
     for d in /opt/nvim/bin "$HOME/.local/nvim/bin" "$HOME/.local/bin"; do

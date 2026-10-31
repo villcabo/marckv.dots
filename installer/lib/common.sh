@@ -65,12 +65,36 @@ die()     { error "$1"; exit 1; }
 INSTALLER_DIR="$(cd "$(dirname "${BASH_SOURCE[1]:-${BASH_SOURCE[0]}}")" && pwd)"
 MARCKV_DOTS_DIR="$(cd "${INSTALLER_DIR}/.." && pwd)"
 
+# Who may write outside $HOME.
+#
+# The sudo binary being on PATH says nothing. On a shared server most accounts
+# have it and are not in sudoers, and treating them as "sudo" asked for a
+# password they could never give — then install.sh stopped, on an account
+# whose root had already installed everything it needed.
+#
+# sudo cannot tell "not allowed" from "allowed, needs a password" without
+# asking for it: `sudo -n -l` answers "a password is required" to both
+# (measured, Ubuntu 24.04). So: a passwordless sudo, or membership in the group
+# a distro grants sudo to. Anyone else installs under $HOME, and can still
+# claim sudo with MARCKV_PRIV_MODE=sudo.
+#
+# install.sh exports what it settled on in MARCKV_PRIV_MODE, so a step it runs
+# does not work it out again — and ask again — on its own.
+_detect_priv_mode() {
+    command -v sudo &>/dev/null || { echo user; return; }
+    sudo -n true 2>/dev/null && { echo sudo; return; }
+    case " $(id -nG 2>/dev/null) " in
+        *" sudo "*|*" admin "*|*" wheel "*) echo sudo ;;
+        *) echo user ;;
+    esac
+}
+
 if [[ $EUID -eq 0 ]]; then
     PRIV_MODE="root"
-elif command -v sudo &>/dev/null; then
-    PRIV_MODE="sudo"
+elif [[ "${MARCKV_PRIV_MODE:-}" == sudo || "${MARCKV_PRIV_MODE:-}" == user ]]; then
+    PRIV_MODE="$MARCKV_PRIV_MODE"
 else
-    PRIV_MODE="user"
+    PRIV_MODE="$(_detect_priv_mode)"
 fi
 
 # Run a command with whatever privilege this machine allows.
@@ -83,6 +107,15 @@ _run() {
             info "No root or sudo. Run it yourself with: ${BOLD}sudo $*${NC}"
             return 1
             ;;
+    esac
+}
+
+# A one-line description of PRIV_MODE, for previews.
+priv_label() {
+    case "$PRIV_MODE" in
+        root) echo "root" ;;
+        sudo) echo "sudo" ;;
+        user) echo "none — installs under ~/.local, and uses what root already installed" ;;
     esac
 }
 

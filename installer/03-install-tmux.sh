@@ -20,7 +20,15 @@ is_linked() {
 }
 
 do_install() {
-    command -v tmux &>/dev/null || die "tmux is not installed — sudo apt install tmux"
+    # Without root, a missing tmux is something to report, not a reason to
+    # stop: the config and TPM are this user's files, ready for the day an
+    # admin installs tmux — and stopping here also stopped install.sh before
+    # Neovim, which a user CAN install.
+    if ! command -v tmux &>/dev/null; then
+        [[ "$PRIV_MODE" == "user" ]] || die "tmux is not installed — sudo apt install tmux"
+        warn "tmux is not installed, and installing it needs root"
+        info "Ask an admin to run: ${BOLD}sudo apt-get install -y tmux${NC} — the config below will be ready for it"
+    fi
     [[ -f "$SOURCE_TMUX_CONF" ]] || die "Not found: $SOURCE_TMUX_CONF"
 
     if is_linked && [[ -d "$TPM_DIR" ]]; then
