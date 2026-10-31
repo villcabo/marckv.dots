@@ -2,21 +2,39 @@
 # Local IPv4 addresses — wired, Wi-Fi and VPN — on a laptop or a server alike.
 # Local only: it never asks an outside service (publip does that).
 #
-# Usage: ips                       table with every connection
-#        ips cable|wifi|vpn        just that IP, bare, ready to copy:  ips wifi | wl-copy
-#        ips cable|wifi|vpn mac    just that MAC address, bare
+# Usage: ips               table: cable, Wi-Fi and VPN
+#        ips -a            also docker networks and other virtual bridges
+#        ips <kind>        just those IPs, bare, ready to copy: ips wifi | wl-copy
+#        ips <kind> mac    just the MAC addresses, bare
+#        <kind> is cable, wifi, vpn, docker or virtual
 #
 # Built on `ip` and /sys/class/net alone, so it runs on a server with nothing
-# installed. nmcli or iw add the Wi-Fi name where they exist, and are skipped
-# where they do not.
+# installed. nmcli or iw add the Wi-Fi name, and docker the network names,
+# where they exist; where they do not, they are skipped.
 # When NetworkManager randomizes a MAC for a network, the hardware one is shown
 # next to it: that is the one infra asks for in a firewall rule.
+#
+# The IPs of the containers themselves are dip's job (docker-aliases): this
+# lists the host's own interfaces.
 #
 # A script on PATH rather than a function in functions.sh: zsh never loads
 # bash/, and a laptop on zsh should run the same file the servers do.
 
 bold=$'\e[1m' dim=$'\e[2m' green=$'\e[32m' cyan=$'\e[36m' reset=$'\e[0m'
-rows=()   # kind|ifname|ip|prefix|mac|details
+rows=()   # kind|ifname|ip|prefix|mac|details|state
+
+usage="usage: ips [-a] [cable|wifi|vpn|docker|virtual] [mac]"
+all=0
+args=()
+for arg in "$@"; do
+    case "$arg" in
+        -a|--all)  all=1 ;;
+        -h|--help) sed -n '2,9p' "$0" | sed 's/^#//; s/^ //'; exit 0 ;;
+        -*)        echo "$usage" >&2; exit 2 ;;
+        *)         args+=("$arg") ;;
+    esac
+done
+set -- "${args[@]}"
 
 # Without `ip` every interface would read "not connected" — a silent lie.
 # Every real Debian has iproute2; minimal container images do not.
@@ -25,25 +43,67 @@ if ! command -v ip >/dev/null 2>&1; then
     exit 1
 fi
 
+want=""
+if [[ $# -gt 0 ]]; then
+    case "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" in
+        cable|eth) want=Cable ;;
+        wifi|wlan) want=WiFi ;;
+        vpn)       want=VPN ;;
+        docker)    want=Docker ;;
+        virtual)   want=Virtual ;;
+        *) echo "$usage" >&2; exit 2 ;;
+    esac
+fi
+virtual=0
+[[ $all == 1 || $want == Docker || $want == Virtual ]] && virtual=1
+
+# br-<first 12 of the network ID> → network name, in one call. No docker, or no
+# permission on its socket, leaves the map empty and the bridge keeps its name.
+declare -A netname=()
+if [[ $virtual == 1 ]] && command -v docker >/dev/null 2>&1; then
+    while read -r id name; do
+        [[ -n "$id" ]] || continue
+        if [[ "$name" == bridge ]]; then netname[docker0]=$name; else netname[br-${id:0:12}]=$name; fi
+    done < <(timeout 5 docker network ls --no-trunc --filter driver=bridge --format '{{.ID}} {{.Name}}' 2>/dev/null)
+fi
+
 for path in /sys/class/net/*; do
     dev=${path##*/}
     # By name, not by "has a device link": inside a container eth0 is a veth
     # with no device behind it, and it is still the machine's cable.
     case "$dev" in
-        lo|docker*|br-*|veth*|virbr*|vmnet*|cni*|flannel*|cali*|vxlan*|kube*|lxc*|lxd*) continue ;;
+        lo|veth*) continue ;;
+        docker0|br-*)
+            if [[ -n "${netname[$dev]}" || "$dev" == docker0 || "$dev" =~ ^br-[0-9a-f]{12}$ ]]; then
+                kind=Docker
+            else
+                kind=Virtual
+            fi ;;
+        virbr*|vmnet*|cni*|flannel*|cali*|vxlan*|kube*|lxc*|lxd*) kind=Virtual ;;
         tun*|wg*|ppp*|tailscale*|zt*) kind=VPN ;;
         *) if [[ -d "$path/wireless" || -e "$path/phy80211" ]]; then kind=WiFi; else kind=Cable; fi ;;
     esac
+    if [[ $kind == Docker || $kind == Virtual ]]; then
+        [[ $virtual == 1 ]] || continue
+    fi
 
     read -r ip prefix <<< "$(ip -o -4 addr show dev "$dev" 2>/dev/null \
         | awk '{split($4, a, "/"); print a[1], a[2]; exit}')"
     [[ -n "$ip" ]] || continue
 
-    if [[ "$kind" == VPN ]]; then
-        # Point-to-point: a tun has no MAC address.
-        rows+=("VPN|$dev|$ip|$prefix|-|(host)")
-        continue
-    fi
+    case "$kind" in
+        VPN)
+            # Point-to-point: a tun has no MAC address.
+            rows+=("VPN|$dev|$ip|$prefix|-|(host)|up")
+            continue ;;
+        Docker|Virtual)
+            # A bridge is down while nothing is attached to it: for docker, no
+            # running container on that network.
+            state=up
+            [[ "$(<"$path/operstate")" == down ]] && state=down
+            rows+=("$kind|$dev|$ip|$prefix|-|${netname[$dev]}|$state")
+            continue ;;
+    esac
 
     mac=$(<"$path/address")
     perm=$(ip link show dev "$dev" 2>/dev/null | awk '{for (i = 1; i < NF; i++) if ($i == "permaddr") print $(i + 1)}')
@@ -62,18 +122,11 @@ for path in /sys/class/net/*; do
     else
         extra="${gw:+gw $gw}"
     fi
-    rows+=("$kind|$dev|$ip|$prefix|$mac|$extra")
+    rows+=("$kind|$dev|$ip|$prefix|$mac|$extra|up")
 done
 
 # Bare mode: only the IPs (or MACs) of one kind, one per line, no colors.
-if [[ $# -gt 0 ]]; then
-    usage="usage: ips [cable|wifi|vpn] [mac]"
-    case "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" in
-        cable|eth) want=Cable ;;
-        wifi|wlan) want=WiFi ;;
-        vpn)       want=VPN ;;
-        *) echo "$usage" >&2; exit 2 ;;
-    esac
+if [[ -n "$want" ]]; then
     case "${2:-}" in
         "")  field=ip ;;
         mac) field=mac ;;
@@ -81,7 +134,7 @@ if [[ $# -gt 0 ]]; then
     esac
     found=1
     for r in "${rows[@]}"; do
-        IFS='|' read -r kind _ ip _ mac _ <<< "$r"
+        IFS='|' read -r kind _ ip _ mac _ _ <<< "$r"
         [[ "$kind" == "$want" ]] || continue
         value=$ip
         [[ "$field" == mac ]] && value=${mac%% *}
@@ -92,17 +145,43 @@ if [[ $# -gt 0 ]]; then
     exit "$found"
 fi
 
-printf "%s%-6s %-20s %-15s %-4s %-17s %s%s\n" \
+kinds="Cable WiFi VPN"
+[[ $all == 1 ]] && kinds="$kinds Docker Virtual"
+
+printf "%s%-7s %-20s %-15s %-4s %-17s %s%s\n" \
     "$dim" "TYPE" "INTERFACE" "IP" "MASK" "MAC" "DETAILS" "$reset"
-for k in Cable WiFi VPN; do
-    found=0
-    for r in "${rows[@]}"; do
-        IFS='|' read -r kind dev ip prefix mac extra <<< "$r"
-        [[ "$kind" == "$k" ]] || continue
-        printf "%s%-6s%s %-20s %s%-15s%s %s/%-3s%s %s%-17s%s %s%s%s\n" \
-            "$bold" "$kind" "$reset" "$dev" "$green" "$ip" "$reset" "$dim" "$prefix" "$reset" \
-            "$cyan" "$mac" "$reset" "$dim" "$extra" "$reset"
-        found=1
+for k in $kinds; do
+    found=0 idle=0
+    # In use first, then the idle bridges, greyed: they are most of the rows,
+    # and still what you look for when an IP clashes with the office network.
+    for want_state in up down; do
+        for r in "${rows[@]}"; do
+            IFS='|' read -r kind dev ip prefix mac extra state <<< "$r"
+            [[ "$kind" == "$k" && "$state" == "$want_state" ]] || continue
+            if [[ "$state" == down ]]; then
+                printf "%s%-7s %-20s %-15s /%-3s %-17s %s%s\n" \
+                    "$dim" "$kind" "$dev" "$ip" "$prefix" "$mac" "${extra}${extra:+ · }idle" "$reset"
+                idle=$((idle + 1))
+            else
+                printf "%s%-7s%s %-20s %s%-15s%s %s/%-3s%s %s%-17s%s %s%s%s\n" \
+                    "$bold" "$kind" "$reset" "$dev" "$green" "$ip" "$reset" "$dim" "$prefix" "$reset" \
+                    "$cyan" "$mac" "$reset" "$dim" "$extra" "$reset"
+            fi
+            found=1
+        done
     done
-    [[ "$found" == 1 ]] || printf "%s%-6s%s %snot connected%s\n" "$bold" "$k" "$reset" "$dim" "$reset"
+    if [[ "$found" == 0 ]]; then
+        # Virtual bridges are absent on most machines; a "none" row every time
+        # would be noise. Docker's absence is an answer in itself.
+        [[ "$k" == Virtual ]] && continue
+        label="not connected"
+        [[ "$k" == Docker ]] && label="none"
+        printf "%s%-7s%s %s%s%s\n" "$bold" "$k" "$reset" "$dim" "$label" "$reset"
+    fi
+    if [[ "$idle" -gt 0 ]]; then
+        noun="networks"; [[ "$idle" == 1 ]] && noun="network"
+        what="docker $noun (no container attached)"
+        [[ "$k" == Virtual ]] && what="virtual $noun (nothing attached)"
+        printf "%s  %d idle %s%s\n" "$dim" "$idle" "$what" "$reset"
+    fi
 done
