@@ -90,6 +90,8 @@ alone — verified, 16 of 16 parsers.
 ```bash
 ./install.sh                            # bash, docker aliases, tmux, Neovim + nvim-lite
 ./install.sh -c                         # same, copying the nvim-lite config (no repo dependency)
+./install.sh --editor vim               # vim-lite instead of Neovim: plain Vim, nothing downloaded
+./install.sh --editor none              # bash, docker aliases and tmux, no editor
 exec bash                               # load it into the shell you ran it from
 ```
 
@@ -111,6 +113,7 @@ Or one piece at a time — each script is independent:
 ./04-install-nvim-lite.sh --copy        # Same but copies the directory (no repo dependency)
 ./04-install-nvim-lite.sh --full        # Deps, the Neovim binary, the config, plugins — nothing deleted
 ./05-install-atuin.sh                   # Shell history with Ctrl+R search (sync off)
+./06-install-vim.sh                     # vim-lite: plain Vim as ~/.vim, no plugins (see vim/README.md)
 ```
 
 Helper scripts:
@@ -143,6 +146,66 @@ One deliberate asymmetry: with no terminal to ask, **installing** goes ahead
 source ~/.bashrc
 ```
 
+### Offline: a host with no internet
+
+Install once by hand; after that, only the repo changes, and it travels as a
+single file. Use `--editor vim`: nvim-lite needs plugins and parsers from
+GitHub, vim-lite needs nothing.
+
+**What the host must already have:** `git`, `tmux` and a full `vim` — Ubuntu
+Server ships all three. A minimal Debian has `vim-tiny` and no tmux; see the
+last step.
+
+**1. On a machine with internet** (your laptop), from an up-to-date `main`:
+
+```bash
+cd ~/.marckv.dots && git switch main && git pull
+git bundle create ~/marckv.bundle main             # the whole repo, one file (~0.5 MB)
+tar -czf ~/tmux-plugins.tgz -C ~ .tmux/plugins/{tpm,tmux-sensible,tmux-yank,tmux-resurrect,tmux-continuum,tmux-which-key,tmux-kanagawa}
+scp ~/marckv.bundle ~/tmux-plugins.tgz <host>:
+```
+
+The tmux plugins go along because `03-install-tmux.sh` clones TPM from GitHub,
+and with no network that clone fails and stops `install.sh` at step 3. With
+`~/.tmux/plugins/tpm` already there it skips the clone, and tmux loads the
+plugins from that directory without a network.
+
+**2. On the host, once per user** (root first, then `development` or whoever):
+
+```bash
+git clone -b main ~/marckv.bundle ~/.marckv.dots
+git -C ~/.marckv.dots remote set-url origin https://github.com/villcabo/marckv.dots.git
+tar -xzf ~/tmux-plugins.tgz -C ~
+~/.marckv.dots/installer/install.sh --editor vim -y
+exec bash
+```
+
+The repo has to land in `~/.marckv.dots` exactly: the line `01` adds to
+`~/.bashrc` names that path, and anywhere else it loads nothing, silently.
+Pointing `origin` back at GitHub means a plain `marckv update` works the day
+the host gets a network.
+
+**Updating** — make a new bundle on the laptop the same way, copy it over, and:
+
+```bash
+marckv update --from ~/marckv.bundle
+```
+
+It is `marckv update` with the bundle in place of GitHub: fast-forward only,
+lists what it brought, reloads bash, and moves `origin/main` along so
+`marckv whatsnew` and `marckv status` stay right. A bundle this repo cannot
+use is refused before anything changes.
+
+**Missing packages** (`vim`, `tmux`, `git`): download them on the laptop in a
+container of the host's **exact** distro version, and install as root before
+step 2:
+
+```bash
+mkdir debs && docker run --rm -v "$PWD/debs:/debs" debian:12 bash -c \
+  'apt-get update -qq && apt-get install -y -qq --download-only vim tmux && cp /var/cache/apt/archives/*.deb /debs/'
+scp -r debs <host>:          # then, on the host:  sudo dpkg -i debs/*.deb
+```
+
 ---
 
 ## Project structure
@@ -154,6 +217,7 @@ source ~/.bashrc
 ├── docker-aliases/         # Eleven Docker & Compose commands, with docs and tests
 ├── nvim/                   # Full Neovim config (LazyVim)
 ├── nvim-lite/              # Minimal Neovim config for servers (LazyVim)
+├── vim/                    # vim-lite: plain Vim for servers, no plugins, nothing to download
 ├── kitty/                  # Kitty terminal config
 ├── tmux/                   # Tmux config
 └── installer/              # Installation scripts (lib/common.sh is their shared base)
