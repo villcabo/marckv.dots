@@ -196,6 +196,40 @@ lists what it brought, reloads bash, and moves `origin/main` along so
 `marckv whatsnew` and `marckv status` stay right. A bundle this repo cannot
 use is refused before anything changes.
 
+**Updating a host on a version before v3.0.0** — it has no `marckv` yet, so
+the first update is plain git, with the same bundle:
+
+```bash
+cd ~/.marckv.dots
+git status --short                       # must be empty: stop here if it is not
+git log -1 --format='%h %cs %s'          # note it — it is the way back
+git pull --ff-only ~/marckv.bundle main
+git fetch -q ~/marckv.bundle +main:refs/remotes/origin/main
+exec bash
+```
+
+"Not possible to fast-forward" means the host has commits of its own: stop and
+look before anything else. To go back, `git reset --hard <the hash noted>`.
+From then on it is `marckv update --from`. Nothing has to be reinstalled: the
+new docker commands load with the new shell. The commands v3.0.0 renamed:
+
+| Before | Now |
+|---|---|
+| `dotsupdate` | `marckv update` |
+| `reloadbash` | `marckv reload` |
+| `bashhelp [cat]` | `marckv help [cat]` |
+| `marckvdots` | `marckv cd` |
+
+**Why a bundle and not rsync.** A host that got the repo with `git clone` keeps
+its `.git`. rsync without `.git` leaves git on the old version, every file
+"modified", and the next pull refusing to overwrite them. rsync with `.git`
+turns the host into a mirror of the laptop — its branches, stashes and loose
+files — and still leaves files the repo deleted unless `--delete` is added,
+which cannot be undone. If rsync is used anyway: from a clean `main`, with
+`--dry-run` first, without `--delete`, and with the trailing slash on the
+source (`~/.marckv.dots/`), or it lands in `.marckv.dots/.marckv.dots`. rsync
+must also exist on the host, which a minimal Debian does not have.
+
 **Missing packages** (`vim`, `tmux`, `git`): download them on the laptop in a
 container of the host's **exact** distro version, and install as root before
 step 2:
