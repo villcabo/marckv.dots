@@ -1,0 +1,43 @@
+" vim-lite — plain Vim for the servers this repo supports.
+"
+" No plugin manager, no plugins, nothing downloaded or compiled: every file is
+" in this directory, which is installed as ~/.vim. The heavy lifting lives in
+" plugin/lite.vim, which Vim loads on its own.
+"
+" This file is split in two on purpose. Debian's minimal install ships
+" vim-tiny, which has no +eval: it cannot run a function, an `if`, or most of
+" plugin/lite.vim. Without +eval Vim skips everything between `if` and
+" `endif`, so the part above the `if 1` is what vim-tiny gets — settings it
+" understands — and the rest is ignored instead of erroring on every start.
+
+set nocompatible
+" UTF-8 whatever the locale says. A server reached over ssh often has none
+" (LANG not forwarded, no locale generated), and Vim then starts in latin1:
+" every multibyte character in listchars or fillchars becomes an error and a
+" "Press ENTER" on each start. Neovim is always UTF-8, so nvim-lite never had
+" to say this.
+set encoding=utf-8
+set number
+set expandtab shiftwidth=2 tabstop=2 softtabstop=2
+set ignorecase smartcase incsearch hlsearch
+set backspace=indent,eol,start
+set scrolloff=8
+set nowrap
+set splitright splitbelow
+set hidden
+set laststatus=2
+set ruler
+
+" Swap and backup files out of the directory being edited. The default puts
+" `.nginx.conf.swp` next to /etc/nginx/nginx.conf — in a directory the
+" service reads, owned by root, and left behind when the session drops. The
+" `/tmp//` entry is the fallback for vim-tiny, which cannot create the first
+" one (plugin/lite.vim does).
+set directory=~/.local/state/vim/swap//,/tmp//
+set backupdir=~/.local/state/vim/backup//,/tmp//
+
+if 1
+  let mapleader = " "
+  syntax on
+  filetype plugin indent on
+endif
