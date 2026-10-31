@@ -132,6 +132,20 @@ _marckv_update() {
         echo -e "       To bring it up to date: ${BOLD}marckv install nvim --copy${RESET}"
         echo
     fi
+    # nvim-lite installed from an offline pack: its plugins were built for one
+    # nvim-lite. A config that now wants others makes lazy try to clone them,
+    # on every start, with no network to do it.
+    local pack="$HOME/.local/share/nvim/marckv-pack.manifest" built_for now_lua
+    if [[ -f "$pack" ]]; then
+        built_for=$(sed -n 's/^NVIM_LITE_LUA_TREE=//p' "$pack")
+        now_lua=$(_marckv_git rev-parse "$after:nvim-lite/lua" 2>/dev/null)
+        if [[ -n "$built_for" && "$built_for" != "$now_lua" ]]; then
+            echo -e "${YELLOW}[WARN]${RESET} nvim-lite changed since its offline pack was built."
+            echo -e "       Rebuild it on a machine with internet (${BOLD}installer/offline/nvim-pack.sh${RESET})"
+            echo -e "       and unpack it here (${BOLD}installer/offline/nvim-unpack.sh${RESET})."
+            echo
+        fi
+    fi
     if _marckv_vim_is_copy && ! _marckv_git diff --quiet "$before" "$after" -- vim; then
         echo -e "${YELLOW}[WARN]${RESET} vim-lite changed, and ~/.vim is a copy the pull did not touch."
         echo -e "       To bring it up to date: ${BOLD}marckv install vim --copy${RESET}"
