@@ -188,6 +188,7 @@ _marckv_help() {
         _h_header "Shell Configuration"
         _h_section "marckv — this repo"
         _h_cmd "marckv update"     "Pull the repo; reload bash if anything changed"
+        _h_cmd "marckv update --from <f>" "The same, offline, from a git bundle"  "marckv update --from ~/marckv.bundle"
         _h_cmd "marckv reload"     "Reload bash config without closing the session"
         _h_cmd "marckv help [cat]" "This help; pass a category for details"   "marckv help services"
         _h_cmd "marckv status"     "Repo state and what each installer reports"

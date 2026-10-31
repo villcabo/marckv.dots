@@ -13,7 +13,8 @@ exists here or above — adding one silently stops it from reading this file.
 
 ### Installation (run from `installer/`)
 
-`./install.sh` runs the whole setup — 01, 02, 03 and `04 --full` — after one
+`./install.sh` runs the whole setup — 01, 02, 03 and the editor (`--editor
+nvim`, the default, is `04 --full`; `vim` is `06`; `none` skips it) — after one
 preview and one confirmation, passing `-y` to each. It re-implements nothing:
 a change to what a piece installs belongs in that piece's own installer. Its
 `uninstall` uses `confirm_destructive` (it deletes TPM's plugins and Neovim's
@@ -27,6 +28,7 @@ Core installers — numbered prefixes define execution order. Each supports `ins
 ./03-install-tmux.sh                    # Tmux config (symlink) + TPM
 ./04-install-nvim-lite.sh [--copy]      # Server-focused Neovim config (symlink, or copy)
 ./05-install-atuin.sh                   # atuin shell history — optional, not in install.sh
+./06-install-vim.sh [--copy]            # vim-lite as ~/.vim — install.sh --editor vim uses it instead of 04
 ```
 
 `04-install-nvim-lite.sh` also orchestrates the whole Neovim stack, because the
@@ -121,6 +123,16 @@ cd nvim-lite/tests
 ./run.sh debian12              # one — the GLIBC 2.36 case, the awkward one
 ```
 
+vim-lite has one as well — what changes per distro is the Vim version (8.1 on
+Debian 10, 8.2 on Debian 11 and Ubuntu 20.04, 9.x after) and therefore which
+features exist:
+
+```bash
+cd vim/tests
+./run.sh                       # eight distros, concurrently
+./run.sh debian11              # one — Vim 8.2, no live pickers
+```
+
 Docker aliases — their own harness, which also carries `bats` and `zsh`:
 
 ```bash
@@ -176,7 +188,7 @@ Colors must load first as other modules depend on them. The theme depends on fun
   `functions.sh`, when it must also run from zsh (a laptop on zsh never loads
   `bash/`) — and it follows the POSIX-plus-coreutils rule below, since it ships
   to servers too
-- `bash/marckv.sh` — the `marckv` command (`update`, `reload`, `help`, `cd`,
+- `bash/marckv.sh` — the `marckv` command (`update [--from <bundle>]`, `reload`, `help`, `cd`,
   `status`, `version`, `whatsnew`, `install`, `doctor`). A function, not a
   `bash/bin/` tool, because `update`/`reload`/`cd` must act on the calling
   shell. `install` and `status` delegate to `installer/`, never re-implement it
@@ -193,6 +205,14 @@ Colors must load first as other modules depend on them. The theme depends on fun
   blast radius, resolve files and profiles exactly as docker does) are the
   reason it exists in that shape.
 - `nvim/` vs `nvim-lite/` — full LazyVim setup vs. minimal server profile; both have their own `stylua.toml`
+- `vim/` — vim-lite: plain Vim for servers with no internet or an EDR. Installed
+  as `~/.vim` (symlink, or `--copy`). **No plugins, by design**: everything is
+  Vim script that ships with Vim (findfunc, wildtrigger, matchfuzzy, the
+  `comment`/`hlyank`/`osc52` packages). `vimrc` is split — the part above
+  `if 1` is all vim-tiny can read; the rest is skipped without +eval. State
+  (swap, backup, undo, netrw) goes to `~/.local/state/vim`, never into `~/.vim`,
+  which is the repo. `colors/gentleman.vim` is generated from the Neovim theme
+  with `nvim_get_hl`, not picked by hand. Read `vim/README.md` before changing it
 - `nvim-lite/VERSION` — plain text, semver over the CONFIG (not over Neovim).
   Bump it in the same commit as the change it describes: major when something
   in use is gone or a keymap moved, minor for new plugins/parsers/filetypes,

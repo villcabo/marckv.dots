@@ -4,7 +4,7 @@
 # A function and not a script in bash/bin: update, reload and cd act on the
 # shell you are in, and a child process cannot touch its parent.
 
-_MARCKV_PIECES="bash docker tmux nvim atuin"
+_MARCKV_PIECES="bash docker tmux nvim vim atuin"
 
 marckv() {
     local sub="$1"
@@ -34,6 +34,7 @@ _marckv_usage() {
     echo -e "\n  ${BOLD}marckv${RE} — manage marckv.dots ($MARCKV_DOTS_DIR)\n"
     printf "  ${G}%-26s${RE}%s\n" \
         "marckv update"            "Pull the repo; reload bash if anything changed" \
+        "marckv update --from <f>" "The same, offline, from a git bundle" \
         "marckv reload"            "Reload the bash config in this shell" \
         "marckv help [category]"   "Command reference for this bash setup" \
         "marckv cd"                "Go to the repo" \
@@ -66,15 +67,49 @@ _marckv_nvim_is_copy() {
     [[ -d "$HOME/.config/nvim" && ! -L "$HOME/.config/nvim" && -f "$HOME/.config/nvim/VERSION" ]]
 }
 
+# Same for vim-lite: ~/.vim as a real directory that 06 --copy made.
+_marckv_vim_is_copy() {
+    [[ -d "$HOME/.vim" && ! -L "$HOME/.vim" && -f "$HOME/.vim/plugin/lite.vim" ]]
+}
+
 _marckv_update() {
     _marckv_is_repo || return 1
-    local before after
+    local before after bundle="" pull_from=()
+
+    # --from <file>: a host with no internet updates from a git bundle made
+    # on a machine that has one —  git bundle create marckv.bundle main
+    # Everything after the pull is the same as an update from GitHub.
+    case "${1:-}" in
+        "") ;;
+        --from)
+            bundle=$(readlink -f "${2:-}" 2>/dev/null)
+            if [[ -z "${2:-}" || ! -f "$bundle" ]]; then
+                echo -e "${RED}error:${RESET} --from needs a bundle file: marckv update --from ~/marckv.bundle" >&2
+                return 1
+            fi
+            # A full bundle has no prerequisites; an incremental one that needs
+            # commits this repo lacks is rejected here, before anything moves.
+            if ! _marckv_git bundle verify "$bundle" >/dev/null 2>&1; then
+                echo -e "${RED}error:${RESET} $bundle is not a bundle this repo can use" >&2
+                _marckv_git bundle verify "$bundle" 2>&1 | sed 's/^/       /' >&2
+                return 1
+            fi
+            # The bundle IS origin's main as of when it was made, so origin/main
+            # moves with it. Left behind, whatsnew counted the new commits as
+            # local ones and reported nothing, and status called them unpushed.
+            pull_from=("$bundle" "+main:refs/remotes/origin/main")
+            ;;
+        *)
+            echo -e "${RED}error:${RESET} usage: marckv update [--from <bundle>]" >&2
+            return 1
+            ;;
+    esac
 
     before=$(_marckv_git rev-parse HEAD) || return 1
-    echo "Updating marckv.dots ($MARCKV_DOTS_DIR)..."
+    echo "Updating marckv.dots ($MARCKV_DOTS_DIR)${bundle:+ from $bundle}..."
     # --ff-only: a server only follows origin. A local commit there should
     # stop the update, not be merged into a commit nobody pushes.
-    if ! _marckv_git pull --ff-only; then
+    if ! _marckv_git pull --ff-only "${pull_from[@]}"; then
         echo -e "${RED}Update failed.${RESET} Check the error above." >&2
         return 1
     fi
@@ -95,6 +130,11 @@ _marckv_update() {
     if _marckv_nvim_is_copy && ! _marckv_git diff --quiet "$before" "$after" -- nvim-lite; then
         echo -e "${YELLOW}[WARN]${RESET} nvim-lite changed, and ~/.config/nvim is a copy the pull did not touch."
         echo -e "       To bring it up to date: ${BOLD}marckv install nvim --copy${RESET}"
+        echo
+    fi
+    if _marckv_vim_is_copy && ! _marckv_git diff --quiet "$before" "$after" -- vim; then
+        echo -e "${YELLOW}[WARN]${RESET} vim-lite changed, and ~/.vim is a copy the pull did not touch."
+        echo -e "       To bring it up to date: ${BOLD}marckv install vim --copy${RESET}"
         echo
     fi
 
@@ -134,6 +174,22 @@ _marckv_version() {
             "${repo_v:-?} in the repo, ${YELLOW}${inst_v} installed (copy)${RESET} — marckv install nvim --copy"
     else
         printf "  %-12s %s\n" "nvim-lite" "${repo_v:-?} ($mode)"
+    fi
+
+    repo_v="" mode=""
+    [[ -f "$MARCKV_DOTS_DIR/vim/VERSION" ]] && repo_v=$(<"$MARCKV_DOTS_DIR/vim/VERSION")
+    if [[ -L "$HOME/.vim" && "$HOME/.vim" -ef "$MARCKV_DOTS_DIR/vim" ]]; then
+        printf "  %-12s %s\n" "vim-lite" "${repo_v:-?} (symlink)"
+    elif _marckv_vim_is_copy; then
+        inst_v=$(<"$HOME/.vim/VERSION")
+        if [[ "$inst_v" != "$repo_v" ]]; then
+            printf "  %-12s %b\n" "vim-lite" \
+                "${repo_v:-?} in the repo, ${YELLOW}${inst_v} installed (copy)${RESET} — marckv install vim --copy"
+        else
+            printf "  %-12s %s\n" "vim-lite" "${repo_v:-?} (copy)"
+        fi
+    else
+        printf "  %-12s %s\n" "vim-lite" "${repo_v:-?} in the repo, not installed"
     fi
 }
 
@@ -208,6 +264,7 @@ _marckv_install() {
         tmux)    script="03-install-tmux.sh" ;;
         nvim)    script="04-install-nvim-lite.sh" ;;
         atuin)   script="05-install-atuin.sh" ;;
+        vim)     script="06-install-vim.sh" ;;
         *)
             echo -e "${RED}error:${RESET} unknown piece '$piece' — one of: all ${_MARCKV_PIECES}" >&2
             return 1
@@ -282,6 +339,16 @@ _marckv_doctor() {
         else
             _doc_warn compiler "no gcc — treesitter parsers cannot build (marckv install nvim -d)"
         fi
+    fi
+
+    # vim-tiny is what a minimal Debian ships: no syntax, and vim-lite can only
+    # give it the basic settings.
+    if ! command -v vim >/dev/null; then
+        _doc_info vim "not installed"
+    elif vim --version 2>/dev/null | grep -q '+eval'; then
+        _doc_ok vim "$(vim --version | head -n1 | sed -E 's/.*IMproved ([0-9.]+).*/\1/'), full"
+    else
+        _doc_warn vim "only vim-tiny — no syntax, no vim-lite pickers (apt install vim)"
     fi
 
     unset -f _doc_ok _doc_warn _doc_info

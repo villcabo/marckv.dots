@@ -24,13 +24,32 @@ set -e
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/common.sh"
 
 INSTALLER_NAME="install.sh"
-INSTALLER_ABOUT="The whole setup in one go: bash, docker aliases, tmux, Neovim + nvim-lite."
+INSTALLER_ABOUT="The whole setup in one go: bash, docker aliases, tmux, and an editor config."
 
 use_copy=false
+editor=nvim
+_editor_next=false
+
+# --editor takes a value, and the shared parser hands flags over one argument
+# at a time — so `--editor` notes that the NEXT argument is its value.
+# `--editor=vim` works too.
+_set_editor() {
+    case "$1" in
+        nvim|vim|none) editor="$1" ;;
+        *) die "--editor takes nvim, vim or none — got '${1}'" ;;
+    esac
+}
 
 installer_flag() {
+    if [[ "$_editor_next" == true ]]; then
+        _editor_next=false
+        _set_editor "$1"
+        return 0
+    fi
     case "$1" in
-        -c|--copy) use_copy=true ;;
+        -c|--copy)  use_copy=true ;;
+        --editor)   _editor_next=true ;;
+        --editor=*) _set_editor "${1#--editor=}" ;;
         *) return 1 ;;
     esac
     return 0
@@ -41,7 +60,7 @@ installer_usage() {
     echo
     echo -e "  ${INSTALLER_ABOUT}"
     echo
-    echo -e "${BLUE}Usage:${NC} ./${INSTALLER_NAME} [install|status|uninstall] [-c] [-y]"
+    echo -e "${BLUE}Usage:${NC} ./${INSTALLER_NAME} [install|status|uninstall] [--editor nvim|vim|none] [-c] [-y]"
     echo
     echo -e "  ${YELLOW}install${NC}      Everything below, in order. The default."
     echo -e "  ${YELLOW}status${NC}       What each piece reports about itself."
@@ -49,6 +68,11 @@ installer_usage() {
     echo
     echo -e "  ${YELLOW}-c, --copy${NC}   Copy the nvim-lite config instead of symlinking it — for a"
     echo -e "               server that should not depend on the repo staying where it is."
+    echo -e "  ${YELLOW}--editor${NC}     Which editor config is step 4:"
+    echo -e "                 ${BOLD}nvim${NC}  Neovim + nvim-lite — plugins, parsers, downloads. The default."
+    echo -e "                 ${BOLD}vim${NC}   vim-lite — plain Vim, no plugins, nothing downloaded. For a"
+    echo -e "                       host with no internet, or an EDR."
+    echo -e "                 ${BOLD}none${NC}  no editor: bash, docker and tmux only."
     echo -e "  ${YELLOW}-y, --yes${NC}    Skip the one confirmation. The plan is still printed."
     echo
     echo -e "${BLUE}Runs:${NC}"
@@ -65,13 +89,16 @@ installer_usage() {
 # The steps, in order, as "label<TAB>script<TAB>what it does". One record per
 # step rather than parallel lists, so a label can never drift from its script.
 _steps() {
-    local nvim_args="--full"
-    [[ "$use_copy" == true ]] && nvim_args="--full --copy"
+    local nvim_args="--full" vim_args=""
+    [[ "$use_copy" == true ]] && nvim_args="--full --copy" vim_args="--copy"
     printf '%s\t%s\t%s\n' \
         "bash"   "01-install-bash.sh"           "loads bash/.bashrc from ~/.bashrc" \
         "docker" "02-install-docker-aliases.sh" "loads docker-aliases/init.sh from ~/.bash_aliases" \
-        "tmux"   "03-install-tmux.sh"           "links ~/.tmux.conf, installs TPM and its plugins" \
-        "nvim"   "04-install-nvim-lite.sh $nvim_args" "system deps, Neovim, the nvim-lite config, plugins"
+        "tmux"   "03-install-tmux.sh"           "links ~/.tmux.conf, installs TPM and its plugins"
+    case "$editor" in
+        nvim) printf '%s\t%s\t%s\n' "nvim" "04-install-nvim-lite.sh $nvim_args" "system deps, Neovim, the nvim-lite config, plugins" ;;
+        vim)  printf '%s\t%s\t%s\n' "vim" "06-install-vim.sh $vim_args" "vim-lite as ~/.vim: plain Vim, nothing downloaded" ;;
+    esac
 }
 
 # Ask for sudo now, while the person who just said yes is still watching.
@@ -93,7 +120,7 @@ _steps() {
 _prime_sudo() {
     [[ "$PRIV_MODE" == "sudo" ]] || return 0
     if [[ -t 0 ]]; then
-        info "Neovim and its dependencies need ${BOLD}sudo${NC} — asking once, now"
+        info "System packages need ${BOLD}sudo${NC} — asking once, now"
         sudo -v && return 0
         error "sudo was not granted. Nothing was changed."
         info "To install for ${BOLD}$(id -un)${NC} only, under ~/.local: ${BOLD}MARCKV_PRIV_MODE=user ./${INSTALLER_NAME}${NC}"
@@ -105,7 +132,10 @@ _prime_sudo() {
 }
 
 do_install() {
-    local label script what n=0 total=4 failed=""
+    local label script what n=0 total failed=""
+
+    [[ "$_editor_next" == true ]] && die "--editor needs a value: nvim, vim or none"
+    total=$(_steps | wc -l)
 
     preview_open "Install the marckv.dots setup"
     while IFS=$'\t' read -r label script what; do
@@ -114,9 +144,11 @@ do_install() {
         preview_line "" "${DIM}./$script${NC}"
     done < <(_steps)
     preview_line "privileges" "$(priv_label)"
-    [[ "$use_copy" == true ]] \
-        && preview_line "nvim config" "copied — the server will not need the repo afterwards" \
-        || preview_line "nvim config" "symlinked — repo edits are live"
+    if [[ "$editor" != none ]]; then
+        [[ "$use_copy" == true ]] \
+            && preview_line "editor config" "copied — the server will not need the repo afterwards" \
+            || preview_line "editor config" "symlinked — repo edits are live"
+    fi
     preview_line "deletes" "nothing — every step backs up what it replaces"
     preview_close
 
@@ -153,7 +185,7 @@ do_install() {
         return 1
     fi
 
-    success "All four steps finished."
+    success "All $total steps finished."
     echo
     info "Load it into this shell with: ${YELLOW}exec bash${NC}   (or open a new terminal)"
 }

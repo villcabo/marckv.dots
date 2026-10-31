@@ -26,9 +26,27 @@ wipe() { rm -rf /opt/nvim /opt/nvim.prev /opt/.nvim-stage.* /etc/profile.d/nvim.
 # it was supposed to be measuring, and the scenario stayed green while testing
 # nothing — exactly what its own comment warned would happen. script(1) gives
 # the installer a pty, so the answer is read.
+#
+# Its stdin stays open until the command has finished, and the whole call is
+# bounded. Closing it right after the reply — what this did first — is the trap
+# oneshot.test.sh's as_user_tty documents: script(1) can spin and stop relaying
+# the pty. It did here: S4 sat 13 minutes on Debian 13 with the installer still
+# running, and nothing would ever have ended it. The command drops a marker
+# when it is done, the feeder waits for it, and a hang fails in five minutes
+# with rc 124 instead of stalling every distro after it.
 answer() {
     local reply="$1"; shift
-    script -qec "$*" /dev/null < <(printf '%s\n' "$reply")
+    local done_flag="/tmp/answer.done.$$.$RANDOM" rc=124 i
+    rm -f "$done_flag"
+    timeout 300 script -qec "$*; echo \$? > $done_flag" /dev/null < <(
+        printf '%s\n' "$reply"
+        # Bounded too: on a timeout nobody writes the marker, and an unbounded
+        # wait would outlive the scenario.
+        for i in $(seq 300); do [ -e "$done_flag" ] && break; sleep 1; done
+    )
+    [ -s "$done_flag" ] && rc=$(cat "$done_flag")
+    rm -f "$done_flag"
+    return "$rc"
 }
 
 GLIBC=$(ldd --version | head -1 | awk '{print $NF}')
