@@ -17,7 +17,7 @@ ok()  { printf '  \033[32mok\033[0m   %s\n' "$1"; PASS=$((PASS + 1)); }
 bad() { printf '  \033[31mFAIL\033[0m %s\n' "$1"; [ -n "$2" ] && printf '       %s\n' "$2"; FAIL=$((FAIL + 1)); }
 
 # The numbered installers plus the gradle helper: these own install/status/uninstall.
-LIFECYCLE="01-install-bash 02-install-docker-aliases 03-install-tmux 04-install-nvim-lite 05-install-atuin install-bash-extensions-gradle-functions"
+LIFECYCLE="01-install-bash 02-install-docker-aliases 03-install-tmux 04-install-nvim-lite 05-install-atuin 06-install-vim install-bash-extensions-gradle-functions"
 # These two are helpers with their own flags — same base contract, no three verbs.
 HELPERS="clean-nvim-data install-nvim"
 # The one-shot installer. Same --help and unknown-flag contract, but kept out of
