@@ -149,8 +149,8 @@ source ~/.bashrc
 ### Offline: a host with no internet
 
 Install once by hand; after that, only the repo changes, and it travels as a
-single file. Use `--editor vim`: nvim-lite needs plugins and parsers from
-GitHub, vim-lite needs nothing.
+single file. The steps below use `--editor vim`, which needs nothing from the
+network. For nvim-lite, see **Offline nvim-lite** after them.
 
 **What the host must already have:** `git`, `tmux` and a full `vim` — Ubuntu
 Server ships all three. A minimal Debian has `vim-tiny` and no tmux; see the
@@ -205,6 +205,38 @@ mkdir debs && docker run --rm -v "$PWD/debs:/debs" debian:12 bash -c \
   'apt-get update -qq && apt-get install -y -qq --download-only vim tmux && cp /var/cache/apt/archives/*.deb /debs/'
 scp -r debs <host>:          # then, on the host:  sudo dpkg -i debs/*.deb
 ```
+
+#### Offline nvim-lite (Ubuntu 22.04+, Debian 12+)
+
+nvim-lite downloads Neovim, ~20 plugins, 24 parser sources, fzf and the
+tree-sitter CLI. `nvim-pack.sh` does all of that on the laptop, inside
+`ubuntu:22.04`, and writes it to one file (~70 MB); `nvim-unpack.sh` puts each
+piece where the regular installers and Neovim already look — so with no
+network, nvim-lite starts exactly as it does online, and nothing in it tries to
+download. One pack serves Ubuntu 22.04, 24.04, 26.04 and Debian 12, 13: the
+build checks every binary's GLIBC floor (2.34 today) against 22.04's 2.35, and
+the unpacker refuses an older host (Debian 11, Ubuntu 20.04).
+
+```bash
+# laptop (docker + internet), from main
+~/.marckv.dots/installer/offline/nvim-pack.sh          # -> ~/marckv-nvim-<tag>.tgz
+scp ~/marckv-nvim-v0.12.6.tgz <host>:
+
+# host: step 2 above, with  install.sh --editor none -y  in place of
+# --editor vim; then, once per user, root first:
+~/.marckv.dots/installer/offline/nvim-unpack.sh ~/marckv-nvim-v0.12.6.tgz
+```
+
+Root's run installs Neovim in `/opt/nvim` and fzf and tree-sitter in
+`/usr/local/bin`; every other user reuses them and only gets their own
+plugins and parsers, with no sudo asked. Unpacking again — the way a new pack
+is installed — moves the previous `~/.local/share/nvim` aside.
+
+**When to rebuild the pack:** when nvim-lite's plugins change, or for a new
+Neovim. The pack records which `nvim-lite/lua` it was built for, and
+`marckv update --from` warns when a bundle brings a different one. Ignored, the
+mismatch is visible: lazy tries to clone what is missing, on every start, with
+no network to do it.
 
 ---
 
