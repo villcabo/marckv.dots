@@ -60,9 +60,12 @@ die()     { error "$1"; exit 1; }
 # Paths and privileges
 # ---------------------------------------------------------------------------
 
-# Resolved from the CALLER's location, not this file's: every installer sits in
-# installer/ and expects MARCKV_DOTS_DIR to be the repo root.
-INSTALLER_DIR="$(cd "$(dirname "${BASH_SOURCE[1]:-${BASH_SOURCE[0]}}")" && pwd)"
+# Resolved from THIS file's location, which is fixed at installer/lib/, and not
+# from the caller's. The caller's was right exactly while every caller sat
+# directly in installer/: the first script one level deeper (installer/offline/)
+# got MARCKV_DOTS_DIR=installer and went looking for installer/nvim-lite. The
+# value is the same for every numbered installer either way.
+INSTALLER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MARCKV_DOTS_DIR="$(cd "${INSTALLER_DIR}/.." && pwd)"
 
 # Who may write outside $HOME.
