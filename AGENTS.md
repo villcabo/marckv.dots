@@ -123,6 +123,16 @@ cd nvim-lite/tests
 ./run.sh debian12              # one — the GLIBC 2.36 case, the awkward one
 ```
 
+The offline nvim-lite pack has its own, and every container runs with
+`--network none`; curl, wget and git are wrapped to log each call, so
+"offline" is measured, not inferred:
+
+```bash
+cd installer/offline/tests
+PACK=~/marckv-nvim-v0.12.6.tgz ./run.sh   # five supported distros + Debian 11 (must refuse)
+./run.sh ubuntu22                          # builds a pack first when PACK is unset
+```
+
 vim-lite has one as well — what changes per distro is the Vim version (8.1 on
 Debian 10, 8.2 on Debian 11 and Ubuntu 20.04, 9.x after) and therefore which
 features exist:
@@ -192,6 +202,14 @@ Colors must load first as other modules depend on them. The theme depends on fun
   `status`, `version`, `whatsnew`, `install`, `doctor`). A function, not a
   `bash/bin/` tool, because `update`/`reload`/`cd` must act on the calling
   shell. `install` and `status` delegate to `installer/`, never re-implement it
+- `installer/offline/` — nvim-lite for hosts with no internet (Ubuntu 22.04+,
+  Debian 12+). `nvim-pack.sh` runs the real installers inside `ubuntu:22.04` and
+  harvests what they downloaded; `nvim-unpack.sh` drops each piece where the
+  installers and Neovim already look (install-nvim.sh's `/tmp` cache,
+  `~/.local/share/nvim`, `/usr/local/bin`). **No installer has an offline
+  mode, and none should get one** — feed the paths they read instead. Scripts
+  here source `../lib/common.sh`, which is why it resolves its paths from its
+  own location
 - `bash-extensions/` — optional add-ons sourced separately (e.g. `bash_gradle_functions.sh`)
 - `docker-aliases/` — docker/compose shortcuts for bash and zsh. Twenty-three
   commands — the compose project (`dcup dcdown dcrestart dcx dclt dcps dcver
