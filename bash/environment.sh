@@ -60,7 +60,12 @@ unset HISTIGNORE
 # every prompt. At the 100k entries HISTSIZE allows that measured 0.62s per 30
 # prompts against 0.11s for -n, and it grows with the file while -n does not.
 # -c also wipes and renumbers the in-memory list on every command.
-export PROMPT_COMMAND="history -n; history -a${PROMPT_COMMAND:+; $PROMPT_COMMAND}"
+#
+# Added once: a reload (marckv reload) sources this again, and prepending a
+# second copy would also put it ahead of the theme's prompt function, which
+# has to run first to read $?.
+[[ "$PROMPT_COMMAND" == *"history -n; history -a"* ]] \
+    || export PROMPT_COMMAND="history -n; history -a${PROMPT_COMMAND:+; $PROMPT_COMMAND}"
 
 # Restrict default permissions: new files are rwxr-x--- (not readable by others).
 umask 027

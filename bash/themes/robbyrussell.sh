@@ -83,10 +83,31 @@ get_compact_pwd() {
     esac
 }
 
+# Start the prompt on a line of its own, as zsh does.
+#
+# Output with no final newline — `curl` printing a JSON body, `printf x` — left
+# the cursor mid-line, and bash drew the prompt right after it. Readline still
+# believes the prompt starts at column 1, so the next redraw returned there and
+# overwrote the output: `{"error":"...","error_description":"Usuario o clave
+# incorrectos"}` came back as `o clave incorrectos"}` with the prompt on top.
+#
+# The trick is zsh's PROMPT_SP, and it asks the terminal nothing (a cursor
+# query waits on a reply, which over a slow ssh arrives late and gets typed
+# into the next command). Print a dim `%` and pad to exactly one line's width,
+# then return and clear: started at column 1, that fills the line, `\r` comes
+# back to its start and `\e[K` erases it — nothing shows. Started mid-line, the
+# padding wraps, `\r` lands at the start of the NEW line, and the output above
+# keeps its `%` to say it had no newline.
+_prompt_own_line() {
+    [[ -t 1 && -n "$COLUMNS" ]] || return 0
+    printf '\e[2m%%\e[0m%*s\r\e[K' "$((COLUMNS - 1))" ''
+}
+
 # Custom prompt function (robbyrussell style)
 set_robbyrussell_prompt() {
     local last_exit_code=$?
-    
+    _prompt_own_line
+
     # User and host info
     local user_host=""
     if [[ $EUID -eq 0 ]]; then
@@ -115,5 +136,15 @@ set_robbyrussell_prompt() {
     PS1="${user_host} ${current_dir}${git_info} ${arrow} "
 }
 
-# Activate the theme
-PROMPT_COMMAND='set_robbyrussell_prompt'
+# Activate the theme: FIRST in PROMPT_COMMAND, and added to it, not over it.
+#
+# First, because set_robbyrussell_prompt reads $? for the arrow's colour and
+# anything before it — `history -n` included — would leave $? at 0 and the
+# arrow green after a failed command.
+#
+# Added rather than assigned: this line used to be PROMPT_COMMAND=..., which
+# threw away the `history -n; history -a` environment.sh had just put there,
+# and with it history shared across sessions. Checked before adding, so a
+# reload (marckv reload sources .bashrc again) does not stack a second copy.
+[[ ";${PROMPT_COMMAND};" == *";set_robbyrussell_prompt;"* ]] \
+    || PROMPT_COMMAND="set_robbyrussell_prompt${PROMPT_COMMAND:+;$PROMPT_COMMAND}"
