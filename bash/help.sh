@@ -200,7 +200,6 @@ _marckv_help() {
         _h_cmd "histappend"        "History is always appended, never overwritten"
         _h_cmd "checkjobs"         "Warns before exit if background jobs are running"
         _h_cmd "PROMPT_COMMAND"    "History flushed to disk after every command"
-        _h_cmd "TMOUT=1800"        "Auto-logout after 30 minutes of inactivity"
         ;;
 
     # ════════════════════════════════════════════════════════════════════════
@@ -208,15 +207,13 @@ _marckv_help() {
         _h_header "Server Security"
         _h_section "Active protections"
         _h_cmd "umask 027"         "New files deny permissions to others (rwxr-x---)"
-        _h_cmd "TMOUT=1800"        "Idle SSH sessions close automatically after 30 min"
-        _h_cmd "readonly TMOUT"    "Timeout cannot be unset within the session"
-        _h_cmd "HISTCONTROL"       "Records everything; skips consecutive duplicates only"
+        _h_cmd "HISTCONTROL"       "Skips repeats in a row, and commands typed with a leading space"
         _h_cmd "HISTTIMEFORMAT"    "Every command stamped with exact date and time"
         _h_section "Diagnostics"
         _h_cmd "tailauth"          "Watch SSH login attempts and sudo usage live"
         _h_cmd "dmesgc"            "Kernel messages (hardware errors, network issues)"
         _h_cmd "certcheck <host>"  "Verify SSL certificate is not about to expire"    "certcheck example.com"
-        _h_cmd "lastb"             "View failed login attempts (requires sudo)"
+        _h_cmd "journalctl -u ssh -g Failed" "Failed SSH logins (sudo; lastb is gone from newer distros)"
         ;;
 
     # ════════════════════════════════════════════════════════════════════════
