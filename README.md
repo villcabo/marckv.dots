@@ -196,8 +196,7 @@ lists what it brought, reloads bash, and moves `origin/main` along so
 `marckv whatsnew` and `marckv status` stay right. A bundle this repo cannot
 use is refused before anything changes.
 
-**Updating a host on a version before v3.0.0** — it has no `marckv` yet, so
-the first update is plain git, with the same bundle:
+**With plain git**, where `marckv` is not available — the same bundle works:
 
 ```bash
 cd ~/.marckv.dots
@@ -210,15 +209,8 @@ exec bash
 
 "Not possible to fast-forward" means the host has commits of its own: stop and
 look before anything else. To go back, `git reset --hard <the hash noted>`.
-From then on it is `marckv update --from`. Nothing has to be reinstalled: the
-new docker commands load with the new shell. The commands v3.0.0 renamed:
-
-| Before | Now |
-|---|---|
-| `dotsupdate` | `marckv update` |
-| `reloadbash` | `marckv reload` |
-| `bashhelp [cat]` | `marckv help [cat]` |
-| `marckvdots` | `marckv cd` |
+Nothing has to be reinstalled: `exec bash` loads what changed, and from then
+on `marckv update --from` is available.
 
 **Why a bundle and not rsync.** A host that got the repo with `git clone` keeps
 its `.git`. rsync without `.git` leaves git on the old version, every file
