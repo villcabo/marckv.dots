@@ -55,8 +55,16 @@ source "$BASH_MODULES_DIR/atuin.sh"
 # ADDITIONAL CONFIGURATIONS
 # =============================================================================
 
-# Source additional custom configurations if they exist
+# Source additional custom configurations if they exist.
+#
+# ~/.bash_aliases is skipped when ~/.bashrc already sources it, which the stock
+# Ubuntu and Debian .bashrc both do — a few lines above the one that loads this
+# file. Sourcing it here as well loaded the docker aliases twice in every shell.
 for config_file in "$HOME/.bash_aliases" "$HOME/.bash_local" "$HOME/.bashrc.local"; do
+    if [[ "$config_file" == "$HOME/.bash_aliases" ]] \
+        && grep -qsE '^[^#]*\.bash_aliases' "$HOME/.bashrc"; then
+        continue
+    fi
     [[ -r "$config_file" ]] && . "$config_file"
 done
 
@@ -64,3 +72,16 @@ done
 for script in /etc/profile.d/{nvim,node,go}.sh; do
     [[ -r "$script" ]] && . "$script"
 done
+
+# One entry per directory in PATH, the first occurrence wins. A login shell has
+# already run those profile.d scripts once, and install-nvim.sh's nvim.sh
+# appends without checking, so /opt/nvim/bin came out twice — and once more on
+# every `marckv reload`.
+_dedupe_path() {
+    local out="" dir IFS=:
+    for dir in $PATH; do
+        [[ -n "$dir" && ":$out:" != *":$dir:"* ]] && out="${out:+$out:}$dir"
+    done
+    PATH="$out"
+}
+_dedupe_path
