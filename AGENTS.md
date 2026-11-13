@@ -198,10 +198,16 @@ Colors must load first as other modules depend on them. The theme depends on fun
   `functions.sh`, when it must also run from zsh (a laptop on zsh never loads
   `bash/`) — and it follows the POSIX-plus-coreutils rule below, since it ships
   to servers too
-- `bash/marckv.sh` — the `marckv` command (`update [--from <bundle>]`, `reload`, `help`, `cd`,
+- `bash/marckv.sh` — the `marckv` command (`update [--from <bundle>] [--no-verify]`, `reload`, `help`, `cd`,
   `status`, `version`, `whatsnew`, `install`, `doctor`). A function, not a
   `bash/bin/` tool, because `update`/`reload`/`cd` must act on the calling
   shell. `install` and `status` delegate to `installer/`, never re-implement it
+- `keys/` — the public keys `marckv update` checks every incoming commit
+  against: `marckv.asc` (the owner; any commit) and `github-web-flow.asc`
+  (GitHub; merge commits only). Read from the copy already on the host, before
+  the update — so changing a key is itself checked against the old keys. A new
+  signing key goes here in a commit signed by the CURRENT one, or no host will
+  ever accept it. Its scenarios: `bash/tests/verify-update.test.sh`
 - `installer/offline/` — nvim-lite for hosts with no internet (Ubuntu 22.04+,
   Debian 12+). `nvim-pack.sh` runs the real installers inside `ubuntu:22.04` and
   harvests what they downloaded; `nvim-unpack.sh` drops each piece where the

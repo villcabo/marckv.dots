@@ -196,6 +196,17 @@ lists what it brought, reloads bash, and moves `origin/main` along so
 `marckv whatsnew` and `marckv status` stay right. A bundle this repo cannot
 use is refused before anything changes.
 
+**Every update is verified before anything moves**, from GitHub or from a
+bundle. Each new commit must be signed by the owner's key (`keys/marckv.asc`);
+a merge may instead carry GitHub's (`keys/github-web-flow.asc`), the key that
+signs "Merge pull request" commits — but the commits it merges are checked too.
+One unsigned or foreign commit and the update is refused, with the commits
+named and the working tree untouched. The keys are read from the copy already
+on the host, so a commit that changes `keys/` is checked against the old ones:
+taking over the GitHub account is not enough to push code to a host. It needs
+`gpg` (Ubuntu and Debian ship it); `marckv doctor` says whether it is there.
+`marckv update --no-verify` skips the check, and says so.
+
 **With plain git**, where `marckv` is not available — the same bundle works:
 
 ```bash
