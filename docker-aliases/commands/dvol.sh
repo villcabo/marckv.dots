@@ -129,7 +129,7 @@ dvol() {
 
     # --- who mounts what --------------------------------------------------
     # From inspect, not from `ps --format {{.Mounts}}`: ps truncates the names
-    # to fourteen characters with an ellipsis ("nginx-api-ws_n…"), so nothing
+    # to fourteen characters with an ellipsis ("nginx-gw-api_n…"), so nothing
     # would ever match and every volume would come out "unused".
     #
     # A lookup table, so each volume is one access instead of a scan. Lookups

@@ -124,7 +124,7 @@ priv_label() {
 
 # A scratch directory that can run what is put in it.
 #
-# /tmp is mounted noexec on hardened servers. On buildproapp (Ubuntu 26.04 on
+# /tmp is mounted noexec on hardened servers. On one of them (Ubuntu 26.04 on
 # OpenStack) the tree-sitter CLI downloaded and unpacked fine, then failed its
 # own --version check with "Permission denied", and the installer called the
 # binary unable to run on this system. Nothing was wrong with the binary.

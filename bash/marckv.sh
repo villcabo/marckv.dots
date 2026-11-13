@@ -35,6 +35,7 @@ _marckv_usage() {
     printf "  ${G}%-26s${RE}%s\n" \
         "marckv update"            "Pull the repo; reload bash if anything changed" \
         "marckv update --from <f>" "The same, offline, from a git bundle" \
+        "  ... --no-verify"         "Skip the signature check (it is on by default)" \
         "marckv reload"            "Reload the bash config in this shell" \
         "marckv help [category]"   "Command reference for this bash setup" \
         "marckv cd"                "Go to the repo" \
@@ -72,47 +73,120 @@ _marckv_vim_is_copy() {
     [[ -d "$HOME/.vim" && ! -L "$HOME/.vim" && -f "$HOME/.vim/plugin/lite.vim" ]]
 }
 
+# Every commit an update brings must be signed by a key this copy already
+# trusts — keys/ as it is BEFORE the update, so a commit that adds a key is
+# checked against the old ones and refused. A plain commit needs the owner's
+# key (keys/marckv.asc); only a merge may also carry GitHub's (keys/github-
+# web-flow.asc), which is what "Merge pull request" commits are signed with.
+# Not GitHub's for anything else: someone holding the account who edits a
+# file on the web gets a commit GitHub signs, and that is exactly the one to
+# stop.
+#
+# Checked in a throwaway GNUPGHOME, so the host's own keyring is neither read
+# nor written. The keys are imported, not trusted — `U`, a good signature from
+# a key of unknown validity, is accepted when its fingerprint is in keys/.
+_marckv_verify() {  # <from> <to>
+    local keys="$MARCKV_DOTS_DIR/keys" home mine github allowed sha st fp parents bad="" n=0
+
+    if ! command -v gpg >/dev/null 2>&1; then
+        echo -e "${RED}error:${RESET} gpg is not installed, so the update cannot be verified" >&2
+        return 1
+    fi
+    if [[ ! -f "$keys/marckv.asc" ]]; then
+        echo -e "${RED}error:${RESET} no trusted key in this copy ($keys/marckv.asc)" >&2
+        return 1
+    fi
+    # Everything gpg does here happens in a throwaway home: without one even
+    # --show-keys creates ~/.gnupg in the account being updated.
+    home=$(mktemp -d) || return 1
+    mine=$(GNUPGHOME="$home" gpg --batch --with-colons --show-keys "$keys/marckv.asc" 2>/dev/null | awk -F: '$1=="fpr"{print $10}')
+    github=$(GNUPGHOME="$home" gpg --batch --with-colons --show-keys "$keys/github-web-flow.asc" 2>/dev/null | awk -F: '$1=="fpr"{print $10}')
+    GNUPGHOME="$home" gpg --batch --quiet --import "$keys"/*.asc >/dev/null 2>&1
+
+    while IFS=$'\t' read -r sha st fp parents; do
+        n=$((n + 1))
+        allowed="$mine"
+        [[ "$parents" == *" "* ]] && allowed="$mine"$'\n'"$github"
+        if [[ "$st" != G && "$st" != U ]] || ! grep -qx "$fp" <<< "$allowed"; then
+            bad+="  ${sha:0:9} $(_marckv_git log -1 --format='%s' "$sha" | cut -c1-60)  [signature: $st${fp:+ ${fp: -16}}]"$'\n'
+        fi
+    # Tab-separated: an empty field (no signature, so no fingerprint) must not
+    # shift the parents into its place. %GP is the primary key behind a
+    # subkey signature; %GF when the primary signed directly.
+    done < <(GNUPGHOME="$home" git -C "$MARCKV_DOTS_DIR" log --format='%H%x09%G?%x09%GP%x09%GF%x09%P' "$1..$2" 2>/dev/null \
+        | awk -F'\t' -v OFS='\t' '{ print $1, $2, ($3 != "" ? $3 : ($4 != "" ? $4 : "-")), $5 }')
+    rm -rf "$home"
+
+    if [[ -n "$bad" ]]; then
+        echo -e "${RED}error:${RESET} not signed by a trusted key — nothing was changed:" >&2
+        printf '%s' "$bad" >&2
+        return 1
+    fi
+    [[ $n -gt 0 ]] && echo "Verified: $n new commit(s), all signed by a trusted key."
+    return 0
+}
+
 _marckv_update() {
     _marckv_is_repo || return 1
-    local before after bundle="" pull_from=()
+    local before after target bundle="" verify=true
 
     # --from <file>: a host with no internet updates from a git bundle made
     # on a machine that has one —  git bundle create marckv.bundle main
-    # Everything after the pull is the same as an update from GitHub.
-    case "${1:-}" in
-        "") ;;
-        --from)
-            bundle=$(readlink -f "${2:-}" 2>/dev/null)
-            if [[ -z "${2:-}" || ! -f "$bundle" ]]; then
-                echo -e "${RED}error:${RESET} --from needs a bundle file: marckv update --from ~/marckv.bundle" >&2
+    # Everything after the fetch is the same as an update from GitHub.
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --from)
+                bundle=$(readlink -f "${2:-}" 2>/dev/null)
+                if [[ -z "${2:-}" || ! -f "$bundle" ]]; then
+                    echo -e "${RED}error:${RESET} --from needs a bundle file: marckv update --from ~/marckv.bundle" >&2
+                    return 1
+                fi
+                # A full bundle has no prerequisites; an incremental one that
+                # needs commits this repo lacks is rejected here.
+                if ! _marckv_git bundle verify "$bundle" >/dev/null 2>&1; then
+                    echo -e "${RED}error:${RESET} $bundle is not a bundle this repo can use" >&2
+                    _marckv_git bundle verify "$bundle" 2>&1 | sed 's/^/       /' >&2
+                    return 1
+                fi
+                shift 2
+                ;;
+            --no-verify) verify=false; shift ;;
+            *)
+                echo -e "${RED}error:${RESET} usage: marckv update [--from <bundle>] [--no-verify]" >&2
                 return 1
-            fi
-            # A full bundle has no prerequisites; an incremental one that needs
-            # commits this repo lacks is rejected here, before anything moves.
-            if ! _marckv_git bundle verify "$bundle" >/dev/null 2>&1; then
-                echo -e "${RED}error:${RESET} $bundle is not a bundle this repo can use" >&2
-                _marckv_git bundle verify "$bundle" 2>&1 | sed 's/^/       /' >&2
-                return 1
-            fi
-            # The bundle IS origin's main as of when it was made, so origin/main
-            # moves with it. Left behind, whatsnew counted the new commits as
-            # local ones and reported nothing, and status called them unpushed.
-            pull_from=("$bundle" "+main:refs/remotes/origin/main")
-            ;;
-        *)
-            echo -e "${RED}error:${RESET} usage: marckv update [--from <bundle>]" >&2
-            return 1
-            ;;
-    esac
+                ;;
+        esac
+    done
 
     before=$(_marckv_git rev-parse HEAD) || return 1
     echo "Updating marckv.dots ($MARCKV_DOTS_DIR)${bundle:+ from $bundle}..."
+
+    # Fetch, verify, then move: nothing in the working tree changes until
+    # every new commit has passed.
+    if [[ -n "$bundle" ]]; then
+        _marckv_git fetch -q "$bundle" main || { echo -e "${RED}Update failed.${RESET}" >&2; return 1; }
+        target=$(_marckv_git rev-parse FETCH_HEAD)
+    else
+        _marckv_git fetch -q || { echo -e "${RED}Update failed.${RESET} Check the error above." >&2; return 1; }
+        target=$(_marckv_git rev-parse '@{upstream}') || return 1
+    fi
+
+    if [[ "$verify" == true ]]; then
+        _marckv_verify "$before" "$target" || return 1
+    else
+        echo -e "${YELLOW}[WARN]${RESET} --no-verify: taking these commits without checking who signed them."
+    fi
+
     # --ff-only: a server only follows origin. A local commit there should
     # stop the update, not be merged into a commit nobody pushes.
-    if ! _marckv_git pull --ff-only "${pull_from[@]}"; then
+    if ! _marckv_git merge --ff-only -q "$target"; then
         echo -e "${RED}Update failed.${RESET} Check the error above." >&2
         return 1
     fi
+    # The bundle IS origin's main as of when it was made, so origin/main moves
+    # with it. Left behind, whatsnew counted the new commits as local ones and
+    # reported nothing, and status called them unpushed.
+    [[ -n "$bundle" ]] && _marckv_git update-ref refs/remotes/origin/main "$target"
     after=$(_marckv_git rev-parse HEAD)
 
     # Compared by commit, not by git's "Already up to date": that text is
@@ -363,6 +437,16 @@ _marckv_doctor() {
         _doc_ok vim "$(vim --version | head -n1 | sed -E 's/.*IMproved ([0-9.]+).*/\1/'), full"
     else
         _doc_warn vim "only vim-tiny — no syntax, no vim-lite pickers (apt install vim)"
+    fi
+
+    # marckv update refuses to move without both: gpg to check signatures, and
+    # the keys it checks them against.
+    if ! command -v gpg >/dev/null; then
+        _doc_warn gpg "not installed — marckv update cannot verify signatures (apt install gnupg)"
+    elif [[ ! -f "$MARCKV_DOTS_DIR/keys/marckv.asc" ]]; then
+        _doc_warn keys "no keys/marckv.asc in the repo — marckv update cannot verify signatures"
+    else
+        _doc_ok signing "gpg present, updates are checked against keys/"
     fi
 
     unset -f _doc_ok _doc_warn _doc_info

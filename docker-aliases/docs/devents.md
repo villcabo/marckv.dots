@@ -52,7 +52,7 @@ reach.
 ## The story of one container
 
 ```
-  story  ·  nginx-api-ws-log-trim-1  ·  exited (137)
+  story  ·  nginx-gw-api-log-trim-1  ·  exited (137)
   why       killed (SIGKILL) — kill, or stop timeout
             its policy is unless-stopped, so docker would have restarted a crash —
             it was stopped on purpose (docker stop, compose stop/down).
@@ -66,7 +66,7 @@ reach.
   ──────────────────────────────────────────────────────────────────
   last log lines
   22:47:41  log-trim: /var/log/gateway/access.json reached 2002087 bytes; …
-  more with docker logs --tail 100 nginx-api-ws-log-trim-1
+  more with docker logs --tail 100 nginx-gw-api-log-trim-1
 ```
 
 **`why` is the line it exists for.** The exit code is interpreted, and what

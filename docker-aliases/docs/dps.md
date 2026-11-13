@@ -89,7 +89,7 @@ is one command away: [`dcd`](dcd.md) takes you to it.
 ## Nothing is truncated
 
 The image is shown **whole**. A tag is what tells you which build is running,
-and `…support:v1.0.0` does not — so `cr.sintesis.com.bo/crossborder-dev/crossborder-support:v1.0.0`
+and `…support:v1.0.0` does not — so `registry.example.com/team/support-api:v1.0.0`
 appears in full, all sixty-one characters of it.
 
 Names are whole too, and that one is free: the identifier is the **last**

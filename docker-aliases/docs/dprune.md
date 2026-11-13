@@ -54,7 +54,7 @@ So every network, image and volume in the preview says which it is:
 
 ```
   NETWORKS  24
-    cbtest-auth      bridge  freed — its stopped containers go first
+    devlab-auth      bridge  freed — its stopped containers go first
     dxprobe-orphan   bridge  unused
 ```
 
@@ -67,12 +67,12 @@ already unused before anything ran.
   prune  ·  SCSSAADES24  ·  these are DELETED, and cannot be undone
 
   STOPPED CONTAINERS  160  their filesystems and logs go with them
-    nginx-api-ws-log-trim-1  Exited (137) 57 minutes ago  alpine:3.24.2  nginx-api-ws
+    nginx-gw-api-log-trim-1  Exited (137) 57 minutes ago  alpine:3.24.2  nginx-gw-api
     kc-theme-test            Exited (143) 5 days ago      quay.io/keycloak/keycloak:26.8.1
     … and 150 more — every one with dprune -n
 
   NETWORKS  24
-    cbtest-auth              bridge  freed — its stopped containers go first
+    devlab-auth              bridge  freed — its stopped containers go first
     dxprobe-orphan           bridge  unused
     … and 14 more — every one with dprune -n
 
@@ -87,7 +87,7 @@ already unused before anything ran.
 
   runs, in this order — each item by name, never with -f:
     docker rm dxprobe-loop dxprobe-oom dxprobe-ev … +157 more
-    docker network rm cbtest-auth cbtest-mon cbtest-pg … +21 more
+    docker network rm devlab-auth devlab-mon devlab-pg … +21 more
     docker rmi 3f2a9c1b7d4e … +41 more
   ──────────────────────────────────────────────────────────────────
   [!] This deletes 160 container(s), 24 network(s), 42 image(s) on SCSSAADES24, permanently. Type the host name to confirm:

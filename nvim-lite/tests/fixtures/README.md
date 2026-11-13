@@ -8,7 +8,7 @@ Restore procedure for the payment gateway.
 2. Restore the dump:
 
    ```bash
-   gunzip -c backup.sql.gz | psql -U postgres gpgw
+   gunzip -c backup.sql.gz | psql -U postgres shop
    ```
 
 3. Bring it back with `dcup -r paymentms`

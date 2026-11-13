@@ -42,11 +42,11 @@ the other. The same goes for prefixes — `172.18` must mean `172.18.*`, not als
 ## Output
 
 ```
-  [docker] docker ip  ·  3 of 39  ·  filter: nginx-api-ws-nginx
+  [docker] docker ip  ·  3 of 39  ·  filter: nginx-gw-api-nginx
   IP          NETWORK               PROJECT       SERVICE  STATUS   NAME
-  10.78.10.2  nginx-api-ws_default  nginx-api-ws  nginx    running  nginx-api-ws-nginx-1
-  10.100.4.2  nginx-api-ws_grafana  nginx-api-ws  nginx    running  nginx-api-ws-nginx-1
-  10.78.20.2  nginx-api-ws_scan     nginx-api-ws  nginx    running  nginx-api-ws-nginx-1
+  10.78.10.2  nginx-gw-api_default  nginx-gw-api  nginx    running  nginx-gw-api-nginx-1
+  10.100.4.2  nginx-gw-api_grafana  nginx-gw-api  nginx    running  nginx-gw-api-nginx-1
+  10.78.20.2  nginx-gw-api_scan     nginx-gw-api  nginx    running  nginx-gw-api-nginx-1
 ```
 
 **One row per container per network.** A container on three networks holds

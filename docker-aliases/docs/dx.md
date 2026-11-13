@@ -144,7 +144,7 @@ opening a shell changes nothing by itself, and this is used all day.
 ## Notes
 
 - The pattern is a regex, so `dx api` matches `api`, `fx-api` and
-  `nginx-api-ws-nginx-1`. Anchor it — `'^fx-api$'` — when the name is a
+  `nginx-gw-api-nginx-1`. Anchor it — `'^fx-api$'` — when the name is a
   substring of others.
 - Completion offers running container names, and after the pattern it offers
   common commands. It does **not** offer `dx`'s own flags there: after the

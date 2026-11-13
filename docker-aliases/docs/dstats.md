@@ -37,9 +37,9 @@ nothing in docker's output says so. `dstats` shows `50.7% / 50%`, in red.
 ```
   docker stats  ·  26 of 26
   NAME                   CPU      MEM           PIDS  NET I/O           DISK I/O
-  crossborder-kafka    1.13%  1005MiB /   2GiB   117   19.7kB /   126B     215MB / 36.6MB
+  platform-kafka-01    1.13%  1005MiB /   2GiB   117   19.7kB /   126B     215MB / 36.6MB
   keycloak             0.37%   652MiB / 1.5GiB    78    3.1MB /  4.0MB     137MB /  1.7MB
-  warpgate             0.23%  58.8MiB / 256MiB    28   39.8kB /   252B    51.9MB /  3.3MB
+  sshproxy             0.23%  58.8MiB / 256MiB    28   39.8kB /   252B    51.9MB /  3.3MB
   da-ubuntu24          0.00%  48.7MiB /      ∞     1    5.3kB /   126B    50.4MB /     0B
   26 shown use 2.8GiB of memory (host: 30.1GiB) · CPU 208.34% of 1400% (14 cores)
   [!] 15 with no memory limit — nothing stops one of them from taking the host's RAM

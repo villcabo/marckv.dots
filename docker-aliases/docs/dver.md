@@ -35,8 +35,8 @@ Patterns are regular expressions matched against **container names**, as in
 ```
  docker versions · 2 of 20
 NAME              PROJECT           VERSION        COMMIT   BRANCH   BUILT
-gpgw-backoffice   gpgwbackoffice    1.1.0-d3cabc9  d3cabc9  main     2y   ⚠ dirty
-atcqrms-api       gpgw-atcqrms      2.0.1-aabbccd  aabbccd  develop  3d
+shop-backoffice   shopbackoffice    1.1.0-d3cabc9  d3cabc9  main     2y   ⚠ dirty
+reports-api       shop-reports      2.0.1-aabbccd  aabbccd  develop  3d
  18 with no git.properties (postgres, keycloak, traefik…)  -a to show
 ```
 
