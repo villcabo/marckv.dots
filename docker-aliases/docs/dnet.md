@@ -51,9 +51,9 @@ none.
 ```
   [docker] docker networks  ·  14 of 41
   SUBNET           GATEWAY       DRIVER            USE        PROJECT        NAME
-  172.31.62.0/24   172.31.62.1   bridge, internal  2 running  bastion-lab    bastion-lab_db
+  172.31.62.0/24   172.31.62.1   bridge, internal  2 running  sandbox-lab    sandbox-lab_db
   10.100.0.0/24    10.100.0.1    bridge            built-in   —              bridge
-  172.29.0.0/16    172.29.0.1    bridge            stopped    —              cbtest-auth
+  172.29.0.0/16    172.29.0.1    bridge            stopped    —              devlab-auth
   10.100.6.0/24    10.100.6.1    bridge            unused     —              dxprobe-orphan
   —                —             host              built-in   —              host
   16 running · 22 held by stopped containers · 1 unused — dprune removes them
@@ -81,7 +81,7 @@ tally says where to look next:
 dnet                 # every network
 dnet -u              # what could actually be cleaned up
 dnet 10.100          # which network owns that range
-dnet bastion-lab     # by compose project
+dnet sandbox-lab     # by compose project
 dnet _backend        # by name
 ```
 

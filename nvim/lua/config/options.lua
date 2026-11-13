@@ -6,7 +6,7 @@
 -- falta, ni quitar el que ya está. Preserva el archivo tal cual.
 vim.opt.fixendofline = false
 
--- Detectar INI por contenido en archivos sin extensión (ej. ~/.oidc-sintesis).
+-- Detectar INI por contenido en archivos sin extensión (ej. un archivo de credenciales sin extensión).
 -- Prioridad mínima: solo corre si nombre, extensión y shebang no dieron tipo.
 -- Pide una sección [nombre] seguida de líneas clave=valor en las primeras 30.
 -- Clave ".+" y no ".*": snacks.bigfile ya registra ".*" y la pisaría.

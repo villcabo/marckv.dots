@@ -1,5 +1,5 @@
 {
-  "name": "gpgw-paymentms",
+  "name": "shop-paymentms",
   "replicas": 3,
   "resources": { "limits": { "cpu": "2", "memory": "2Gi" } },
   "env": [

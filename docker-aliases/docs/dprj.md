@@ -29,9 +29,9 @@ dprj [-a] [pattern]
 ```
   [docker] compose projects  ·  7 of 15  ·  filter: running only
   NAME                  UP   STATE    SERVICES  FILES            DIRECTORY
-  nginx-api-ws          7/9  partial  9         compose.yaml +1  ~/SintesisProjects/nginx-api-ws
-  bastion-lab           9/9  running  9         compose.yaml     ~/PersonalProjects/bastion-zero-trust/laboratorio
-  crossborder-infra     1/3  partial  3         compose.yaml     /tmp/claude-…/scratchpad/cb-infra-test
+  nginx-gw-api          7/9  partial  9         compose.yaml +1  ~/Projects/nginx-gw-api
+  sandbox-lab           9/9  running  9         compose.yaml     ~/Projects/sandbox-lab
+  platform-infra-01     1/3  partial  3         compose.yaml     /tmp/claude-…/scratchpad/cb-infra-test
   15 projects · 27 containers up · 8 stopped, see dprj -a
   [!] 5 run from /tmp — tmpfs, gone after a reboot
   go to one with dcd <name>

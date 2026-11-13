@@ -47,8 +47,8 @@ means it, and the preview will count it out loud.
 
 ```
   restart  ·  2 container(s)
-  srv-debian  bastion-lab/srv-debian
-  srv-ubuntu  bastion-lab/srv-ubuntu
+  srv-debian  sandbox-lab/srv-debian
+  srv-ubuntu  sandbox-lab/srv-ubuntu
   docker restart srv-debian srv-ubuntu
   ──────────────────────────────────────────────────────────────────
   [!] 2 from compose: a restart keeps the config they were created with — dcup applies a changed compose file

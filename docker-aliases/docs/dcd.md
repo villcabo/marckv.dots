@@ -44,7 +44,7 @@ code "$(dcd -p redmine)"  # open the project in an editor
    redmine backup postgres
    docker-compose.yml
    docker-compose.override.yml
-   /home/villcabo/DockerProjects/redmine-docker
+   ~/Projects/redmine-docker
 ──────────────────────────────────────────────────────────────────────────
 ```
 
@@ -71,8 +71,8 @@ A pattern that spans two *projects* genuinely has two answers, so it stops:
 ```
 $ dcd keycloak
   dcd: 'keycloak' spans 2 projects
-  gpgwbackofficejhiangular  /home/villcabo/SintesisProjects/.../src/main/docker
-  kctheme-compose           /home/villcabo/DockerProjects/keycloak-docker
+  backoffice-ui-angular-js  ~/Projects/backoffice/src/main/docker
+  kctheme-compose           ~/Projects/keycloak-docker
   → narrow the pattern
 ```
 

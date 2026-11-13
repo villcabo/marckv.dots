@@ -128,7 +128,7 @@ drestart() {
 
     # --- preview ------------------------------------------------------------
     # One line per container, with where it came from: a name alone does not
-    # say that srv-debian belongs to bastion-lab and will come back with that
+    # say that srv-debian belongs to sandbox-lab and will come back with that
     # project's old config.
     {
         printf "  %s ${CYE}${CB}restart${CR}  ${CDIM}·${CR}  ${CB}%s${CR} ${CDIM}container(s)${CR}\n" \
