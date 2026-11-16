@@ -100,8 +100,7 @@ minutes in, and runs `01`, `02`, `03` and `04-install-nvim-lite.sh --full` in
 that order — no `source` between steps. `./install.sh status` asks each piece
 how it is; `./install.sh uninstall` undoes all of it in reverse, keeping the
 Neovim binary and the system packages. A run that stopped half way is finished
-by running it again: every step skips what is already in place. `05` (atuin)
-is not part of it.
+by running it again: every step skips what is already in place.
 
 Or one piece at a time — each script is independent:
 
@@ -112,7 +111,6 @@ Or one piece at a time — each script is independent:
 ./04-install-nvim-lite.sh               # Neovim config — server-focused, minimal (symlink)
 ./04-install-nvim-lite.sh --copy        # Same but copies the directory (no repo dependency)
 ./04-install-nvim-lite.sh --full        # Deps, the Neovim binary, the config, plugins — nothing deleted
-./05-install-atuin.sh                   # Shell history with Ctrl+R search (sync off)
 ./06-install-vim.sh                     # vim-lite: plain Vim as ~/.vim, no plugins (see vim/README.md)
 ```
 

@@ -434,7 +434,7 @@ echo ""
 # And it stayed broken: the next run found a non-empty file, said "Using cached
 # archive", and failed the same way without ever retrying. Removing the partial
 # file is the other half — a cache entry is only worth keeping once it is whole.
-# atuin and fzf already used -f; this was the one that did not.
+# fzf already used -f; this was the one that did not.
 if [ -f "$NVIM_TAR" ] && [ -s "$NVIM_TAR" ]; then
     info "Using cached archive: $NVIM_TAR"
 else
