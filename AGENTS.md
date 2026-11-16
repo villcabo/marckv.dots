@@ -7,7 +7,11 @@ exists here or above — adding one silently stops it from reading this file.
 
 ## Project Overview
 
-**marckv.dots** is a personal Linux dotfiles repo: modular bash, Docker aliases with colored output and previews, Neovim (LazyVim — full `nvim/` and server-focused `nvim-lite/`), Kitty, and Tmux. Targets Debian/Ubuntu: Debian 11/12/13 and Ubuntu 20.04/22.04/24.04/26.04.
+**marckv.dots** is a personal Linux dotfiles repo for servers: modular bash, Docker aliases with colored output and previews, a server-focused Neovim (`nvim-lite/`), plain Vim (`vim/`), and Tmux. Targets Debian/Ubuntu: Debian 11/12/13 and Ubuntu 20.04/22.04/24.04/26.04.
+
+**Everything here must earn its place on a server.** Configuration that only
+runs on a workstation — a full editor setup, a terminal emulator, build
+helpers — belongs in a separate, private repo, not here.
 
 ## Commands
 
@@ -51,7 +55,6 @@ Helpers (not part of the numbered lifecycle):
 
 ```bash
 sudo ./install-nvim.sh [-y]             # Neovim binary, system-wide
-./install-bash-extensions-gradle-functions.sh   # Adds bash-extensions/bash_gradle_functions.sh
 ./clean-nvim-data.sh [-y]               # Wipe ~/.local/share/nvim, ~/.cache/nvim, etc.
 ```
 
@@ -154,7 +157,7 @@ docker compose exec -T ubuntu24 /repo/docker-aliases/tests/run.sh
 ```
 
 ### Neovim Lua formatting
-Follows `nvim/stylua.toml`: 2-space indent, 120 column width.
+Follows `nvim-lite/stylua.toml`: 2-space indent, 120 column width.
 
 ## Architecture
 
@@ -216,7 +219,6 @@ Colors must load first as other modules depend on them. The theme depends on fun
   mode, and none should get one** — feed the paths they read instead. Scripts
   here source `../lib/common.sh`, which is why it resolves its paths from its
   own location
-- `bash-extensions/` — optional add-ons sourced separately (e.g. `bash_gradle_functions.sh`)
 - `docker-aliases/` — docker/compose shortcuts for bash and zsh. Twenty-three
   commands — the compose project (`dcup dcdown dcrestart dcx dclt dcps dcver
   dcstats dcd`), looking at the host (`dps dprj dip dnet dvol di dver dstats
@@ -228,7 +230,7 @@ Colors must load first as other modules depend on them. The theme depends on fun
   design rules (mandatory preview, preview on stderr, confirmation scaled to
   blast radius, resolve files and profiles exactly as docker does) are the
   reason it exists in that shape.
-- `nvim/` vs `nvim-lite/` — full LazyVim setup vs. minimal server profile; both have their own `stylua.toml`
+- `nvim-lite/` — LazyVim trimmed for servers, with its own `stylua.toml`
 - `vim/` — vim-lite: plain Vim for servers with no internet or an EDR. Installed
   as `~/.vim` (symlink, or `--copy`). **No plugins, by design**: everything is
   Vim script that ships with Vim (findfunc, wildtrigger, matchfuzzy, the
@@ -243,7 +245,7 @@ Colors must load first as other modules depend on them. The theme depends on fun
   patch for fixes. Plain text and not Lua because both the installer
   (`$(<VERSION)`) and `lua/config/branding.lua` read it, and one source beats
   parsing Lua from shell. It shows on the start screen and in `:LiteVersion`
-- `kitty/`, `tmux/` — terminal/multiplexer configs
+- `tmux/` — multiplexer config
 
 ### Docker test environments
 Two, on purpose:

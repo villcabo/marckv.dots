@@ -2,8 +2,8 @@
 --
 -- This config exists to administer servers over SSH. Every plugin here is one
 -- LazyVim would install by default, and each is turned off for a reason that
--- holds on a server rather than on a workstation. The full set lives in
--- `nvim/`, which runs where those reasons do not apply.
+-- holds on a server rather than on a workstation, where those reasons do not
+-- apply.
 --
 -- Measured: 116 MB and 50 s of `--sync` before this file grew; the plugin
 -- clones are the whole cost. The 15 treesitter parsers are 1.1 MB together and

@@ -23,9 +23,7 @@
 # anything but "No value for $TERM". That is every non-interactive context —
 # cron, CI, `docker exec -T`, `ssh host ./installer.sh`.
 # ---------------------------------------------------------------------------
-# Taken from install-bash-extensions-gradle-functions.sh, which had the most
-# careful version of this in the repo while being the one script nobody counts
-# as core. It honours NO_COLOR, stays plain when stdout is not a terminal, and
+# It honours NO_COLOR, stays plain when stdout is not a terminal, and
 # asks how many colours the terminal actually has instead of assuming.
 GREEN=""; BLUE=""; YELLOW=""; RED=""; DIM=""; BOLD=""; NC=""
 

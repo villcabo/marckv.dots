@@ -3,8 +3,8 @@
 -- ONE theme, not six. This shipped with catppuccin, tokyonight, kanagawa,
 -- gruvbox and rose-pine installed alongside the one actually in use — 16 MB of
 -- git checkouts on every server so that `<leader>uC` could offer alternatives
--- nobody switches to over SSH. The full set stays in `nvim/`, which runs on a
--- workstation where that is worth having.
+-- nobody switches to over SSH. A full set belongs on a workstation, where that
+-- is worth having.
 --
 -- gentleman-kanagawa-blur is self-contained: it carries its own palette and
 -- highlights and does NOT require kanagawa.nvim, which is why removing that

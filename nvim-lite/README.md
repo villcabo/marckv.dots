@@ -1,8 +1,7 @@
 # nvim-lite
 
 A LazyVim configuration for administering servers over SSH. Not a smaller copy
-of the `nvim/` config in this repo — a different set of tradeoffs for a
-different machine.
+of a workstation setup — a different set of tradeoffs for a different machine.
 
 Current version is in [`VERSION`](VERSION). `:LiteVersion` reports it from
 inside Neovim, and it is on the start screen.
