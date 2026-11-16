@@ -279,7 +279,7 @@ no network to do it.
 ```
 ~/.marckv.dots/
 ├── bash/                   # Bash modules (colors, aliases, functions, theme)
-├── docker-aliases/         # Eleven Docker & Compose commands, with docs and tests
+├── docker-aliases/         # 23 Docker & Compose commands, with docs and tests
 ├── nvim-lite/              # Minimal Neovim config for servers (LazyVim)
 ├── vim/                    # vim-lite: plain Vim for servers, no plugins, nothing to download
 ├── tmux/                   # Tmux config
@@ -290,19 +290,28 @@ no network to do it.
 
 ## Docker aliases
 
-Eleven commands, in bash and zsh, each with its own page in
+Twenty-three commands, in bash and zsh, each with its own page in
 [`docker-aliases/docs/`](docker-aliases/docs/).
 
 | | Host-wide | This compose project |
 |---|---|---|
 | what is running | `dps` | `dcps` |
+| compose projects, and how much of each is up | `dprj` | |
 | which build is running | `dver` | `dcver` |
-| images, and what you could delete | `di` | |
-| bring up | | `dcup` |
+| resource use, against each one's limits | `dstats` | `dcstats` |
 | logs | `dlt` | `dclt` |
-| shell in, or run a command | | `dcx` |
+| shell in, or run a command | `dx` | `dcx` |
+| restart | `drestart` | `dcrestart` |
+| bring up | | `dcup` |
 | stop and remove | | `dcdown` |
 | jump to the project directory | `dcd` | |
+| why a container is (un)healthy | `dhealth` | |
+| what happened to a container, and why | `devents` | |
+| which container has an IP | `dip` | |
+| networks, and what really uses each one | `dnet` | |
+| volumes, who mounts them, and how big | `dvol` | |
+| images, and what you could delete | `di` | |
+| delete what docker no longer uses | `dprune` | |
 
 Every command previews what it is about to do — **naming the exact command it
 will run** — before running it, and asks before anything that changes state.
@@ -321,8 +330,8 @@ docker compose up -d ubuntu24
 docker compose exec ubuntu24 bash -c "cd /root/.marckv.dots/installer && ./01-install-bash.sh"
 ```
 
-The docker aliases have their own suite — 441 checks per shell, run in **both**
-bash and zsh across seven distros:
+The docker aliases have their own suite, run in **both** bash and zsh across
+seven distros:
 
 ```bash
 cd docker-aliases/tests
