@@ -4,7 +4,7 @@
 # A function and not a script in bash/bin: update, reload and cd act on the
 # shell you are in, and a child process cannot touch its parent.
 
-_MARCKV_PIECES="bash docker tmux nvim vim atuin"
+_MARCKV_PIECES="bash docker tmux nvim vim"
 
 marckv() {
     local sub="$1"
@@ -351,7 +351,6 @@ _marckv_install() {
         docker)  script="02-install-docker-aliases.sh" ;;
         tmux)    script="03-install-tmux.sh" ;;
         nvim)    script="04-install-nvim-lite.sh" ;;
-        atuin)   script="05-install-atuin.sh" ;;
         vim)     script="06-install-vim.sh" ;;
         *)
             echo -e "${RED}error:${RESET} unknown piece '$piece' — one of: all ${_MARCKV_PIECES}" >&2

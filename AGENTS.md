@@ -22,7 +22,7 @@ nvim`, the default, is `04 --full`; `vim` is `06`; `none` skips it) — after on
 preview and one confirmation, passing `-y` to each. It re-implements nothing:
 a change to what a piece installs belongs in that piece's own installer. Its
 `uninstall` uses `confirm_destructive` (it deletes TPM's plugins and Neovim's
-data), so a pipe is a no there; `install` uses plain `confirm`. 05 is not in it.
+data), so a pipe is a no there; `install` uses plain `confirm`.
 
 Core installers — numbered prefixes define execution order. Each supports `install` (default), `status`, and `uninstall`:
 
@@ -31,7 +31,6 @@ Core installers — numbered prefixes define execution order. Each supports `ins
 ./02-install-docker-aliases.sh          # Docker & Compose shortcuts (bash + zsh)
 ./03-install-tmux.sh                    # Tmux config (symlink) + TPM
 ./04-install-nvim-lite.sh [--copy]      # Server-focused Neovim config (symlink, or copy)
-./05-install-atuin.sh                   # atuin shell history — optional, not in install.sh
 ./06-install-vim.sh [--copy]            # vim-lite as ~/.vim — install.sh --editor vim uses it instead of 04
 ```
 
@@ -165,7 +164,7 @@ Follows `nvim-lite/stylua.toml`: 2-space indent, 120 column width.
 No symlinks. Installers append `source` lines to `~/.bashrc` and `~/.bash_aliases` that point into the repo (e.g., `~/.marckv.dots/bash/.bashrc`). Changes in the repo are immediately live. Backups are created with timestamps before any modification.
 
 ### Bash module load order (bash/.bashrc)
-`colors.sh` → `environment.sh` → `completion.sh` → `aliases.sh` → `functions.sh` → `help.sh` → `marckv.sh` → `themes/robbyrussell.sh` → `welcome.sh` → `atuin.sh` → `~/.bash_aliases` → `~/.bash_local` → `/etc/profile.d/*`
+`colors.sh` → `environment.sh` → `completion.sh` → `aliases.sh` → `functions.sh` → `help.sh` → `marckv.sh` → `themes/robbyrussell.sh` → `welcome.sh` → `~/.bash_aliases` → `~/.bash_local` → `/etc/profile.d/*`
 
 Colors must load first as other modules depend on them. The theme depends on functions from `colors.sh` and `functions.sh`.
 
@@ -179,7 +178,9 @@ Colors must load first as other modules depend on them. The theme depends on fun
 - A script with flags of its own extends the shared parser instead of replacing
   it: override `installer_flag` (return 0 when the argument is consumed) and,
   if the help needs more than the three verbs, `installer_usage`
-- Numbered prefixes (`01-` … `05-`) on core installers define execution order
+- Numbered prefixes (`01-` … `06-`) on core installers define execution order.
+  `05` is unused: a number is never reused or shifted, because servers and
+  `marckv install` call these scripts by name
 - Every core installer supports the `install` / `status` / `uninstall` lifecycle — keep parity when adding new ones
 - **Every installer previews before it acts, and takes `-y`.** The preview goes
   to *stdout*, unlike docker-aliases which puts it on stderr: an installer's

@@ -16,8 +16,6 @@
 # /etc/profile.d, which a running process never re-reads, and the config step
 # right after it said Neovim was not installed. 04 now adopts the new PATH for
 # the rest of its own run.
-#
-# 05 (atuin) is left out on purpose: it is optional, and has its own installer.
 
 set -e
 

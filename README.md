@@ -100,8 +100,7 @@ minutes in, and runs `01`, `02`, `03` and `04-install-nvim-lite.sh --full` in
 that order — no `source` between steps. `./install.sh status` asks each piece
 how it is; `./install.sh uninstall` undoes all of it in reverse, keeping the
 Neovim binary and the system packages. A run that stopped half way is finished
-by running it again: every step skips what is already in place. `05` (atuin)
-is not part of it.
+by running it again: every step skips what is already in place.
 
 Or one piece at a time — each script is independent:
 
@@ -112,7 +111,6 @@ Or one piece at a time — each script is independent:
 ./04-install-nvim-lite.sh               # Neovim config — server-focused, minimal (symlink)
 ./04-install-nvim-lite.sh --copy        # Same but copies the directory (no repo dependency)
 ./04-install-nvim-lite.sh --full        # Deps, the Neovim binary, the config, plugins — nothing deleted
-./05-install-atuin.sh                   # Shell history with Ctrl+R search (sync off)
 ./06-install-vim.sh                     # vim-lite: plain Vim as ~/.vim, no plugins (see vim/README.md)
 ```
 
@@ -281,7 +279,7 @@ no network to do it.
 ```
 ~/.marckv.dots/
 ├── bash/                   # Bash modules (colors, aliases, functions, theme)
-├── docker-aliases/         # Eleven Docker & Compose commands, with docs and tests
+├── docker-aliases/         # 23 Docker & Compose commands, with docs and tests
 ├── nvim-lite/              # Minimal Neovim config for servers (LazyVim)
 ├── vim/                    # vim-lite: plain Vim for servers, no plugins, nothing to download
 ├── tmux/                   # Tmux config
@@ -292,19 +290,28 @@ no network to do it.
 
 ## Docker aliases
 
-Eleven commands, in bash and zsh, each with its own page in
+Twenty-three commands, in bash and zsh, each with its own page in
 [`docker-aliases/docs/`](docker-aliases/docs/).
 
 | | Host-wide | This compose project |
 |---|---|---|
 | what is running | `dps` | `dcps` |
+| compose projects, and how much of each is up | `dprj` | |
 | which build is running | `dver` | `dcver` |
-| images, and what you could delete | `di` | |
-| bring up | | `dcup` |
+| resource use, against each one's limits | `dstats` | `dcstats` |
 | logs | `dlt` | `dclt` |
-| shell in, or run a command | | `dcx` |
+| shell in, or run a command | `dx` | `dcx` |
+| restart | `drestart` | `dcrestart` |
+| bring up | | `dcup` |
 | stop and remove | | `dcdown` |
 | jump to the project directory | `dcd` | |
+| why a container is (un)healthy | `dhealth` | |
+| what happened to a container, and why | `devents` | |
+| which container has an IP | `dip` | |
+| networks, and what really uses each one | `dnet` | |
+| volumes, who mounts them, and how big | `dvol` | |
+| images, and what you could delete | `di` | |
+| delete what docker no longer uses | `dprune` | |
 
 Every command previews what it is about to do — **naming the exact command it
 will run** — before running it, and asks before anything that changes state.
@@ -323,8 +330,8 @@ docker compose up -d ubuntu24
 docker compose exec ubuntu24 bash -c "cd /root/.marckv.dots/installer && ./01-install-bash.sh"
 ```
 
-The docker aliases have their own suite — 441 checks per shell, run in **both**
-bash and zsh across seven distros:
+The docker aliases have their own suite, run in **both** bash and zsh across
+seven distros:
 
 ```bash
 cd docker-aliases/tests

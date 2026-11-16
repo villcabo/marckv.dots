@@ -126,7 +126,6 @@ priv_label() {
 # OpenStack) the tree-sitter CLI downloaded and unpacked fine, then failed its
 # own --version check with "Permission denied", and the installer called the
 # binary unable to run on this system. Nothing was wrong with the binary.
-# atuin's gnu/musl probe had the same trap and would have blamed the version.
 # The cache dir lives in $HOME, where these installers put user binaries anyway.
 exec_tmpdir() {
     local base="${XDG_CACHE_HOME:-$HOME/.cache}/marckv-installer"
@@ -230,7 +229,7 @@ installer_usage() {
 #
 # Return 0 when the argument was consumed, 1 to let installer_main reject it.
 # Without this the shared parser rejected every script's own options:
-# --version= on atuin, --copy/--sync/--deps on nvim-lite, --ls-remote on the
+# --copy/--sync/--deps on nvim-lite, --ls-remote on the
 # Neovim binary installer. Sharing the parser has to mean extending it, not
 # flattening every script into the same three commands.
 installer_flag() { return 1; }
@@ -238,8 +237,8 @@ installer_flag() { return 1; }
 # The three are expected to return 0 when they did what they say and non-zero
 # when they did not — `status` in particular means "installed and working", not
 # "the script ran". Watch the last line of each: a bare `[[ ... ]] && cmd` there
-# returns the test's status, which is how a healthy atuin install reported rc=1
-# on any machine that had no history directory yet.
+# returns the test's status, which is how a healthy install reported rc=1 on
+# any machine that had no data directory yet.
 installer_main() {
     local cmd=""
     local arg
