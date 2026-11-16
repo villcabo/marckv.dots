@@ -1,7 +1,7 @@
 # marckv.dots
 
-Personal dotfiles for Linux — enhanced bash, Docker and Compose shortcuts,
-Neovim, Kitty, and Tmux.
+Personal dotfiles for the Linux servers I administer — enhanced bash, Docker
+and Compose shortcuts, Neovim and Vim for working over SSH, and Tmux.
 
 Targets Debian 11/12/13 and Ubuntu 20.04/22.04/24.04/26.04, in **bash and
 zsh**.
@@ -120,7 +120,6 @@ Helper scripts:
 
 ```bash
 sudo ./install-nvim.sh                          # Neovim binary (latest stable, system-wide)
-./install-bash-extensions-gradle-functions.sh   # Gradle helper functions
 ./clean-nvim-data.sh                            # Wipe ~/.local/share/nvim, ~/.cache/nvim, etc.
 ```
 
@@ -282,12 +281,9 @@ no network to do it.
 ```
 ~/.marckv.dots/
 ├── bash/                   # Bash modules (colors, aliases, functions, theme)
-├── bash-extensions/        # Extra functions (Gradle, etc.)
 ├── docker-aliases/         # Eleven Docker & Compose commands, with docs and tests
-├── nvim/                   # Full Neovim config (LazyVim)
 ├── nvim-lite/              # Minimal Neovim config for servers (LazyVim)
 ├── vim/                    # vim-lite: plain Vim for servers, no plugins, nothing to download
-├── kitty/                  # Kitty terminal config
 ├── tmux/                   # Tmux config
 └── installer/              # Installation scripts (lib/common.sh is their shared base)
 ```
