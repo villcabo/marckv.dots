@@ -50,6 +50,37 @@ cat > "${WORK}/bin/docker" <<SHIM
 #   dd2             dangling but RUN by fx-db   -> kept (a re-tag leaves that)
 #   old/tool:2 + old/tool:latest, one image     -> its size counted once
 #   busy/img:1      unused, but docker refuses  -> counted as refused
+#
+# DAV2_DPRUNE_WORLD=versions swaps only the images, for dprune -k: several
+# versions of one repository, listed out of date order on purpose.
+#   nginx:1.27 + nginx:1.27-abc  one image, the newest  -> one version, not two
+#   nginx:1.26, nginx:1.25       older                  -> beyond the newest N
+#   nginx:alpine                 the oldest, RUN by fx-api -> kept whatever N
+#   app/worker:1.0, app/worker:0.9                      -> its own count
+if [ "\${DAV2_DPRUNE_WORLD:-}" = versions ]; then
+    case "\$*" in
+        *"images --no-trunc --filter dangling=true"*)
+            exit 0 ;;
+        *"images --no-trunc --format {{.ID}}"*"{{.CreatedAt}}"*)
+            printf 'sha256:n2\tnginx\t2026-10-26 09:00:00 -0400 -04\n'
+            printf 'sha256:n4\tnginx\t2026-11-25 10:00:00 -0400 -04\n'
+            printf 'sha256:w0\tapp/worker\t2026-11-12 08:00:00 -0400 -04\n'
+            printf 'sha256:img-api\tnginx\t2026-09-20 12:00:00 -0400 -04\n'
+            printf 'sha256:n4\tnginx\t2026-11-25 10:00:00 -0400 -04\n'
+            printf 'sha256:n3\tnginx\t2026-11-18 15:00:00 -0400 -04\n'
+            printf 'sha256:img-worker\tapp/worker\t2026-11-21 11:00:00 -0400 -04\n'
+            exit 0 ;;
+        *"images --no-trunc"*)
+            printf 'sha256:n4\tnginx\t1.27\t60MB\t1 day ago\n'
+            printf 'sha256:n4\tnginx\t1.27-abc\t60MB\t1 day ago\n'
+            printf 'sha256:n3\tnginx\t1.26\t55MB\t1 week ago\n'
+            printf 'sha256:n2\tnginx\t1.25\t52MB\t4 weeks ago\n'
+            printf 'sha256:img-api\tnginx\talpine\t50MB\t2 months ago\n'
+            printf 'sha256:img-worker\tapp/worker\t1.0\t200MB\t5 days ago\n'
+            printf 'sha256:w0\tapp/worker\t0.9\t190MB\t2 weeks ago\n'
+            exit 0 ;;
+    esac
+fi
 case "\$*" in
     *"ps -a --no-trunc"*)
         printf 'id-fx-api\trunning\tfx-api\tUp 2 hours\tnginx:alpine\tfixture-proj_default\tfixture-proj\n'
@@ -72,6 +103,14 @@ case "\$*" in
         printf 'sha256:dd1\t<none>\t<none>\t120MB\t3 weeks ago\n'
         printf 'sha256:dd2\t<none>\t<none>\t80MB\t2 days ago\n'
         printf 'sha256:dd3\t<none>\t<none>\t300MB\t2 days ago\n'
+        exit 0 ;;
+    *"images --no-trunc --format {{.ID}}"*"{{.CreatedAt}}"*)
+        printf 'sha256:img-api\tnginx\t2026-06-30 22:04:16 -0400 -04\n'
+        printf 'sha256:img-db\tpostgres\t2026-05-20 10:00:00 -0400 -04\n'
+        printf 'sha256:img-worker\tapp/worker\t2026-07-18 08:00:00 -0400 -04\n'
+        printf 'sha256:img-tool\told/tool\t2025-07-23 09:00:00 -0400 -04\n'
+        printf 'sha256:img-tool\told/tool\t2025-07-23 09:00:00 -0400 -04\n'
+        printf 'sha256:img-busy\tbusy/img\t2026-07-22 18:00:00 -0400 -04\n'
         exit 0 ;;
     *"images --no-trunc"*)
         printf 'sha256:img-api\tnginx\talpine\t50MB\t3 weeks ago\n'

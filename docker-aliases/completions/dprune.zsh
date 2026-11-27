@@ -4,7 +4,7 @@
 _dprune_complete_zsh() {
     local -a flags
     if [[ "${words[CURRENT]}" == -* ]]; then
-        flags=(-a -v -n -h --help)
+        flags=(-a -k -v -n -h --help)
         compadd -a flags
     fi
 }

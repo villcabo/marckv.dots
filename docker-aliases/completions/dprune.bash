@@ -5,7 +5,7 @@ _dprune_complete_bash() {
     local cur
     cur="${COMP_WORDS[COMP_CWORD]}"
     if [[ "$cur" == -* ]]; then
-        COMPREPLY=( $(compgen -W "-a -v -n -h --help" -- "$cur") )
+        COMPREPLY=( $(compgen -W "-a -k -v -n -h --help" -- "$cur") )
     else
         COMPREPLY=()
     fi

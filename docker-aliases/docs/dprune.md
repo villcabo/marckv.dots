@@ -15,7 +15,7 @@ deletes exactly that list and nothing else.
 ## Usage
 
 ```
-dprune [-a] [-v] [-n]
+dprune [-a | -k [N]] [-v] [-n]
 ```
 
 ## Flags
@@ -23,6 +23,7 @@ dprune [-a] [-v] [-n]
 | Flag | Meaning |
 |---|---|
 | `-a` | Also every tagged image no remaining container uses, and the build cache |
+| `-k [N]` | Also the tagged images beyond the newest `N` of each repository (default 3). The number goes after it (`-k 2`) or attached (`-k2`). Cannot be combined with `-a` |
 | `-v` | Also every volume no remaining container uses — **this is data** |
 | `-n` | Dry run: the full lists on stdout, nothing deleted, nothing asked |
 | `-h`, `--help` | Show the built-in help |
@@ -35,11 +36,38 @@ There is no `-y`. `DOCKER_ALIASES_AUTO_YES=1` exists for tests and CI only.
 |---|---|
 | always | stopped containers (exited, created, dead), the networks they leave unused, dangling images |
 | `-a` | + tagged images no remaining container uses, + the build cache |
+| `-k N` | + tagged images beyond the newest `N` of each repository; the build cache stays |
 | `-v` | + volumes no remaining container uses |
 
 Running containers — and every network, image and volume they use — are never
 touched. Neither are `bridge`, `host`, `none`, swarm-scope networks,
 `docker_gwbridge` or `ingress`.
+
+## Keeping the last versions: `-k`
+
+A host that deploys by tag piles up one image per release. `-a` takes all of
+them, and with them the version you would roll back to. `-k` keeps the newest
+`N` of each repository and deletes the rest:
+
+```
+  IMAGES  2  dangling, and beyond the newest 2 of each repository · up to 1.5GB
+    registry/app/transactionservice:1.14.6-ddd2b99e  746MB  9 days ago  beyond the newest 2 of registry/app/transactionservice
+    registry/app/transactionservice:1.14.5-97b9d826  746MB  9 days ago  beyond the newest 2 of registry/app/transactionservice
+```
+
+- **It counts versions, not tags.** `app:1.14.8` and `app:1.14.8-796837ab` are
+  one image, so they are one of the `N`. Counting tags would keep one version
+  fewer than asked.
+- **The rank is by creation date** (`CreatedAt`), not by tag name: `1.10` and
+  `1.9` do not sort as text, and a tag says nothing about when it was built.
+- **An image a container uses is always kept**, even when it is older than the
+  newest `N` — for example after a rollback. It counts toward the `N` like any
+  other, so the host keeps at most `N` versions plus the ones in use.
+- **Repositories are counted separately**: `-k 3` keeps three of every
+  service, not three in total.
+
+Three is the default because it covers the rollback to the previous version
+and one more, for a fault that shows up only after the next release is out.
 
 ## The cascade
 
@@ -153,6 +181,8 @@ dprune -n              # everything it would delete, uncapped, nothing deleted
 dprune -n | less       # the same, paged
 dprune                 # stopped containers, the networks they free, dangling images
 dprune -a              # plus unused tagged images and the build cache
+dprune -k              # plus every image older than the newest 3 of its repository
+dprune -k 2 -n         # what keeping only 2 versions would delete
 dprune -av             # everything unused, volumes included
 ```
 
@@ -160,7 +190,7 @@ dprune -av             # everything unused, volumes included
 
 `docker info`, `ps -a`, one `inspect` of every container, `network ls`, two
 `images`, `volume ls` and `builder du`: about 2 s on a host with 196
-containers. `-v` adds `docker system df -v` for the volume sizes (~3.5 s) —
+containers. `-k` adds a third `images` for the creation dates. `-v` adds `docker system df -v` for the volume sizes (~3.5 s) —
 paid only when the sizes of what is about to be destroyed are the thing you
 need to see.
 
@@ -169,7 +199,7 @@ need to see.
 | Code | When |
 |---|---|
 | 0 | It ran, nothing was left to prune, or it was a dry run |
-| 1 | The confirmation was not the host's name, an unknown flag or argument, or no daemon |
+| 1 | The confirmation was not the host's name, an unknown flag or argument, `-k 0`, `-a` with `-k`, or no daemon |
 
 ## Related
 
