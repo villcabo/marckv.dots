@@ -178,6 +178,76 @@ deleted() {
     [[ "$output" == *"3 VOLUME(S)"* ]]
 }
 
+# --- -k: keep the newest N of each repository ---------------------------------------
+# Runs in the versions world (see shim.bash): nginx has four images, one of
+# them with two tags and the oldest one running; app/worker has two.
+
+@test "dprune -k keeps the newest 3 of each repository by default" {
+    run declined "$WORK" 'export DAV2_DPRUNE_WORLD=versions; dprune -k'
+    [[ "$output" != *"IMAGES"* ]]
+    [[ "$output" == *"tagged images: the newest 3 of each repository, kept"* ]]
+}
+
+@test "dprune -k 1 deletes every version beyond the newest, by reference" {
+    run deleted "$WORK" fixture-host 'export DAV2_DPRUNE_WORLD=versions; dprune -k 1'
+    [[ "$output" == *"ARGV: [rmi] [nginx:1.26] [nginx:1.25] [app/worker:0.9]"* ]]
+}
+
+@test "dprune -k counts two tags of one image as one version" {
+    # nginx:1.27 and nginx:1.27-abc are one image: with -k 2, nginx:1.26 is
+    # the second version and stays.
+    run deleted "$WORK" fixture-host 'export DAV2_DPRUNE_WORLD=versions; dprune -k 2'
+    [[ "$output" == *"ARGV: [rmi] [nginx:1.25]"* ]]
+    [[ "$output" != *"nginx:1.26"* ]]
+}
+
+@test "dprune -k ranks by creation date, not by listing order" {
+    # The shim lists nginx:1.25 and app/worker:0.9 first; they are the oldest.
+    run deleted "$WORK" fixture-host 'export DAV2_DPRUNE_WORLD=versions; dprune -k 1'
+    local rmi
+    rmi=$(printf '%s\n' "$output" | grep '^ARGV: \[rmi\]')
+    [[ "$rmi" != *"nginx:1.27"* ]]
+    [[ "$rmi" != *"app/worker:1.0"* ]]
+}
+
+@test "dprune -k never deletes an image a container runs, however old" {
+    run deleted "$WORK" fixture-host 'export DAV2_DPRUNE_WORLD=versions; dprune -k 1'
+    [[ "$output" != *"nginx:alpine"* ]]
+}
+
+@test "dprune -k says why each image goes" {
+    run declined "$WORK" 'export DAV2_DPRUNE_WORLD=versions; dprune -k 1'
+    [[ "$(printf '%s\n' "$output" | grep 'nginx:1.25')" == *"beyond the newest 1 of nginx"* ]]
+    [[ "$output" == *"IMAGES  3"*"dangling, and beyond the newest 1 of each repository"* ]]
+}
+
+@test "dprune -k takes its number attached, or after a cluster" {
+    run deleted "$WORK" fixture-host 'export DAV2_DPRUNE_WORLD=versions; dprune -k2'
+    [[ "$output" == *"ARGV: [rmi] [nginx:1.25]"* ]]
+    run out_of "$WORK" 'export DAV2_DPRUNE_WORLD=versions; dprune -nk 2'
+    [[ "$output" == *"dry run"* ]]
+    [[ "$output" == *"nginx:1.25"* ]]
+    [[ "$output" != *"nginx:1.26"* ]]
+}
+
+@test "dprune -k leaves the build cache alone" {
+    run declined "$WORK" 'dprune -k'
+    [[ "$output" != *"BUILD CACHE"* ]]
+    [[ "$output" == *"build cache: 2.5GB, kept — it goes with -a"* ]]
+}
+
+@test "dprune -k 0 is refused: that is what -a does" {
+    run rc_of "$WORK" 'dprune -k 0'
+    [ "$output" = "1" ]
+}
+
+@test "dprune refuses -a together with -k" {
+    run rc_of "$WORK" 'dprune -a -k 2'
+    [ "$output" = "1" ]
+    run rc_of "$WORK" 'dprune -ak'
+    [ "$output" = "1" ]
+}
+
 # --- the confirmation -------------------------------------------------------------
 
 @test "dprune asks for the docker host's name" {
@@ -280,6 +350,7 @@ ARGV: [rmi] [dd1] [dd3]" ]
 @test "dprune completes its flags" {
     run complete_in "$WORK" 1 dprune '-'
     [[ "$output" == *"-v"* ]]
+    [[ "$output" == *"-k"* ]]
 }
 
 @test "dprune offers no names" {

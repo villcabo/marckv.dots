@@ -20,7 +20,11 @@
 #     and the confirmation makes docker refuse that one item instead of
 #     deleting it.
 #   * What is KEPT is said too: running containers and everything they use;
-#     volumes unless -v; tagged images and the build cache unless -a.
+#     volumes unless -v; tagged images and the build cache unless -a; with
+#     -k, the newest N images of each repository.
+#   * -k counts versions, not tags: one image with two tags is one version.
+#     The rank is by creation date, so a rollback target survives a cleanup,
+#     and an image a container uses is kept even when it is older than N.
 #   * Every number is exact or labelled as an estimate. The build cache is
 #     only touched with -a, because that is the case `builder du` reports
 #     exactly; a default `builder prune` frees a share nobody can preview.
@@ -39,10 +43,11 @@ _dprune_help() {
     printf "${CB}${CCY}dprune${CR} — delete what docker no longer uses, after showing exactly what\n\n"
 
     printf "${CCY}USAGE${CR}\n"
-    printf "  ${CB}dprune${CR} [${CYE}-a${CR}] [${CYE}-v${CR}] [${CYE}-n${CR}]\n\n"
+    printf "  ${CB}dprune${CR} [${CYE}-a${CR} | ${CYE}-k${CR} [N]] [${CYE}-v${CR}] [${CYE}-n${CR}]\n\n"
 
     printf "${CCY}FLAGS${CR}\n"
     printf "  ${CYE}-a${CR}                 Also every image no container uses, and the build cache\n"
+    printf "  ${CYE}-k${CR} [N]             Also the images beyond the newest N of each repository ${CDIM}(default 3)${CR}\n"
     printf "  ${CYE}-v${CR}                 Also every volume no remaining container uses ${CRE}(data!)${CR}\n"
     printf "  ${CYE}-n${CR}                 Dry run: the full lists, nothing deleted\n"
     printf "  ${CYE}-h${CR}, ${CYE}--help${CR}         Show this help\n\n"
@@ -50,8 +55,10 @@ _dprune_help() {
     printf "${CCY}WHAT GOES${CR}\n"
     printf "  ${CB}always${CR}   stopped containers, the networks they leave unused, dangling images\n"
     printf "  ${CB}-a${CR}       + tagged images no container uses, + the build cache\n"
+    printf "  ${CB}-k${CR} N     + tagged images beyond the newest N of each repository\n"
     printf "  ${CB}-v${CR}       + volumes no remaining container uses\n"
-    printf "  Running containers, and everything they use, are never touched.\n\n"
+    printf "  Running containers, and everything they use, are never touched.\n"
+    printf "  -k counts versions, not tags, ranked by creation date.\n\n"
 
     printf "${CCY}THE CASCADE${CR}\n"
     printf "  Removing a stopped container frees its networks, images and volumes —\n"
@@ -65,6 +72,8 @@ _dprune_help() {
     printf "  ${CGR}dprune -n${CR}             See everything it would delete\n"
     printf "  ${CGR}dprune${CR}                Containers, freed networks, dangling images\n"
     printf "  ${CGR}dprune -a${CR}             Plus unused images and the build cache\n"
+    printf "  ${CGR}dprune -k${CR}             Plus every image older than the newest 3 of its repository\n"
+    printf "  ${CGR}dprune -k 2 -n${CR}        See what keeping only 2 versions would delete\n"
     printf "  ${CGR}dprune -av${CR}            Everything unused, volumes included\n"
 }
 
@@ -159,7 +168,8 @@ _dprune_run() {
 # ---------------------------------------------------------------------------
 
 dprune() {
-    local all=false with_volumes=false dry=false arg i ch
+    local all=false with_volumes=false dry=false arg i ch keep_n="" take_next
+    local recent="," ranked="," digits
     local host raw line tab=$'\t' nl=$'\n' rest
     local id state name cstatus image nets project ref size created repo tag
     local driver scope why vname vproj
@@ -167,10 +177,11 @@ dprune() {
     local n_running=0 img_bytes=0 seen_imgs="," kept_tagged=0 unused_vols_kept=0
     local cache_reclaim="" vol_sizes="" rec_c="" rec_n="" rec_i="" rec_v=""
     local -a all_ids del_cids del_netids del_imgrefs del_vnames
-    typeset -A vol_size
+    typeset -A vol_size repo_kept
 
     while [[ $# -gt 0 ]]; do
         arg="$1"
+        take_next=false
         case "$arg" in
             -h|--help) _dprune_help; return 0 ;;
             # One arm per flag as well as the clustered form, as dnet, dps and
@@ -178,6 +189,10 @@ dprune() {
             -a) all=true ;;
             -v) with_volumes=true ;;
             -n) dry=true ;;
+            -k)
+                keep_n=3
+                if [[ -n "${2:-}" && "$2" != *[!0-9]* ]]; then keep_n="$2"; take_next=true; fi
+                ;;
             -[a-zA-Z]*)
                 for (( i = 1; i < ${#arg}; i++ )); do
                     ch="${arg:$i:1}"
@@ -186,14 +201,41 @@ dprune() {
                         v) with_volumes=true ;;
                         n) dry=true ;;
                         h) _dprune_help; return 0 ;;
+                        # The number is optional: attached (-k2), or the next
+                        # argument when k ends the cluster (-nk 2).
+                        k)
+                            keep_n=3
+                            digits="${arg:$(( i + 1 ))}"
+                            if [[ -n "$digits" && "$digits" != *[!0-9]* ]]; then
+                                keep_n="$digits"
+                                break
+                            fi
+                            if [[ -z "$digits" && -n "${2:-}" && "$2" != *[!0-9]* ]]; then
+                                keep_n="$2"; take_next=true
+                            fi
+                            ;;
                         *) _err dprune "unknown flag: -$ch  (try: dprune --help)"; return 1 ;;
                     esac
                 done
                 ;;
             *) _err dprune "unexpected argument: $arg — dprune takes no names, only flags"; return 1 ;;
         esac
+        $take_next && shift
         shift
     done
+
+    if [[ -n "$keep_n" ]]; then
+        # 10# so that "08" is eight, not an invalid octal.
+        keep_n=$(( 10#$keep_n ))
+        if (( keep_n < 1 )); then
+            _err dprune "-k keeps at least 1 image per repository — to delete every unused one, use -a"
+            return 1
+        fi
+        if $all; then
+            _err dprune "-a and -k do not mix: -a deletes every unused image, -k keeps the newest of each repository"
+            return 1
+        fi
+    fi
 
     if ! host=$(docker info --format '{{.Name}}' 2>/dev/null) || [[ -z "$host" ]]; then
         _err dprune "could not reach the docker daemon"
@@ -275,6 +317,28 @@ dprune() {
     #
     # By reference, not by ID, for tagged ones: an ID with two tags makes
     # `docker rmi <id>` refuse without -f. Dangling ones have no tag, so ID.
+    #
+    # -k ranks first, from a listing of its own: CreatedAt sorts as text
+    # (one daemon, one time zone), where CreatedSince ("2 weeks ago") does
+    # not. Each repository keeps its newest N distinct IDs; the loop below
+    # then deletes the tagged references outside that set.
+    if [[ -n "$keep_n" ]]; then
+        raw=$(docker images --no-trunc --format '{{.ID}}\t{{.Repository}}\t{{.CreatedAt}}' 2>/dev/null \
+                | LC_ALL=C sort -s -t "$tab" -k3,3r)
+        while IFS= read -r line; do
+            [[ -z "$line" ]] && continue
+            id="${line%%"$tab"*}"; rest="${line#*"$tab"}"
+            repo="${rest%%"$tab"*}"
+            [[ "$repo" == "<none>" ]] && continue
+            [[ "$ranked" == *",${repo}|${id},"* ]] && continue
+            ranked+="${repo}|${id},"
+            if (( ${repo_kept[$repo]:-0} < keep_n )); then
+                repo_kept[$repo]=$(( ${repo_kept[$repo]:-0} + 1 ))
+                recent+="${repo}|${id},"
+            fi
+        done <<< "$raw"
+    fi
+
     local fmt='{{.ID}}\t{{.Repository}}\t{{.Tag}}\t{{.Size}}\t{{.CreatedSince}}'
     raw=$(docker images --no-trunc --filter dangling=true --format "$fmt" 2>/dev/null)
     raw+="${nl}$(docker images --no-trunc --format "$fmt" 2>/dev/null)"
@@ -294,11 +358,14 @@ dprune() {
             name="<none>"
         elif $all; then
             ref="${repo}:${tag}"; name="$ref"
+        elif [[ -n "$keep_n" && "$recent" != *",${repo}|${id},"* ]]; then
+            ref="${repo}:${tag}"; name="$ref"
         else
             kept_tagged=$(( kept_tagged + 1 ))
             continue
         fi
         if [[ "$del_imgs" == *",${id},"* ]]; then why="freed — only stopped containers used it"
+        elif [[ -n "$keep_n" && "$name" != "<none>" ]]; then why="beyond the newest $keep_n of $repo"
         else why="unused"; fi
         # Two tags of one image are one set of bytes: count the size once.
         if [[ "$seen_imgs" != *",${id},"* ]]; then
@@ -390,6 +457,8 @@ dprune() {
         fi
         if (( n_i > 0 )); then
             if $all; then _dprune_section "IMAGES" "$n_i" "up to $img_total — images share layers, docker may free less"
+            elif [[ -n "$keep_n" ]]; then
+                _dprune_section "IMAGES" "$n_i" "dangling, and beyond the newest $keep_n of each repository · up to $img_total — images share layers, docker may free less"
             else _dprune_section "DANGLING IMAGES" "$n_i" "up to $img_total — images share layers, docker may free less"; fi
             _dprune_items "$rec_i" "$cap"
         fi
@@ -408,8 +477,11 @@ dprune() {
             fi
         fi
         if ! $all; then
-            (( kept_tagged > 0 )) && \
+            if [[ -n "$keep_n" ]]; then
+                printf "    ${CWH}tagged images${CR}${CDIM}: the newest %s of each repository, kept${CR}\n" "$keep_n"
+            elif (( kept_tagged > 0 )); then
                 printf "    ${CWH}tagged images${CR}${CDIM}: %s unused, kept — they go with${CR} ${CYE}-a${CR}\n" "$kept_tagged"
+            fi
             if [[ -n "$cache_reclaim" && "$cache_reclaim" != "0B" ]]; then
                 printf "    ${CWH}build cache${CR}${CDIM}: %s, kept — it goes with${CR} ${CYE}-a${CR}\n" "$cache_reclaim"
             fi
